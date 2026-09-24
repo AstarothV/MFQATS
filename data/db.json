@@ -1,0 +1,83 @@
+{
+  "users": [
+    {
+      "id": "u-admin-001",
+      "email": "sunita.kapoor@mvcawood.com",
+      "name": "Sunita Kapoor",
+      "role": "admin",
+      "passwordHash": "bae3738edcb7930ae89189222f9a2473653b704d4bf8c14a4d54eb07153a6f7b5733e66ab5e5a8e834d634814d853f68ca1a6efbfc91beab048e5a4eb4b83833",
+      "passwordSalt": "e547e9e72f7146241e0d53d7af902695",
+      "active": true,
+      "createdAt": "2026-01-23T08:42:00.000Z"
+    },
+    {
+      "id": "u-staff-001",
+      "email": "marcos.reyes@mvcawood.com",
+      "name": "Marcos Reyes",
+      "role": "staff",
+      "passwordHash": "c14fd89e265d1a823bedf63d1e7296235076b4a7f943b74ef1d1bd893752454fa7373ce091678617ce466e037fd80874cdb4cfd7a46fe4bc93f05a25281c2852",
+      "passwordSalt": "0cb90b54e3c9f9da39d0c16bb860dd57",
+      "active": true,
+      "createdAt": "2026-02-12T09:15:00.000Z"
+    },
+    {
+      "id": "u-customer-001",
+      "email": "claire.leblanc@gmail.com",
+      "name": "Claire Leblanc",
+      "role": "customer",
+      "passwordHash": "f88177095f38ed796643003b5329642bf5b79c3f0131a90779cb51f7fc97539f799ae76ce08894b2f60aa0c181caf8faf7d21d4b2f1213067742863025da675b",
+      "passwordSalt": "db9998d642ae0a9fae7142f9476d8b92",
+      "active": true,
+      "createdAt": "2026-03-05T12:00:00.000Z"
+    }
+  ],
+  "otps": [],
+  "orders": [
+    {
+      "id": "ORD-4421",
+      "customerId": "u-customer-001",
+      "product": "Oak Dining Table",
+      "amount": 2160,
+      "status": "In Production",
+      "stage": "Sanding",
+      "dueDate": "2026-05-18",
+      "assignedWorker": "u-staff-001"
+    },
+    {
+      "id": "ORD-4418",
+      "customerId": "u-customer-001",
+      "product": "Walnut Bookshelf Unit",
+      "amount": 1420,
+      "status": "Quality Check",
+      "stage": "QA Review",
+      "dueDate": "2026-05-15",
+      "assignedWorker": "u-staff-001"
+    }
+  ],
+  "inventory": [
+    {
+      "id": "MAT-1001",
+      "name": "Oak Wood Planks",
+      "category": "Wood",
+      "supplier": "TimberCorp",
+      "stockLevel": 245,
+      "minStock": 100,
+      "unit": "boards",
+      "location": "Warehouse A-12",
+      "lastUpdated": "2026-05-14",
+      "status": "in-stock"
+    },
+    {
+      "id": "MAT-1002",
+      "name": "Cherry Wood Veneer",
+      "category": "Wood",
+      "supplier": "Premium Woods Inc",
+      "stockLevel": 67,
+      "minStock": 80,
+      "unit": "sheets",
+      "location": "Warehouse B-05",
+      "lastUpdated": "2026-05-13",
+      "status": "low-stock"
+    }
+  ]
+}
