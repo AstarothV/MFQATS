@@ -1,6 +1,6 @@
 # MFQATS Roadmap: plan of plans
 
-**Spec:** the master build prompt + the capstone document + `docs/mfqats-current-state.md` (including "Decisions taken").
+**Spec:** the master build prompt + the capstone document + `docs/project/mfqats-current-state.md` (including "Decisions taken").
 
 MFQATS has four independent subsystems: the database, the Laravel API, the Python CV service, and the Flutter app. Following superpowers:writing-plans, each gets its **own plan**. Each plan produces working, tested software on its own. A plan is written in detail only when the one before it is done, so it can use real interfaces instead of guesses.
 
