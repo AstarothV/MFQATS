@@ -25,6 +25,11 @@ A modern Next.js 15 application built with TypeScript and Tailwind CSS.
   ```
 3. Open [http://localhost:4028](http://localhost:4028) with your browser to see the result.
 
+> **AI defect detection (Quality Scan page):** also needs the Python YOLOv12n server.
+> See **[docs/setup/YOLO_SERVER_SETUP.md](docs/setup/YOLO_SERVER_SETUP.md)** for setup and run steps.
+
+📚 **All project documentation** (setup, navigation, project status and plans) is in **[docs/](docs/README.md)**.
+
 ## 📁 Project Structure
 
 ```

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Supabase Postgres SQL (plpgsql, RLS) · Node 22 `node:test` · `@electric-sql/pglite` 0.3.16 (dev-only, isolated in `supabase/tests/`) · Next.js 15 / TypeScript 5.
 
-**Spec:** `docs/mfqats-current-state.md` (findings S1–S7, D1, MOCKED YOLO) + the master build prompt §26 (Security) and §40 (Do not fake the AI) + `docs/superpowers/plans/2026-09-25-mfqats-roadmap.md`.
+**Spec:** `docs/project/mfqats-current-state.md` (findings S1–S7, D1, MOCKED YOLO) + the master build prompt §26 (Security) and §40 (Do not fake the AI) + `docs/superpowers/plans/2026-09-25-mfqats-roadmap.md`.
 
 **Pre-verified:** every migration, test and TypeScript file in this plan was dry-run on a scratch copy on 2026-09-25. Results: DB tests went from 9 failing to **27/27 passing**, routing tests **8/8 passing**, `tsc --noEmit` clean. Nothing has been applied to your folder or to the live Supabase project yet.
 
@@ -404,7 +404,7 @@ Expected: **9 failing** in this file, including `S1 … true !== false` and `S2 
 - [ ] **Step 3: Write the migration**: `supabase/migrations/20260925000003_mfqats_security_hardening.sql`
 
 ```sql
--- MFQATS security hardening (fixes S1–S5 in docs/mfqats-current-state.md)
+-- MFQATS security hardening (fixes S1–S5 in docs/project/mfqats-current-state.md)
 --
 -- Decision (see docs/decision-log.md, ADR-003): the single source of truth for a
 -- user's role is public.user_profiles.role, which only an admin (or the service
@@ -715,7 +715,7 @@ Expected: failures such as `relation "public.inquiries" does not exist`.
 
 ```sql
 -- MFQATS: tables the existing UI already queries but no migration created
--- (docs/mfqats-current-state.md, finding D1).
+-- (docs/project/mfqats-current-state.md, finding D1).
 -- Column sets are taken from src/components/ui/InquirySystem.tsx and
 -- src/app/customer-dashboard/components/OrderViewContent.tsx.
 -- Idempotent.
@@ -1223,7 +1223,7 @@ npx next lint 2>&1 | grep -c "Error:"    # record the count; must not exceed the
 - [ ] **Step 4: Code review.** Use superpowers:requesting-code-review (or engineering:code-review) on the diff between `_snapshots/2026-09-25-baseline.tar.gz` and the working tree. Fix real findings with superpowers:receiving-code-review.
 
 - [ ] **Step 5: Update docs**
-  - `docs/mfqats-current-state.md`: mark S1–S5, S7, S8 and D1 as FIXED (tested locally; applied or not applied to Supabase), and quality-scan as "MOCKED (labelled)".
+  - `docs/project/mfqats-current-state.md`: mark S1–S5, S7, S8 and D1 as FIXED (tested locally; applied or not applied to Supabase), and quality-scan as "MOCKED (labelled)".
   - `docs/requirements-traceability.md`: create it with the RBAC row → `20260925000003`, `routeAccess.ts`, the tests, and status PARTIAL (the backend layer arrives in Plan 03).
   - `docs/CHANGELOG.md`: final entry with all command outputs.
 
