@@ -14,6 +14,14 @@ const nextConfig = {
     remotePatterns: imageHosts,
     minimumCacheTTL: 60,
   },
+  async rewrites() {
+    // Browser -> this site (/staff/yolo/...) -> Python YOLO server. Same origin, so it also works from phones
+    // over an https tunnel. Under /staff so the middleware only lets logged-in staff reach the AI server.
+    return [{
+      source: '/staff/yolo/:path*',
+      destination: `${process.env.YOLO_SERVER_URL || 'http://localhost:8000'}/:path*`,
+    }];
+  },
   webpack(
     config,
     {
