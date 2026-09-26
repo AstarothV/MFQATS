@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -31,38 +31,66 @@ interface DetectionLog {
   orders?: { order_ref: string; product_name: string } | null;
 }
 
-const DEFECT_TYPES = [
-  { class_name: 'scratch', label: 'Scratch', color: '#F59E0B', severity: 'medium' as const },
-  { class_name: 'crack', label: 'Crack', color: '#EF4444', severity: 'high' as const },
-  { class_name: 'dent', label: 'Dent', color: '#F97316', severity: 'medium' as const },
-  { class_name: 'wood_rot', label: 'Wood Rot', color: '#DC2626', severity: 'critical' as const },
-  { class_name: 'unfinished_sanding', label: 'Unfinished Sanding', color: '#8B5CF6', severity: 'low' as const },
-  { class_name: 'uneven_surface', label: 'Uneven Surface', color: '#6366F1', severity: 'medium' as const },
-  { class_name: 'joint_misalignment', label: 'Joint Misalignment', color: '#EC4899', severity: 'high' as const },
-  { class_name: 'stain_inconsistency', label: 'Stain Inconsistency', color: '#14B8A6', severity: 'low' as const },
-];
+interface DetectResponse {
+  detections: Detection[];
+  overall_result: 'pass' | 'fail';
+  confidence_avg: number;
+  defect_count: number;
+}
 
 const STAGE_OPTIONS = ['cutting', 'assembly', 'sanding', 'staining', 'finishing', 'quality_check'];
+const YOLO_API_URL = process.env.NEXT_PUBLIC_YOLO_API_URL || 'http://localhost:8000';
+const LIVE_SCAN_INTERVAL_MS = 1000;
 
-function simulateYOLODetection(): Detection[] {
-  const count = Math.floor(Math.random() * 3);
-  if (count === 0) return [];
-  return Array.from({ length: count }, (_, i) => {
-    const defect = DEFECT_TYPES[Math.floor(Math.random() * DEFECT_TYPES.length)];
-    return {
-      id: `det-${Date.now()}-${i}`,
-      class_name: defect.class_name,
-      confidence_score: Math.round((Math.random() * 30 + 65) * 10) / 10,
-      severity: defect.severity,
-      recommendation: `Inspect and address ${defect.label.toLowerCase()} before proceeding to next stage.`,
-      bounding_box: {
-        x: Math.random() * 60 + 10,
-        y: Math.random() * 60 + 10,
-        width: Math.random() * 20 + 10,
-        height: Math.random() * 20 + 10,
-      },
-    };
-  });
+const formatLabel = (s: string) => s.replace(/_/g, ' ');
+
+// Thrown when the FastAPI server can't be reached (fetch network failure).
+class BackendOfflineError extends Error {}
+
+async function detectDefects(imageData: string): Promise<DetectResponse> {
+  let res: Response;
+  try {
+    res = await fetch(`${YOLO_API_URL}/api/detect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData }),
+    });
+  } catch {
+    throw new BackendOfflineError();
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail || `Detection failed (HTTP ${res.status})`);
+  }
+  return res.json();
+}
+
+// Canvas is sized to the source's pixel dimensions and scaled by CSS object-contain,
+// so normalized boxes line up with the image/video regardless of aspect ratio.
+function drawDetections(canvas: HTMLCanvasElement, dets: Detection[], w: number, h: number, image?: CanvasImageSource) {
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || !w || !h) return;
+  if (image) ctx.drawImage(image, 0, 0, w, h);
+  const lw = Math.max(2, w / 320);
+  const fs = Math.max(14, Math.round(w / 45));
+  ctx.lineWidth = lw;
+  ctx.font = `600 ${fs}px sans-serif`;
+  ctx.textBaseline = 'top';
+  for (const d of dets) {
+    const bx = d.bounding_box.x * w;
+    const by = d.bounding_box.y * h;
+    ctx.strokeStyle = '#EF4444';
+    ctx.strokeRect(bx, by, d.bounding_box.width * w, d.bounding_box.height * h);
+    const label = `${formatLabel(d.class_name)} (${d.confidence_score}%)`;
+    const tagH = fs * 1.4;
+    const tagY = by - tagH < 0 ? by : by - tagH;
+    ctx.fillStyle = '#EF4444';
+    ctx.fillRect(bx - lw / 2, tagY, ctx.measureText(label).width + fs * 0.6, tagH);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, bx - lw / 2 + fs * 0.3, tagY + fs * 0.2);
+  }
 }
 
 export default function QualityScanPage() {
@@ -71,6 +99,8 @@ export default function QualityScanPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const inFlightRef = useRef(false);
 
   const [mode, setMode] = useState<'live' | 'upload'>('live');
   const [scanning, setScanning] = useState(false);
@@ -80,6 +110,8 @@ export default function QualityScanPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<'pass' | 'fail' | 'pending' | null>(null);
+  const [confidenceAvg, setConfidenceAvg] = useState(0);
+  const [backendOffline, setBackendOffline] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -135,29 +167,54 @@ export default function QualityScanPage() {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
   }
 
+  function handleDetectError(err: unknown) {
+    if (err instanceof BackendOfflineError) setBackendOffline(true);
+    else showToast('error', err instanceof Error ? err.message : 'Detection failed');
+  }
+
+  function grabFrame(): string | null {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || !video.videoWidth) return null;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.8);
+  }
+
   function startScan() {
     setScanning(true);
     setDetections([]);
     setResult(null);
-    scanIntervalRef.current = setInterval(() => {
-      const newDetections = simulateYOLODetection();
-      setDetections(newDetections);
-    }, 2000);
+    const id = setInterval(async () => {
+      if (inFlightRef.current) return; // skip ticks while the previous frame is still being analyzed
+      const frame = grabFrame();
+      if (!frame) return;
+      inFlightRef.current = true;
+      try {
+        const res = await detectDefects(frame);
+        setBackendOffline(false);
+        // ignore responses that land after the scan was paused/captured
+        if (scanIntervalRef.current === id) setDetections(res.detections);
+      } catch (err) {
+        handleDetectError(err);
+        if (scanIntervalRef.current === id) pauseScan();
+      } finally {
+        inFlightRef.current = false;
+      }
+    }, LIVE_SCAN_INTERVAL_MS);
+    scanIntervalRef.current = id;
   }
 
   function pauseScan() {
     setScanning(false);
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
+    scanIntervalRef.current = null;
   }
 
   function captureImage() {
-    if (!videoRef.current || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(videoRef.current, 0, 0);
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    const imageData = grabFrame();
+    if (!imageData) return;
     setCapturedImage(imageData);
     pauseScan();
     analyzeImage(imageData);
@@ -167,15 +224,38 @@ export default function QualityScanPage() {
     setAnalyzing(true);
     setDetections([]);
     setResult(null);
-    await new Promise((r) => setTimeout(r, 1500));
-    const newDetections = simulateYOLODetection();
-    setDetections(newDetections);
-    setResult(newDetections.length === 0 ? 'pass' : 'fail');
-    setAnalyzing(false);
+    setSaved(false);
+    try {
+      const res = await detectDefects(imageData);
+      setBackendOffline(false);
+      setDetections(res.detections);
+      setConfidenceAvg(res.confidence_avg);
+      setResult(res.overall_result);
+    } catch (err) {
+      handleDetectError(err);
+    } finally {
+      setAnalyzing(false);
+    }
   }
+
+  // Redraw the visible canvas: still image + boxes, or transparent boxes over the live video.
+  useEffect(() => {
+    const canvas = overlayRef.current;
+    if (!canvas) return;
+    const still = capturedImage || uploadedImage;
+    if (still) {
+      const img = new Image();
+      img.onload = () => drawDetections(canvas, detections, img.naturalWidth, img.naturalHeight, img);
+      img.src = still;
+    } else {
+      const video = videoRef.current;
+      drawDetections(canvas, detections, video?.videoWidth || 0, video?.videoHeight || 0);
+    }
+  }, [detections, capturedImage, uploadedImage, mode]);
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-uploading the same file
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -189,24 +269,25 @@ export default function QualityScanPage() {
     reader.readAsDataURL(file);
   }
 
-  function rescan() {
+  async function rescan() {
     setCapturedImage(null);
     setUploadedImage(null);
     setDetections([]);
     setResult(null);
+    setConfidenceAvg(0);
+    setNotes('');
     setSaved(false);
-    if (mode === 'live' && !cameraActive) startCamera();
+    if (mode === 'live') {
+      if (!cameraActive) await startCamera();
+      startScan();
+    }
   }
 
   async function saveDetection() {
     if (!user) return;
     setSaving(true);
     try {
-      const avgConfidence = detections.length > 0
-        ? detections.reduce((sum, d) => sum + d.confidence_score, 0) / detections.length
-        : 0;
-
-      const { data, error } = await supabase.from('detection_logs').insert({
+      const { error } = await supabase.from('detection_logs').insert({
         order_id: selectedOrderId || null,
         stage_name: selectedStage,
         inspector_id: user.id,
@@ -214,10 +295,10 @@ export default function QualityScanPage() {
         image_url: capturedImage || uploadedImage || '',
         detections: detections,
         overall_result: result || 'pending',
-        confidence_avg: Math.round(avgConfidence * 10) / 10,
+        confidence_avg: confidenceAvg,
         defect_count: detections.length,
         notes,
-      }).select().single();
+      });
 
       if (error) throw error;
 
@@ -227,7 +308,7 @@ export default function QualityScanPage() {
           order_id: selectedOrderId,
           stage_name: selectedStage,
           defect_type: d.class_name,
-          description: `${d.class_name} detected with ${d.confidence_score}% confidence`,
+          description: `${formatLabel(d.class_name)} detected with ${d.confidence_score}% confidence`,
           severity: d.severity,
           confidence_score: d.confidence_score,
           bounding_box: d.bounding_box,
@@ -308,6 +389,25 @@ export default function QualityScanPage() {
           </div>
         </div>
 
+        {/* Backend offline alert */}
+        {backendOffline && (
+          <div role="alert" className="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4">
+            <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-foreground">AI detection server is offline</p>
+              <p className="text-muted-foreground mt-1">
+                Couldn&apos;t reach <code className="text-foreground">{YOLO_API_URL}</code>. Start the backend from the project root, then try again:
+              </p>
+              <code className="block mt-2 rounded-lg bg-black/40 px-3 py-2 text-xs text-foreground">
+                uvicorn src.api.yolo_server:app --reload --port 8000
+              </code>
+            </div>
+            <button onClick={() => setBackendOffline(false)} aria-label="Dismiss" className="text-muted-foreground hover:text-foreground">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Controls Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -360,39 +460,23 @@ export default function QualityScanPage() {
             <div className="card-dark rounded-3xl border border-border overflow-hidden">
               {/* Camera View */}
               <div className="relative bg-black" style={{ aspectRatio: '16/9' }}>
+                {/* Detection canvas: draws the analyzed still + boxes, or boxes only over the live video */}
+                <canvas
+                  ref={overlayRef}
+                  role="img"
+                  aria-label={`Defect detection overlay: ${detections.length} defect(s) found`}
+                  className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                />
                 {mode === 'live' ? (
                   <>
                     <video
                       ref={videoRef}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       playsInline
                       muted
                       style={{ display: cameraActive && !capturedImage ? 'block' : 'none' }}
                     />
                     <canvas ref={canvasRef} className="hidden" />
-
-                    {capturedImage && (
-                      <div className="relative w-full h-full">
-                        <img src={capturedImage} alt="Captured frame for defect analysis" className="w-full h-full object-cover" />
-                        {/* Bounding boxes overlay */}
-                        {detections.map((det) => (
-                          <div
-                            key={det.id}
-                            className="absolute border-2 border-danger"
-                            style={{
-                              left: `${det.bounding_box.x}%`,
-                              top: `${det.bounding_box.y}%`,
-                              width: `${det.bounding_box.width}%`,
-                              height: `${det.bounding_box.height}%`,
-                            }}
-                          >
-                            <span className="absolute -top-6 left-0 bg-danger text-white text-xs px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
-                              {det.class_name.replace('_', ' ')} ({det.confidence_score}%)
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
 
                     {!cameraActive && !capturedImage && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
@@ -414,22 +498,6 @@ export default function QualityScanPage() {
                         <div className="absolute top-4 left-4 bg-black/60 text-accent text-xs font-bold px-2 py-1 rounded">
                           SCANNING...
                         </div>
-                        {detections.map((det) => (
-                          <div
-                            key={det.id}
-                            className="absolute border-2 border-danger animate-pulse"
-                            style={{
-                              left: `${det.bounding_box.x}%`,
-                              top: `${det.bounding_box.y}%`,
-                              width: `${det.bounding_box.width}%`,
-                              height: `${det.bounding_box.height}%`,
-                            }}
-                          >
-                            <span className="absolute -top-6 left-0 bg-danger text-white text-xs px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
-                              {det.class_name.replace('_', ' ')} ({det.confidence_score}%)
-                            </span>
-                          </div>
-                        ))}
                       </div>
                     )}
 
@@ -446,23 +514,6 @@ export default function QualityScanPage() {
                   <>
                     {uploadedImage ? (
                       <div className="relative w-full h-full">
-                        <img src={uploadedImage} alt="Uploaded image for defect analysis" className="w-full h-full object-cover" />
-                        {detections.map((det) => (
-                          <div
-                            key={det.id}
-                            className="absolute border-2 border-danger"
-                            style={{
-                              left: `${det.bounding_box.x}%`,
-                              top: `${det.bounding_box.y}%`,
-                              width: `${det.bounding_box.width}%`,
-                              height: `${det.bounding_box.height}%`,
-                            }}
-                          >
-                            <span className="absolute -top-6 left-0 bg-danger text-white text-xs px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
-                              {det.class_name.replace('_', ' ')} ({det.confidence_score}%)
-                            </span>
-                          </div>
-                        ))}
                         {analyzing && (
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                             <div className="flex flex-col items-center gap-3">
@@ -532,7 +583,7 @@ export default function QualityScanPage() {
                           </>
                         ) : (
                           <button onClick={rescan} className="btn-secondary flex items-center gap-2">
-                            <RotateCcw size={15} /> Rescan
+                            <RotateCcw size={15} /> Clear &amp; Retry
                           </button>
                         )}
                         <button onClick={stopCamera} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted text-muted-foreground border border-border text-sm font-semibold hover:text-foreground transition-all">
@@ -610,12 +661,10 @@ export default function QualityScanPage() {
                     {detections.length}
                   </span>
                 </div>
-                {detections.length > 0 && (
+                {result && detections.length > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Avg Confidence</span>
-                    <span className="font-bold text-foreground">
-                      {Math.round(detections.reduce((s, d) => s + d.confidence_score, 0) / detections.length)}%
-                    </span>
+                    <span className="font-bold text-foreground">{confidenceAvg}%</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center">
@@ -651,7 +700,7 @@ export default function QualityScanPage() {
                     <div key={det.id} className={`rounded-xl border p-3 ${severityBg[det.severity]}`}>
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="text-sm font-semibold text-foreground capitalize">
-                          {det.class_name.replace('_', ' ')}
+                          {formatLabel(det.class_name)}
                         </span>
                         <span className={`text-xs font-bold ${severityColor[det.severity]}`}>
                           {det.confidence_score}%

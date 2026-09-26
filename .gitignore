@@ -36,3 +36,7 @@ jest-test-results.json
 
 # Optional: if using TurboRepo or monorepo
 turbo/
+# YOLO weights / Python
+*.pt
+__pycache__/
+.venv/
