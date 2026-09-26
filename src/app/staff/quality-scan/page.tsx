@@ -39,12 +39,13 @@ interface DetectResponse {
 }
 
 const STAGE_OPTIONS = ['cutting', 'assembly', 'sanding', 'staining', 'finishing', 'quality_check'];
-const YOLO_API_URL = process.env.NEXT_PUBLIC_YOLO_API_URL || 'http://localhost:8000';
+// Same-origin path that next.config.mjs forwards to the Python server, so it also works on phones via an https link.
+const YOLO_API_URL = process.env.NEXT_PUBLIC_YOLO_API_URL || '/staff/yolo';
 const LIVE_SCAN_INTERVAL_MS = 1000;
 
 const formatLabel = (s: string) => s.replace(/_/g, ' ');
 
-// Thrown when the FastAPI server can't be reached (fetch network failure).
+// Thrown when the FastAPI server can't be reached (network failure, or the Next.js proxy can't connect to it).
 class BackendOfflineError extends Error {}
 
 async function detectDefects(imageData: string): Promise<DetectResponse> {
@@ -58,8 +59,13 @@ async function detectDefects(imageData: string): Promise<DetectResponse> {
   } catch {
     throw new BackendOfflineError();
   }
+  const isJson = res.headers.get('content-type')?.includes('application/json');
+  if (res.redirected || (res.ok && !isJson)) {
+    throw new Error('Your session has expired. Please log in again.'); // middleware redirected to the login page
+  }
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
+    const body = isJson ? await res.json().catch(() => null) : null;
+    if (!body && res.status >= 500) throw new BackendOfflineError(); // proxy couldn't reach the Python server
     throw new Error(body?.detail || `Detection failed (HTTP ${res.status})`);
   }
   return res.json();
@@ -145,6 +151,11 @@ export default function QualityScanPage() {
   }, [user, supabase]);
 
   async function startCamera() {
+    // Browsers only expose the camera on https:// pages or localhost; on http://<laptop-ip> it is simply missing.
+    if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+      showToast('error', 'Camera needs a secure (https://) link. On phones, open the site through the https tunnel link.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
       streamRef.current = stream;
@@ -153,8 +164,13 @@ export default function QualityScanPage() {
         await videoRef.current.play();
       }
       setCameraActive(true);
-    } catch {
-      showToast('error', 'Camera access denied. Please allow camera permissions.');
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : '';
+      showToast('error',
+        name === 'NotAllowedError' ? 'Camera permission was blocked. Allow the camera in your browser settings for this site, then try again.'
+        : name === 'NotFoundError' ? 'No camera was found on this device.'
+        : name === 'NotReadableError' ? 'The camera is being used by another app. Close it and try again.'
+        : 'Could not start the camera.');
     }
   }
 
@@ -396,7 +412,7 @@ export default function QualityScanPage() {
             <div className="flex-1 text-sm">
               <p className="font-semibold text-foreground">AI detection server is offline</p>
               <p className="text-muted-foreground mt-1">
-                Couldn&apos;t reach <code className="text-foreground">{YOLO_API_URL}</code>. Start the backend from the project root, then try again:
+                Couldn&apos;t reach the Python YOLO server on the computer running this site. Start it from the project root, then try again:
               </p>
               <code className="block mt-2 rounded-lg bg-black/40 px-3 py-2 text-xs text-foreground">
                 uvicorn src.api.yolo_server:app --reload --port 8000

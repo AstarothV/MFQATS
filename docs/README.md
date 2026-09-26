@@ -15,7 +15,8 @@ docs/
 
 | File | What it's for |
 |---|---|
-| [YOLO_SERVER_SETUP.md](setup/YOLO_SERVER_SETUP.md) | **Start here.** One-time setup (Node, Python, `.env`, `best.pt`), running the website + YOLOv12n AI server, troubleshooting, and retraining on Google Colab |
+| [YOLO_SERVER_SETUP.md](setup/YOLO_SERVER_SETUP.md) | **Start here.** One-time setup (Node, Python, `.env`, model files), running the website + YOLOv12n AI server (multiple models), adding models, troubleshooting, and retraining on Google Colab |
+| [DEVICE_TESTING.md](setup/DEVICE_TESTING.md) | **Every test session.** Start-up order, health check, and step-by-step tests on laptop, Android, iPhone and tablet (https tunnel for phone cameras), fixes, and a test log |
 
 ## 🧭 `navigation/`: role-based navigation (Admin / Staff / Customer)
 
