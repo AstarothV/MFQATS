@@ -60,7 +60,10 @@ export default function OrderManagementContent() {
   // FSM edges (supabase/migrations/*_order_stage_fsm.sql). The database rejects any other move; this only greys out buttons.
   const [transitions, setTransitions] = useState<{ from_status: string; to_status: string; requires_qa_pass: boolean }[]>([]);
   useEffect(() => {
-    supabase.from('order_status_transitions').select('*').then(({ data }) => { if (data) setTransitions(data); });
+    supabase.from('order_status_transitions').select('*').then(({ data, error }) => {
+      if (error) showToast('error', `Could not load stage rules: ${error.message}`);
+      else setTransitions(data || []);
+    });
   }, [supabase]);
 
   // Real-time updates
@@ -88,11 +91,7 @@ export default function OrderManagementContent() {
   async function updateOrderStatus(orderId: string, newStatus: string) {
     setUpdating(true);
     try {
-      const completionMap: Record<string, number> = {
-        pending: 0, confirmed: 5, designing: 10, material_preparation: 20,
-        cutting: 30, assembly: 45, sanding: 55, finishing: 70,
-        quality_inspection: 85, ready_for_delivery: 95, delivered: 100, cancelled: 0,
-      };
+      // completion_pct is set by the database from PERT (trigger set_order_completion)
       const stageMap: Record<string, string> = {
         cutting: 'cutting', assembly: 'assembly', sanding: 'sanding',
         finishing: 'finishing', quality_inspection: 'quality_check',
@@ -102,7 +101,6 @@ export default function OrderManagementContent() {
       const { error } = await supabase.from('orders').update({
         extended_status: newStatus,
         status: ['delivered', 'cancelled'].includes(newStatus) ? newStatus : 'in_production',
-        completion_pct: completionMap[newStatus] || 0,
         current_stage: stageMap[newStatus] || 'cutting',
       }).eq('id', orderId);
 
@@ -345,7 +343,7 @@ export default function OrderManagementContent() {
                       type="button"
                       onClick={() => updateOrderStatus(activeOrder.id, 'cancelled')}
                       disabled={updating || !canMoveTo('cancelled')}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition-all"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <X size={16} /> Cancel Order
                     </button>

@@ -35,6 +35,15 @@ const EXTENDED_STATUS_LABELS: Record<string, string> = {
   in_production: 'In Production',
 };
 
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' });
+
+// calendar days between today and the date: "today", "tomorrow", "in 4 days"
+const daysFromToday = (d: string) => {
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date(d)) - startOfDay(new Date())) / 86_400_000);
+  return days <= 0 ? 'today' : days === 1 ? 'tomorrow' : `in ${days} days`;
+};
+
 const stagePalette: Record<string, { text: string; badge: string; track: string; icon: string }> = {
   complete: {
     text: 'text-emerald-600 dark:text-emerald-400',
@@ -83,6 +92,13 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
     fetchStages();
   }, [order?.id, supabase]);
 
+  // PERT-based Estimated Delivery Date (supabase function order_eta); null once delivered/cancelled
+  const [eta, setEta] = useState<string | null>(null);
+  useEffect(() => {
+    if (!order?.id) return;
+    supabase.rpc('order_eta', { p_order_id: order.id }).then(({ data }) => setEta(data ?? null));
+  }, [order?.id, order?.extended_status, supabase]);
+
   const currentStageIndex = STAGE_ORDER.indexOf(order?.current_stage || 'cutting');
   const completionPct = order?.completion_pct || Math.round(((currentStageIndex + 1) / STAGE_ORDER.length) * 100);
 
@@ -117,7 +133,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">{order?.product_name || 'Your Order'}</h2>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Order #{order?.order_ref} · Placed {order?.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}</p>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Order #{order?.order_ref} · Placed {order?.created_at ? fmtDate(order.created_at) : '—'}</p>
           
           {/* Queue Position & Status */}
           <div className="flex items-center gap-3 mt-2 flex-wrap">
@@ -147,8 +163,13 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
           </div>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-xs text-slate-500 dark:text-slate-400">Expected Delivery</p>
-          <p className="text-base font-bold text-slate-900 dark:text-white">{order?.due_date || 'TBD'}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400" title="Estimated with PERT from today, based on how long each remaining stage usually takes">
+            Estimated Delivery
+          </p>
+          <p className="text-base font-bold text-slate-900 dark:text-white">
+            {eta ? fmtDate(eta) : extendedStatus === 'delivered' ? 'Delivered' : order?.due_date ? fmtDate(order.due_date) : 'TBD'}
+          </p>
+          {eta && <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{daysFromToday(eta)}</p>}
         </div>
       </div>
 
