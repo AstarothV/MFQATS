@@ -4,6 +4,7 @@ import KPICardGrid from './KPICardGrid';
 import WorkstationGrid from './WorkstationGrid';
 import ProductionChartsRow from './ProductionChartsRow';
 import AlertsFeed from './AlertsFeed';
+import StageTimelinePanel from './StageTimelinePanel';
 
 export default function ProductionDashboardContent() {
   return (
@@ -22,6 +23,8 @@ export default function ProductionDashboardContent() {
           <AlertsFeed />
         </div>
       </div>
+
+      <StageTimelinePanel />
 
       {/* Charts Row */}
       <ProductionChartsRow />

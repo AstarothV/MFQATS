@@ -305,7 +305,7 @@ export default function CustomerOverviewContent() {
                   <p className="text-base font-bold text-foreground">{selectedOrder.quantity || 1}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Delivery</p>
+                  <p className="text-xs text-muted-foreground mb-1">Delivery Method</p>
                   <p className="text-sm font-semibold text-foreground capitalize">{selectedOrder.pickup_type || 'Delivery'}</p>
                 </div>
               </div>
