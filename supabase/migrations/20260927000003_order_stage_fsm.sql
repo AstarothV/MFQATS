@@ -46,6 +46,8 @@ ALTER TABLE public.order_status_transitions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "order_status_transitions_read" ON public.order_status_transitions;
 CREATE POLICY "order_status_transitions_read" ON public.order_status_transitions
 FOR SELECT TO authenticated USING (true);
+-- newer Supabase projects don't expose new tables to the website automatically
+GRANT SELECT ON public.order_status_transitions TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.enforce_order_fsm()
 RETURNS TRIGGER

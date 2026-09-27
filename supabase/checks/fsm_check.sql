@@ -34,7 +34,7 @@ BEGIN
     END;
 
     -- 4. a FAILED scan must also block it
-    INSERT INTO public.detection_logs (order_id, stage_name, overall_result) VALUES (oid, 'quality_check', 'fail');
+    INSERT INTO public.detection_logs (order_id, stage_name, overall_result, created_at) VALUES (oid, 'quality_check', 'fail', clock_timestamp());
     BEGIN
         UPDATE public.orders SET extended_status = 'ready_for_delivery' WHERE id = oid;
         report := report || E'\nFAIL 4. ready_for_delivery allowed after a failed scan';
@@ -49,7 +49,7 @@ BEGIN
     report := report || E'\nPASS 5. rework quality_inspection -> sanding -> finishing -> quality_inspection';
 
     -- 6. after a PASSING scan, delivery is allowed
-    INSERT INTO public.detection_logs (order_id, stage_name, overall_result) VALUES (oid, 'quality_check', 'pass');
+    INSERT INTO public.detection_logs (order_id, stage_name, overall_result, created_at) VALUES (oid, 'quality_check', 'pass', clock_timestamp());  -- real clock time: now() is identical for every row in one transaction
     UPDATE public.orders SET extended_status = 'ready_for_delivery' WHERE id = oid;
     UPDATE public.orders SET extended_status = 'delivered' WHERE id = oid;
     report := report || E'\nPASS 6. passing scan -> ready_for_delivery -> delivered';
