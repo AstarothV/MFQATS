@@ -2,8 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity } from 'lucide-react';
+import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { moveOrderStage } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 
@@ -140,7 +141,7 @@ export default function QualityScanPage() {
     const fetchData = async () => {
       if (!user) return;
       const [{ data: ordersData }, { data: logsData }] = await Promise.all([
-        supabase.from('orders').select('id, order_ref, product_name').order('created_at', { ascending: false }).limit(20),
+        supabase.from('orders').select('id, order_ref, product_name, extended_status, status, queue_position').order('created_at', { ascending: false }).limit(20),
         supabase.from('detection_logs').select('*, orders(order_ref, product_name)').order('created_at', { ascending: false }).limit(20),
       ]);
       if (ordersData) setOrders(ordersData);
@@ -299,6 +300,24 @@ export default function QualityScanPage() {
     }
   }
 
+  const selectedOrder = orders.find((o) => o.id === selectedOrderId);
+  const [releasing, setReleasing] = useState(false);
+
+  // one click after a passing Quality Check scan; the database quality gate still verifies the scan
+  async function releaseOrder() {
+    if (!selectedOrder) return;
+    setReleasing(true);
+    try {
+      await moveOrderStage(supabase, selectedOrder, 'ready_for_delivery');
+      setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: 'ready_for_delivery' } : o)));
+      showToast('success', `${selectedOrder.order_ref} moved to Ready for Delivery`);
+    } catch (err: any) {
+      showToast('error', err?.message || 'Could not move the order');
+    } finally {
+      setReleasing(false);
+    }
+  }
+
   async function saveDetection() {
     if (!user) return;
     setSaving(true);
@@ -318,9 +337,11 @@ export default function QualityScanPage() {
 
       if (error) throw error;
 
-      // If defects found, also save to defects table
-      if (detections.length > 0 && selectedOrderId) {
-        const defectInserts = detections.map((d) => ({
+      // Save real defects to the defects table. Low-severity findings (live knots, resin...) are natural wood
+      // features: they stay in the scan record above but don't count as defects in analytics.
+      const realDefects = detections.filter((d) => d.severity !== 'low');
+      if (realDefects.length > 0 && selectedOrderId) {
+        const defectInserts = realDefects.map((d) => ({
           order_id: selectedOrderId,
           stage_name: selectedStage,
           defect_type: d.class_name,
@@ -343,7 +364,12 @@ export default function QualityScanPage() {
       if (logsData) setHistory(logsData as DetectionLog[]);
 
       setSaved(true);
-      showToast('success', 'Detection saved successfully');
+      // follow-ups (admin notification, rework task) are created by the database trigger after_quality_scan
+      showToast('success',
+        !selectedOrderId ? 'Detection saved (not linked to an order)'
+        : result === 'fail' ? 'Saved. A rework task was created and the admin was notified.'
+        : selectedStage === 'quality_check' ? 'Saved. Quality gate passed and the admin was notified.'
+        : 'Detection saved successfully');
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to save detection');
     } finally {
@@ -747,9 +773,9 @@ export default function QualityScanPage() {
                   >
                     <AlertTriangle size={14} /> Mark Defect & Save
                   </button>
-                  <button className="w-full btn-secondary flex items-center justify-center gap-2 text-sm">
-                    <RotateCcw size={14} /> Request Rework
-                  </button>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedOrderId ? 'Saving creates a rework task for this order and notifies the admin.' : 'Select an order above to create a rework task.'}
+                  </p>
                 </div>
               </div>
             )}
@@ -763,6 +789,15 @@ export default function QualityScanPage() {
                 >
                   <CheckCircle2 size={14} /> Approve QA & Save
                 </button>
+                {saved && selectedStage === 'quality_check' && selectedOrder?.extended_status === 'quality_inspection' && (
+                  <button
+                    onClick={releaseOrder}
+                    disabled={releasing}
+                    className="mt-2 w-full btn-secondary flex items-center justify-center gap-2 text-sm"
+                  >
+                    {releasing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Move {selectedOrder.order_ref} to Ready for Delivery
+                  </button>
+                )}
               </div>
             )}
           </div>

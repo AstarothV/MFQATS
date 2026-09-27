@@ -4,6 +4,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
+import { moveOrderStage } from '@/lib/orders';
 
 const EXTENDED_STATUSES = [
   'pending', 'confirmed', 'designing', 'material_preparation',
@@ -91,44 +92,7 @@ export default function OrderManagementContent() {
   async function updateOrderStatus(orderId: string, newStatus: string) {
     setUpdating(true);
     try {
-      // completion_pct is set by the database from PERT (trigger set_order_completion)
-      const stageMap: Record<string, string> = {
-        cutting: 'cutting', assembly: 'assembly', sanding: 'sanding',
-        finishing: 'finishing', quality_inspection: 'quality_check',
-        ready_for_delivery: 'shipping', delivered: 'shipping',
-      };
-
-      const { error } = await supabase.from('orders').update({
-        extended_status: newStatus,
-        status: ['delivered', 'cancelled'].includes(newStatus) ? newStatus : 'in_production',
-        current_stage: stageMap[newStatus] || 'cutting',
-      }).eq('id', orderId);
-
-      if (error) throw error;
-
-      // Log history event
-      Promise.resolve(supabase.from('order_history_logs').insert({
-        order_id: orderId,
-        event_type: 'status_updated',
-        title: `Status updated to ${STATUS_LABELS[newStatus] || newStatus}`,
-        description: `Order moved to ${STATUS_LABELS[newStatus] || newStatus} stage`,
-        old_status: activeOrder?.extended_status || activeOrder?.status || '',
-        new_status: newStatus,
-        queue_position: activeOrder?.queue_position || null,
-        performed_by: null,
-      })).catch(() => {}); // Non-blocking
-
-      // Notify customer
-      if (activeOrder?.customer_id) {
-        await supabase.from('notifications').insert({
-          user_id: activeOrder.customer_id,
-          title: 'Order Status Updated',
-          message: `Your order ${activeOrder.order_ref} is now: ${STATUS_LABELS[newStatus] || newStatus}`,
-          notification_type: 'info',
-          entity_type: 'orders',
-          entity_id: orderId,
-        });
-      }
+      await moveOrderStage(supabase, orders.find(o => o.id === orderId) || { id: orderId }, newStatus);
 
       showToast('success', `Order status updated to ${STATUS_LABELS[newStatus]}`);
       fetchOrders();
