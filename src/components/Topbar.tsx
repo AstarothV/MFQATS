@@ -122,7 +122,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-60 w-full border-b border-border bg-card/95 backdrop-blur-sm">
+    <header className="fixed top-0 left-0 right-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur-sm">
       <div className="max-w-screen-2xl mx-auto flex h-16 items-center justify-between gap-4 px-4 lg:px-8 xl:px-10 2xl:px-16">
         <div className="flex items-center gap-3">
           <button

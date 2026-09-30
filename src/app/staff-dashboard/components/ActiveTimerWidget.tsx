@@ -34,7 +34,7 @@ export default function ActiveTimerWidget() {
   const overThreshold = elapsed > 5400; // over 1.5h = warning
 
   return (
-    <div className={`card-dark mt-4 md:mt-6 lg:mt-0 p-5 h-full flex flex-col justify-between timer-glow relative overflow-hidden w-full lg:sticky lg:top-16 lg:self-start lg:z-10`}>
+    <div className={`card-dark mt-4 md:mt-6 lg:mt-0 p-5 h-full flex flex-col justify-between timer-glow relative overflow-hidden w-full lg:sticky lg:top-[5.5rem] lg:self-start lg:z-10`}>
       {/* Background accent */}
       <div className="absolute top-0 right-0 w-32 h-32 blob-primary opacity-30 pointer-events-none" />
 

@@ -190,7 +190,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
               <ChevronDown size={12} />
             </button>
             {showOrderPicker && (
-              <div className="absolute right-0 top-10 z-50 w-64 rounded-2xl border border-border bg-card p-2 shadow-2xl">
+              <div className="absolute right-0 top-10 z-30 w-64 rounded-2xl border border-border bg-card p-2 shadow-2xl">
                 {orders.map(order => (
                   <button
                     key={order.id}

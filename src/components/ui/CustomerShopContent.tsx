@@ -386,27 +386,28 @@ export default function CustomerShopContent() {
           <h1 className="text-3xl font-bold text-foreground">Shop Our Collection</h1>
           <p className="text-sm text-muted-foreground mt-2">Handcrafted furniture made with premium woods and expert craftsmanship.</p>
         </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full max-w-sm">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input type="search" placeholder="Search products" value={search} onChange={e => setSearch(e.target.value)} className="input-dark w-full pl-11" />
-          </div>
-          <button type="button" className="btn-primary flex items-center gap-2 relative" onClick={() => setStep('cart')}>
-            <ShoppingCart size={18} />
-            Cart
-            {cartCount > 0 && (
-              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-danger text-white text-xs font-bold flex items-center justify-center">{cartCount}</span>
-            )}
-          </button>
+        <div className="relative w-full lg:w-80 lg:shrink-0">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input type="search" placeholder="Search products" value={search} onChange={e => setSearch(e.target.value)} className="input-dark w-full pl-11" />
         </div>
       </div>
 
+      {/* Category filters + cart, under the search */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex gap-2 flex-wrap">
         {categories.map(cat => (
           <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
             {cat}
           </button>
         ))}
+      </div>
+        <button type="button" className="btn-primary relative flex shrink-0 items-center justify-center gap-2 whitespace-nowrap" onClick={() => setStep('cart')}>
+          <ShoppingCart size={18} />
+          Cart
+          {cartCount > 0 && (
+            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-danger text-white text-xs font-bold flex items-center justify-center">{cartCount}</span>
+          )}
+        </button>
       </div>
 
       {loading ? (
@@ -424,7 +425,7 @@ export default function CustomerShopContent() {
             const inCart = cart.some(i => i.product.id === product.id);
             const cartItem = cart.find(i => i.product.id === product.id);
             return (
-              <div key={product.id} className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200">
+              <div key={product.id} className="flex h-full flex-col rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200">
                 <div className="relative">
                   {product.images?.[0] ? (
                     <img src={product.images[0]} alt={`${product.name} - handcrafted ${product.material_type} furniture`} className="w-full h-48 object-cover" />
@@ -443,13 +444,15 @@ export default function CustomerShopContent() {
                     <div className="absolute bottom-3 left-3 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">AR Preview</div>
                   )}
                 </div>
-                <div className="p-5">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-semibold text-foreground text-lg">{product.name}</h3>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.category}</p>
                     </div>
-                    <StatusBadge variant={getAvailabilityVariant(product.availability)} label={getAvailabilityLabel(product.availability)} />
+                    <span className="shrink-0 whitespace-nowrap">
+                      <StatusBadge variant={getAvailabilityVariant(product.availability)} label={getAvailabilityLabel(product.availability)} />
+                    </span>
                   </div>
                   <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
                   {(product.height_cm > 0 || product.width_cm > 0) && (
@@ -469,7 +472,8 @@ export default function CustomerShopContent() {
                     </div>
                     <span className="text-xs text-muted-foreground">{product.estimated_production_days}d lead time</span>
                   </div>
-                  <div className="space-y-2">
+                  {/* mt-auto pins the action to the card bottom so buttons line up across a row */}
+                  <div className="mt-auto space-y-2">
                     {inCart ? (
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) - 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">

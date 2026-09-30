@@ -91,7 +91,7 @@ export default function AdminDashboardContent() {
             Monitor revenue, orders, production efficiency, and supplier readiness in one premium woodworks management view.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 lg:flex-nowrap lg:shrink-0 lg:justify-end">
           <Link href="/admin/reports" className="btn-secondary flex items-center gap-2">
             <FileText size={16} /> Export Reports
           </Link>

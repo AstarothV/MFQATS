@@ -1,12 +1,6 @@
-'use client';
-import React from 'react';
-import AppLayout from '@/components/AppLayout';
-import InquirySystem from '@/components/ui/InquirySystem';
+import { redirect } from 'next/navigation';
 
-export default function StaffInquiryPage() {
-  return (
-    <AppLayout role="staff" currentPath="/staff/inquiry">
-      <InquirySystem userRole="staff" />
-    </AppLayout>
-  );
+// Inquiries now live in the Messages page next to the order chat.
+export default function StaffInquiryRedirect() {
+  redirect('/staff/chat?tab=inquiries');
 }
