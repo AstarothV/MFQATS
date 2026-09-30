@@ -8,6 +8,7 @@ import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import MeasurePanel from './MeasurePanel';
+import SurfacePanel from './SurfacePanel';
 
 interface Detection {
   id: string;
@@ -755,6 +756,7 @@ export default function QualityScanPage() {
             )}
 
             <MeasurePanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} showToast={showToast} />
+            <SurfacePanel apiUrl={YOLO_API_URL} />
           </div>
 
           {/* Detection Results Panel */}

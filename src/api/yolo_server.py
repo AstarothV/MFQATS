@@ -3,7 +3,7 @@
 Runs EVERY model in src/api/weights/*.pt on each image and merges the results, so new defect types can be added by
 dropping in another trained model. Each model's confidence threshold is set in src/api/weights/models.json.
 
-Also serves /api/measure (marker-based measurement, see measure.py).
+Also serves /api/measure (marker-based measurement, see measure.py) and /api/surface (dents and warping, see surface.py).
 
 Run from the project root:
     uvicorn src.api.yolo_server:app --reload --port 8000
@@ -198,3 +198,27 @@ async def measure_distance(request: Request):
         raise HTTPException(422, str(e))
     except (TypeError, ValueError) as e:
         raise HTTPException(400, f"Invalid measure request: {e}")
+
+
+MAX_CLOUD_BYTES = 50 * 1024 * 1024
+
+
+@app.post("/api/surface")
+async def surface_check(request: Request):
+    """Multipart form: `file` (point cloud, .ply or x y z text), `unit` (mm | cm | m), `tolerance_mm`.
+    -> flat / dent / warp verdict with a deviation map (RANSAC plane + point-to-plane distance)."""
+    from .surface import DEFAULT_TOLERANCE_MM, UNITS_TO_MM, SurfaceError, analyze, read_points  # lazy, as above
+
+    try:
+        form = await request.form()
+        data = await form["file"].read()
+        scale = UNITS_TO_MM[str(form.get("unit") or "mm")]
+        tolerance_mm = float(form.get("tolerance_mm") or DEFAULT_TOLERANCE_MM)
+    except (KeyError, AttributeError, TypeError, ValueError) as e:
+        raise HTTPException(400, f"Invalid surface request: {e}")
+    if len(data) > MAX_CLOUD_BYTES:
+        raise HTTPException(413, "That point cloud file is larger than 50 MB.")
+    try:
+        return analyze(read_points(data) * scale, tolerance_mm)
+    except SurfaceError as e:
+        raise HTTPException(422, str(e))
