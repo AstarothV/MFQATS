@@ -244,25 +244,21 @@ export default function CatalogContent() {
             Manage product listings, pricing, dimensions, and 3D model assets.
           </p>
         </div>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="relative w-full max-w-sm">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input
-              className="input-dark w-full pl-11"
-              type="search"
-              placeholder="Search products"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            />
-          </div>
-          <button type="button" className="btn-primary flex items-center gap-2" onClick={openAdd}>
-            <Plus size={18} /> Add Product
-          </button>
+        <div className="relative w-full lg:w-80 lg:shrink-0">
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            className="input-dark w-full pl-11"
+            type="search"
+            placeholder="Search products"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+          />
         </div>
       </div>
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap gap-2">
+      {/* Category Filters + action, under the search */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-wrap gap-2">
         {CATEGORIES.map((cat) => (
           <button
             key={cat}
@@ -273,6 +269,10 @@ export default function CatalogContent() {
             {cat}
           </button>
         ))}
+        </div>
+        <button type="button" className="btn-primary flex shrink-0 items-center justify-center gap-2 whitespace-nowrap" onClick={openAdd}>
+          <Plus size={18} /> Add Product
+        </button>
       </div>
 
       {/* Stats */}

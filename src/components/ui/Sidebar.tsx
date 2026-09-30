@@ -21,9 +21,7 @@ import {
   History,
   AlertTriangle,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
+  Menu,
   HelpCircle,
   Home,
 } from 'lucide-react';
@@ -40,22 +38,14 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-const roleLabel = {
-  staff: 'Production Staff',
-  admin: 'Administrator',
-  customer: 'Customer',
-} as const;
-
 const navByRole = {
   staff: [
     { label: 'Workshop', href: '/staff-dashboard', icon: LayoutDashboard },
     { label: 'Assigned Tasks', href: '/staff-dashboard/assigned-tasks', icon: ClipboardCheck },
     { label: 'Order Workflow', href: '/staff-dashboard/orders', icon: Package },
     { label: 'Quality Scan (AI)', href: '/staff/quality-scan', icon: Camera },
-    { label: 'AR Visualization', href: '/staff/ar-visualization', icon: Eye },
     { label: 'Inventory', href: '/staff-dashboard/inventory', icon: ShoppingBag },
-    { label: 'Inquiries', href: '/staff/inquiry', icon: HelpCircle },
-    { label: 'Customer Chat', href: '/staff/chat', icon: MessageSquare },
+    { label: 'Messages', href: '/staff/chat', icon: MessageSquare },
   ],
   admin: [
     { label: 'Admin Overview', href: '/admin-dashboard', icon: LayoutDashboard },
@@ -63,8 +53,7 @@ const navByRole = {
     { label: 'User Management', href: '/admin/users', icon: Users },
     { label: 'Product Catalog', href: '/catalog', icon: Box },
     { label: 'Order Management', href: '/orders', icon: Package },
-    { label: 'Inquiries', href: '/admin/inquiry', icon: HelpCircle },
-    { label: 'Order Chat', href: '/admin/chat', icon: MessageSquare },
+    { label: 'Messages', href: '/admin/chat', icon: MessageSquare },
     { label: 'Inventory', href: '/admin/inventory', icon: Truck },
     { label: 'Team', href: '/admin/team', icon: Users },
     { label: 'Reports', href: '/admin/reports', icon: FileText },
@@ -83,11 +72,9 @@ const navByRole = {
 export default function Sidebar({ role, currentPath, open, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { signOut, profile, user } = useAuth();
+  const { signOut } = useAuth();
   const nav = navByRole[role];
   const activePath = currentPath || pathname;
-
-  const displayName = profile?.full_name || user?.user_metadata?.full_name || 'User';
 
   async function handleLogout() {
     try {
@@ -105,44 +92,28 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="relative mb-6 h-16">
+        {/* Toggle: X closes/collapses the sidebar, the hamburger opens it */}
+        <div className={`mb-3 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
-              className={`absolute right-0 top-1/2 -translate-y-1/2 lg:inline-flex items-center justify-center rounded-full border border-border bg-background p-2 text-muted-foreground hover:text-foreground shadow-sm ${collapsed ? 'w-8 h-8' : 'w-9 h-9'}`}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden lg:inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground shadow-sm"
+              aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'}
+              title={collapsed ? 'Open sidebar' : 'Close sidebar'}
             >
-              {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+              {collapsed ? <Menu size={16} /> : <X size={16} />}
             </button>
           )}
 
           <button
             type="button"
             onClick={onClose}
-            className="lg:hidden absolute right-2 top-1/2 -translate-y-1/2 btn-ghost p-2"
+            className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground shadow-sm"
             aria-label="Close navigation"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
-        </div>
-
-        <div className="mb-6">
-          {!collapsed ? (
-            <div className="rounded-3xl border border-border bg-muted/40 p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-[0.24em] mb-2">Signed in as</p>
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{roleLabel[role]}</p>
-                </div>
-                <span className="badge status-info shrink-0">{role === 'staff' ? 'Staff' : role === 'admin' ? 'Admin' : 'Customer'}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="h-16" />
-          )}
         </div>
 
         <nav className="space-y-1">

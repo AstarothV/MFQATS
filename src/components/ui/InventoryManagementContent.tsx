@@ -223,14 +223,9 @@ export default function InventoryManagementContent() {
           <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
           <p className="text-sm text-muted-foreground mt-2">Track raw materials, monitor stock levels, and manage supplier relationships.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <input type="search" placeholder="Search inventory" value={search} onChange={(e) => setSearch(e.target.value)} className="input-dark w-full pl-10" />
-          </div>
-          <button onClick={() => { setForm({ item_ref: '', name: '', category: 'Wood', supplier: '', stock_level: 0, min_stock: 0, unit: 'units', location: '', cost_per_unit: 0 }); setModal('add'); }} className="btn-primary flex items-center gap-2">
-            <Plus size={16} /> Add Item
-          </button>
+        <div className="relative w-full lg:w-80 lg:shrink-0">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input type="search" placeholder="Search inventory" value={search} onChange={(e) => setSearch(e.target.value)} className="input-dark w-full pl-10" />
         </div>
       </div>
 
@@ -250,12 +245,18 @@ export default function InventoryManagementContent() {
         </div>
       )}
 
+      {/* Category filters + action, under the search */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex gap-2 flex-wrap">
         {CATEGORIES.map((cat) => (
           <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
             {cat}
           </button>
         ))}
+      </div>
+        <button onClick={() => { setForm({ item_ref: '', name: '', category: 'Wood', supplier: '', stock_level: 0, min_stock: 0, unit: 'units', location: '', cost_per_unit: 0 }); setModal('add'); }} className="btn-primary shrink-0 justify-center whitespace-nowrap flex items-center gap-2">
+          <Plus size={16} /> Add Item
+        </button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
