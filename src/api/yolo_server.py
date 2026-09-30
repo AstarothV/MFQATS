@@ -3,7 +3,8 @@
 Runs EVERY model in src/api/weights/*.pt on each image and merges the results, so new defect types can be added by
 dropping in another trained model. Each model's confidence threshold is set in src/api/weights/models.json.
 
-Also serves /api/measure (marker-based measurement, see measure.py) and /api/surface (dents and warping, see surface.py).
+Also serves /api/measure (marker-based measurement, see measure.py), /api/surface (dents and warping, see surface.py)
+and /api/reconstruct (3D model from photos, see sfm.py).
 
 Run from the project root:
     uvicorn src.api.yolo_server:app --reload --port 8000
@@ -13,6 +14,8 @@ import binascii
 import io
 import json
 import re
+import threading
+import traceback
 import uuid
 from contextlib import asynccontextmanager
 from functools import cache
@@ -222,3 +225,91 @@ async def surface_check(request: Request):
         return analyze(read_points(data) * scale, tolerance_mm)
     except SurfaceError as e:
         raise HTTPException(422, str(e))
+
+
+# ---- 3D reconstruction (SfM) jobs: photos are uploaded one at a time, then the job runs in the background ----
+# ponytail: jobs live in this process's memory (lost on restart, one at a time); use a job table if that stops being enough.
+JOBS = {}
+MAX_JOBS = 4
+RUNNING = threading.Lock()
+
+
+def get_job(job_id):
+    job = JOBS.get(job_id)
+    if job is None:
+        raise HTTPException(404, "That reconstruction was not found. Start it again.")
+    return job
+
+
+def run_job(job, marker_mm, tolerance_mm):
+    from .sfm import ReconstructionError, reconstruct_and_check
+    from .surface import SurfaceError
+
+    def progress(message, fraction):
+        job["message"], job["progress"] = message, round(float(fraction), 3)
+
+    try:
+        job["result"] = reconstruct_and_check(job.pop("photos"), marker_mm, tolerance_mm, progress)
+        job["status"], job["progress"], job["message"] = "done", 1.0, "Done"
+    except (ReconstructionError, SurfaceError) as e:
+        job["status"], job["error"] = "failed", str(e)
+    except Exception:
+        traceback.print_exc()
+        job["status"], job["error"] = "failed", "The reconstruction stopped unexpectedly. Check the Python server's window."
+    finally:
+        RUNNING.release()
+
+
+@app.post("/api/reconstruct")
+def reconstruct_start():
+    while len(JOBS) >= MAX_JOBS:
+        del JOBS[next(iter(JOBS))]  # oldest first
+    job_id = uuid.uuid4().hex
+    JOBS[job_id] = {"status": "collecting", "photos": [], "progress": 0.0, "message": "Waiting for photos"}
+    return {"job": job_id}
+
+
+@app.post("/api/reconstruct/{job_id}/photo")
+async def reconstruct_photo(job_id: str, request: Request):
+    from .sfm import MAX_PHOTOS
+
+    job = get_job(job_id)
+    if job["status"] != "collecting":
+        raise HTTPException(409, "This reconstruction has already started.")
+    if len(job["photos"]) >= MAX_PHOTOS:
+        raise HTTPException(422, f"Use at most {MAX_PHOTOS} photos.")
+    image = await read_image(request)
+    job["photos"].append(np.asarray(image)[:, :, ::-1].copy())  # RGB -> BGR for OpenCV
+    return {"photos": len(job["photos"])}
+
+
+@app.post("/api/reconstruct/{job_id}/run")
+async def reconstruct_run(job_id: str, request: Request):
+    from .measure import DEFAULT_MARKER_MM
+    from .sfm import MIN_PHOTOS
+    from .surface import DEFAULT_TOLERANCE_MM
+
+    job = get_job(job_id)
+    try:
+        body = await request.json()
+        marker_mm = float(body.get("marker_mm") or DEFAULT_MARKER_MM)
+        tolerance_mm = float(body.get("tolerance_mm") or DEFAULT_TOLERANCE_MM)
+    except (AttributeError, TypeError, ValueError) as e:
+        raise HTTPException(400, f"Invalid reconstruction request: {e}")
+    if not 10 <= marker_mm <= 2000 or not 0.1 <= tolerance_mm <= 100:
+        raise HTTPException(422, "Marker size must be 10 to 2000 mm and tolerance 0.1 to 100 mm.")
+    if job["status"] != "collecting":
+        raise HTTPException(409, "This reconstruction has already started.")
+    if len(job["photos"]) < MIN_PHOTOS:
+        raise HTTPException(422, f"Add at least {MIN_PHOTOS} photos first.")
+    if not RUNNING.acquire(blocking=False):
+        raise HTTPException(409, "Another reconstruction is running. Wait for it to finish, then try again.")
+    job["status"], job["message"] = "running", "Starting"
+    threading.Thread(target=run_job, args=(job, marker_mm, tolerance_mm), daemon=True).start()
+    return {"status": "running"}
+
+
+@app.get("/api/reconstruct/{job_id}")
+def reconstruct_status(job_id: str):
+    job = get_job(job_id)
+    return {k: job.get(k) for k in ("status", "progress", "message", "error", "result")}
