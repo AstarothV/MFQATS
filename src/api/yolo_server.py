@@ -3,6 +3,8 @@
 Runs EVERY model in src/api/weights/*.pt on each image and merges the results, so new defect types can be added by
 dropping in another trained model. Each model's confidence threshold is set in src/api/weights/models.json.
 
+Also serves /api/measure (marker-based measurement, see measure.py).
+
 Run from the project root:
     uvicorn src.api.yolo_server:app --reload --port 8000
 """
@@ -16,6 +18,7 @@ from contextlib import asynccontextmanager
 from functools import cache
 from pathlib import Path
 
+import numpy as np
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
@@ -178,3 +181,20 @@ async def detect(request: Request):
         r = model.predict(image, conf=conf, verbose=False)[0]
         detections += to_detections(r.names, r.boxes.xyxyn.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist(), name)
     return summarize(merge_duplicates(detections))
+
+
+@app.post("/api/measure")
+async def measure_distance(request: Request):
+    """JSON {"image": ..., "marker_mm": 150, "points": [[x, y], [x, y]]} -> real distance between the two points.
+    Without "points" it only reports whether the marker was found."""
+    from .measure import DEFAULT_MARKER_MM, MeasureError, measure  # lazy, like ultralytics above: keeps cv2 out of the unit tests
+
+    image = await read_image(request)
+    body = await request.json()
+    try:
+        marker_mm = float(body.get("marker_mm") or DEFAULT_MARKER_MM)
+        return measure(np.asarray(image)[:, :, ::-1].copy(), marker_mm, body.get("points"))  # RGB -> BGR for OpenCV
+    except MeasureError as e:
+        raise HTTPException(422, str(e))
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, f"Invalid measure request: {e}")

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
+import MeasurePanel from './MeasurePanel';
 
 interface Detection {
   id: string;
@@ -752,6 +753,8 @@ export default function QualityScanPage() {
                 />
               </div>
             )}
+
+            <MeasurePanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} showToast={showToast} />
           </div>
 
           {/* Detection Results Panel */}
