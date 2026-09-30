@@ -40,3 +40,5 @@ turbo/
 *.pt
 __pycache__/
 .venv/
+# rendered test photos (python src/api/test_sfm.py photos)
+src/api/samples/sfm_photos/

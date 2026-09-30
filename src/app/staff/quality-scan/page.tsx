@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import MeasurePanel from './MeasurePanel';
 import SurfacePanel from './SurfacePanel';
+import ReconstructPanel from './ReconstructPanel';
 
 interface Detection {
   id: string;
@@ -756,6 +757,7 @@ export default function QualityScanPage() {
             )}
 
             <MeasurePanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} showToast={showToast} />
+            <ReconstructPanel apiUrl={YOLO_API_URL} />
             <SurfacePanel apiUrl={YOLO_API_URL} />
           </div>
 

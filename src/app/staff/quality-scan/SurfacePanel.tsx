@@ -13,9 +13,10 @@ interface Region {
   width_mm: number;
   height_mm: number;
   depth_mm: number;
+  side: 'below' | 'above' | null;
 }
 
-interface SurfaceResponse {
+export interface SurfaceResponse {
   status: 'flat' | 'dent' | 'warp';
   message: string;
   tolerance_mm: number;
@@ -33,9 +34,97 @@ interface SurfaceResponse {
 
 const MAX_REGIONS_SHOWN = 5;
 
+// Green at the plane, yellow at the tolerance, red at twice the tolerance or more.
+export const deviationColor = (mm: number, toleranceMm: number) =>
+  `hsl(${120 * (1 - Math.min(1, Math.abs(mm) / (2 * toleranceMm)))}, 80%, 45%)`;
+
+// Verdict, numbers, deviation map and out-of-tolerance areas of one surface check (also used by the 3D reconstruction panel).
+export function SurfaceResultView({ result, caption, showMap = true }: { result: SurfaceResponse; caption?: string; showMap?: boolean }) {
+  const mapRef = useRef<HTMLCanvasElement>(null);
+
+  // Deviation map: one canvas pixel per cell.
+  useEffect(() => {
+    const canvas = mapRef.current;
+    if (!canvas) return;
+    const rows = result.grid.length;
+    const cols = result.grid[0]?.length ?? 0;
+    canvas.width = cols;
+    canvas.height = rows;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, cols, rows);
+    result.grid.forEach((row, y) => row.forEach((value, x) => {
+      if (value === null) return;
+      ctx.fillStyle = deviationColor(value, result.tolerance_mm);
+      ctx.fillRect(x, y, 1, 1);
+    }));
+  }, [result, showMap]);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <StatusBadge variant={result.status === 'flat' ? 'ok' : 'danger'} label={result.message} />
+        {caption && <span className="text-sm text-muted-foreground truncate">{caption}</span>}
+      </div>
+
+      {result.warnings.length > 0 && (
+        <div role="status" className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+          <p className="font-semibold flex items-center gap-2"><AlertTriangle size={15} className="text-warning" /> Low confidence. Check this surface by hand.</p>
+          <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+            {result.warnings.map((w) => <li key={w}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+
+      <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+        {[
+          ['Largest deviation', `${result.max_deviation_mm.toFixed(1)} mm`],
+          ['Tolerance', `${result.tolerance_mm} mm`],
+          ['Area out of tolerance', `${result.out_of_tolerance_percent}%`],
+          ['Surface size', `${Math.round(result.size_mm[0])} × ${Math.round(result.size_mm[1])} mm`],
+          ['Points', result.points.toLocaleString()],
+          ['Points on the plane', `${result.inlier_percent}%`],
+          ['Scan noise', `${result.noise_mm} mm`],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+            <dd className="font-semibold text-foreground">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {showMap && (
+        <div>
+          <canvas
+            ref={mapRef}
+            role="img"
+            aria-label={`Deviation map of the surface: ${result.message}`}
+            className="w-full max-w-xl rounded-xl bg-black [image-rendering:pixelated]"
+          />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Deviation map, seen from above. Green is on the plane, yellow is at the tolerance, red is twice the tolerance or more.
+          </p>
+        </div>
+      )}
+
+      {result.regions.length > 0 && (
+        <div className="text-sm">
+          <p className="font-semibold text-foreground mb-1">Out-of-tolerance areas</p>
+          <ul className="space-y-1 text-muted-foreground">
+            {result.regions.slice(0, MAX_REGIONS_SHOWN).map((r, i) => (
+              <li key={i}>
+                {r.depth_mm.toFixed(1)} mm {r.side === 'above' ? 'raised' : 'deep'}, about {Math.round(r.width_mm)} × {Math.round(r.height_mm)} mm, centred {Math.round(r.x_mm)} mm from the left and {Math.round(r.y_mm)} mm from the top of the map
+              </li>
+            ))}
+            {result.regions.length > MAX_REGIONS_SHOWN && <li>and {result.regions.length - MAX_REGIONS_SHOWN} smaller areas</li>}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SurfacePanel({ apiUrl }: { apiUrl: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const mapRef = useRef<HTMLCanvasElement>(null);
   const [unit, setUnit] = useState('mm');
   const [toleranceMm, setToleranceMm] = useState('2');
   const [fileName, setFileName] = useState('');
@@ -77,32 +166,14 @@ export default function SurfacePanel({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  // Deviation map: one canvas pixel per cell, green at the plane, yellow at the tolerance, red at twice the tolerance.
-  useEffect(() => {
-    const canvas = mapRef.current;
-    if (!canvas || !result) return;
-    const rows = result.grid.length;
-    const cols = result.grid[0]?.length ?? 0;
-    canvas.width = cols;
-    canvas.height = rows;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, cols, rows);
-    result.grid.forEach((row, y) => row.forEach((value, x) => {
-      if (value === null) return;
-      const t = Math.min(1, Math.abs(value) / (2 * result.tolerance_mm));
-      ctx.fillStyle = `hsl(${120 * (1 - t)}, 80%, 45%)`;
-      ctx.fillRect(x, y, 1, 1);
-    }));
-  }, [result]);
-
   return (
     <div className="card-dark rounded-3xl border border-border p-5 space-y-4">
       <div>
         <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Layers size={16} className="text-accent" /> 3D Surface Check
+          <Layers size={16} className="text-accent" /> 3D Surface Check (from a file)
         </h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          Upload a 3D point cloud of one surface. The system fits the flat plane it should be and flags dents and warping beyond the tolerance.
+          Upload a 3D point cloud of one surface made with another scanner. The system fits the flat plane it should be and flags dents and warping beyond the tolerance.
         </p>
       </div>
 
@@ -131,66 +202,7 @@ export default function SurfacePanel({ apiUrl }: { apiUrl: string }) {
         </div>
       )}
 
-      {result && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusBadge variant={result.status === 'flat' ? 'ok' : 'danger'} label={result.message} />
-            <span className="text-sm text-muted-foreground truncate">{fileName}</span>
-          </div>
-
-          {result.warnings.length > 0 && (
-            <div role="status" className="rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
-              <p className="font-semibold flex items-center gap-2"><AlertTriangle size={15} className="text-warning" /> Low confidence. Check this surface by hand.</p>
-              <ul className="mt-1 list-disc pl-5 text-muted-foreground">
-                {result.warnings.map((w) => <li key={w}>{w}</li>)}
-              </ul>
-            </div>
-          )}
-
-          <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            {[
-              ['Largest deviation', `${result.max_deviation_mm.toFixed(1)} mm`],
-              ['Tolerance', `${result.tolerance_mm} mm`],
-              ['Area out of tolerance', `${result.out_of_tolerance_percent}%`],
-              ['Surface size', `${Math.round(result.size_mm[0])} × ${Math.round(result.size_mm[1])} mm`],
-              ['Points', result.points.toLocaleString()],
-              ['Points on the plane', `${result.inlier_percent}%`],
-              ['Scan noise', `${result.noise_mm} mm`],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
-                <dd className="font-semibold text-foreground">{value}</dd>
-              </div>
-            ))}
-          </dl>
-
-          <div>
-            <canvas
-              ref={mapRef}
-              role="img"
-              aria-label={`Deviation map of the surface: ${result.message}`}
-              className="w-full max-w-xl rounded-xl bg-black [image-rendering:pixelated]"
-            />
-            <p className="mt-2 text-xs text-muted-foreground">
-              Deviation map, seen from above. Green is on the plane, yellow is at the tolerance, red is twice the tolerance or more.
-            </p>
-          </div>
-
-          {result.regions.length > 0 && (
-            <div className="text-sm">
-              <p className="font-semibold text-foreground mb-1">Out-of-tolerance areas</p>
-              <ul className="space-y-1 text-muted-foreground">
-                {result.regions.slice(0, MAX_REGIONS_SHOWN).map((r, i) => (
-                  <li key={i}>
-                    {r.depth_mm.toFixed(1)} mm deep, about {Math.round(r.width_mm)} × {Math.round(r.height_mm)} mm, centred {Math.round(r.x_mm)} mm from the left and {Math.round(r.y_mm)} mm from the top of the map
-                  </li>
-                ))}
-                {result.regions.length > MAX_REGIONS_SHOWN && <li>and {result.regions.length - MAX_REGIONS_SHOWN} smaller areas</li>}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+      {result && <SurfaceResultView result={result} caption={fileName} />}
     </div>
   );
 }

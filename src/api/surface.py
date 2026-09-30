@@ -118,8 +118,9 @@ def cell_medians(cells, values, n_cells):
     return out
 
 
-def analyze(points_mm, tolerance_mm=DEFAULT_TOLERANCE_MM, inlier_mm=None):
-    """points_mm: Nx3 array in millimetres. Returns the verdict, a deviation map and the out-of-tolerance regions."""
+def analyze(points_mm, tolerance_mm=DEFAULT_TOLERANCE_MM, inlier_mm=None, up=None):
+    """points_mm: Nx3 array in millimetres. Returns the verdict, a deviation map and the out-of-tolerance regions.
+    up: a direction pointing off the surface's face, if known; regions then say whether they are below (dent) or above it."""
     if not 0.1 <= tolerance_mm <= 100:
         raise SurfaceError("Tolerance must be between 0.1 and 100 mm.")
     points = np.asarray(points_mm, dtype=np.float64)
@@ -130,12 +131,15 @@ def analyze(points_mm, tolerance_mm=DEFAULT_TOLERANCE_MM, inlier_mm=None):
         raise SurfaceError("That point cloud has too few points (at least 100 are needed).")
     if len(points) > MAX_POINTS:
         points = points[np.random.default_rng(0).choice(len(points), MAX_POINTS, replace=False)]
-    points = points - points.mean(axis=0)  # keeps the numbers small; distances do not change
+    centre = points.mean(axis=0)
+    points = points - centre  # keeps the numbers small; distances do not change
     across = np.ptp(points, axis=0).max()
     if not 20 <= across <= 20_000:
         raise SurfaceError(f"That point cloud is {across:,.0f} mm across. Check that the right unit is selected.")
 
     normal, d, inlier_ratio = fit_plane_ransac(points, inlier_mm or tolerance_mm / 2)
+    if up is not None and normal @ np.asarray(up, dtype=np.float64) < 0:
+        normal, d = -normal, -d  # positive distances are now above the surface
     # point-to-plane distance D = |a*x + b*y + c*z + d| / sqrt(a^2 + b^2 + c^2); the normal is unit length, so the divisor is 1
     signed = points @ normal + d
     on_surface = np.abs(signed) <= max(IGNORE_BEYOND_MM, 5 * tolerance_mm)
@@ -166,6 +170,7 @@ def analyze(points_mm, tolerance_mm=DEFAULT_TOLERANCE_MM, inlier_mm=None):
             "width_mm": round(float(w * cell), 1),
             "height_mm": round(float(h * cell), 1),
             "depth_mm": round(float(np.abs(grid[labels == i]).max()), 1),
+            "side": None if up is None else "below" if np.median(grid[labels == i]) < 0 else "above",
         })
     regions.sort(key=lambda r: -r["depth_mm"])
 
@@ -188,7 +193,7 @@ def analyze(points_mm, tolerance_mm=DEFAULT_TOLERANCE_MM, inlier_mm=None):
         "points": int(len(points)),
         "inlier_percent": round(inlier_ratio * 100, 1),
         "noise_mm": round(noise, 2),
-        "plane": [round(float(v), 6) for v in (*normal, d)],
+        "plane": [round(float(v), 6) for v in (*normal, d - normal @ centre)],  # a, b, c, d for the points as given
         "size_mm": [round(float(width), 1), round(float(height), 1)],
         "cell_mm": round(float(cell), 2),
         "grid": [[None if np.isnan(v) else round(float(v), 2) for v in row] for row in grid],  # signed mm, row 0 = top
