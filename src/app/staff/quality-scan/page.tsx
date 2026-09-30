@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity, ArrowRight } from 'lucide-react';
+import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity, ArrowRight, Maximize2, Minimize2, Flashlight, FlashlightOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
@@ -127,6 +127,12 @@ export default function QualityScanPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [showHistory, setShowHistory] = useState(false);
+  // Camera view follows the picture's own shape (a phone held upright gives a tall picture), and can fill the screen.
+  const [viewAspect, setViewAspect] = useState(16 / 9);
+  const [expanded, setExpanded] = useState(false);
+  // Flashlight: only offered when the camera in use reports one (phone rear cameras; not laptops).
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -162,6 +168,10 @@ export default function QualityScanPage() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      // `torch` is not in the TypeScript DOM types yet, hence the cast
+      const caps = stream.getVideoTracks()[0]?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+      setTorchAvailable(!!caps?.torch);
+      setTorchOn(false);
       setCameraActive(true);
     } catch (err) {
       const name = err instanceof DOMException ? err.name : '';
@@ -173,12 +183,26 @@ export default function QualityScanPage() {
     }
   }
 
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: !torchOn } as MediaTrackConstraintSet] });
+      setTorchOn(!torchOn);
+    } catch {
+      showToast('error', 'Could not switch the flashlight on this device.');
+    }
+  }
+
   function stopCamera() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
     setCameraActive(false);
     setScanning(false);
+    setExpanded(false);
+    setTorchAvailable(false);
+    setTorchOn(false);
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
   }
 
@@ -260,13 +284,32 @@ export default function QualityScanPage() {
     const still = capturedImage || uploadedImage;
     if (still) {
       const img = new Image();
-      img.onload = () => drawDetections(canvas, detections, img.naturalWidth, img.naturalHeight, img);
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) setViewAspect(img.naturalWidth / img.naturalHeight);
+        drawDetections(canvas, detections, img.naturalWidth, img.naturalHeight, img);
+      };
       img.src = still;
     } else {
       const video = videoRef.current;
+      if (video?.videoWidth && video.videoHeight) setViewAspect(video.videoWidth / video.videoHeight);
       drawDetections(canvas, detections, video?.videoWidth || 0, video?.videoHeight || 0);
     }
   }, [detections, capturedImage, uploadedImage, mode]);
+
+  // Full-screen view: stop the page behind it from scrolling, and let Escape close it.
+  // ponytail: CSS full-screen (works on iPhone, where the Fullscreen API is not available for page elements);
+  // the browser's own address bar stays visible.
+  useEffect(() => {
+    if (!expanded) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [expanded]);
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -401,7 +444,7 @@ export default function QualityScanPage() {
         {/* Toast */}
         {toast && (
           <div
-            className="fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold"
+            className="fixed top-4 right-4 z-[60] flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold"
             style={{ background: toast.type === 'success' ? '#22C55E' : '#EF4444', color: '#fff' }}
           >
             {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
@@ -494,9 +537,12 @@ export default function QualityScanPage() {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           {/* Camera / Upload Panel */}
           <div className="xl:col-span-2 space-y-4">
-            <div className="card-dark rounded-3xl border border-border overflow-hidden">
+            <div className={expanded ? 'fixed inset-0 z-50 flex flex-col bg-black' : 'card-dark rounded-3xl border border-border overflow-hidden'}>
               {/* Camera View */}
-              <div className="relative bg-black" style={{ aspectRatio: '16/9' }}>
+              <div
+                className={`relative bg-black ${expanded ? 'flex-1 min-h-0' : 'w-full'}`}
+                style={expanded ? undefined : { aspectRatio: viewAspect, maxHeight: '75vh' }}
+              >
                 {/* Detection canvas: draws the analyzed still + boxes, or boxes only over the live video */}
                 <canvas
                   ref={overlayRef}
@@ -511,6 +557,8 @@ export default function QualityScanPage() {
                       className="w-full h-full object-contain"
                       playsInline
                       muted
+                      onLoadedMetadata={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setViewAspect(v.videoWidth / v.videoHeight); }}
+                      onResize={(e) => { const v = e.currentTarget; if (v.videoWidth && v.videoHeight) setViewAspect(v.videoWidth / v.videoHeight); }}
                       style={{ display: cameraActive && !capturedImage ? 'block' : 'none' }}
                     />
                     <canvas ref={canvasRef} className="hidden" />
@@ -584,6 +632,33 @@ export default function QualityScanPage() {
                   </>
                 )}
 
+                {/* Flashlight toggle (only on cameras that have one) */}
+                {torchAvailable && cameraActive && !capturedImage && (
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    className={`absolute bottom-3 right-16 flex h-10 w-10 items-center justify-center rounded-full transition-colors ${torchOn ? 'bg-warning text-black' : 'bg-black/60 text-white hover:bg-black/80'}`}
+                    aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+                    aria-pressed={torchOn}
+                    title={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+                  >
+                    {torchOn ? <Flashlight size={18} /> : <FlashlightOff size={18} />}
+                  </button>
+                )}
+
+                {/* Full-screen toggle */}
+                {(cameraActive || capturedImage || uploadedImage) && (
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((v) => !v)}
+                    className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    aria-label={expanded ? 'Exit full screen' : 'Full screen'}
+                    title={expanded ? 'Exit full screen' : 'Full screen'}
+                  >
+                    {expanded ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                  </button>
+                )}
+
                 {/* Result badge */}
                 {result && (
                   <div className={`absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold ${result === 'pass' ? 'bg-success text-white' : 'bg-danger text-white'}`}>
@@ -594,7 +669,10 @@ export default function QualityScanPage() {
               </div>
 
               {/* Camera Controls */}
-              <div className="p-4 flex flex-wrap gap-2">
+              <div
+                className={`p-4 flex flex-wrap gap-2 ${expanded ? 'shrink-0 justify-center bg-card' : ''}`}
+                style={expanded ? { paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' } : undefined}
+              >
                 {mode === 'live' ? (
                   <>
                     {!cameraActive ? (
