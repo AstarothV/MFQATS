@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp, ShoppingBag, MessageSquare, Eye } from 'lucide-react';
+import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp, ShoppingBag, MessageSquare, Eye, Upload, Box, FileText } from 'lucide-react';
+import { statusLabel, statusVariant } from '@/lib/orders';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
@@ -31,48 +32,20 @@ interface Order {
   updated_at: string;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  designing: 'Designing',
-  material_preparation: 'Material Prep',
-  cutting: 'Cutting',
-  assembly: 'Assembly',
-  sanding: 'Sanding',
-  finishing: 'Finishing',
-  quality_inspection: 'Quality Inspection',
-  ready_for_delivery: 'Ready for Delivery',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  in_production: 'In Production',
-};
-
+// order statuses shown as a stepper: approval, the five process stages, delivery
 const QUEUE_STAGES = [
-  { key: 'pending', label: 'Pending', icon: Clock },
-  { key: 'confirmed', label: 'Confirmed', icon: CheckCircle2 },
-  { key: 'in_production', label: 'In Production', icon: TrendingUp },
-  { key: 'quality_inspection', label: 'Quality Check', icon: Eye },
-  { key: 'ready_for_delivery', label: 'Ready', icon: Package },
-  { key: 'delivered', label: 'Delivered', icon: Truck },
-];
+  { key: 'pending', icon: Clock },
+  { key: 'confirmed', icon: CheckCircle2 },
+  { key: 'upload', icon: Upload },
+  { key: 'reconstruction_3d', icon: Box },
+  { key: 'detect_defects', icon: Eye },
+  { key: 'results', icon: FileText },
+  { key: 'recommendation', icon: TrendingUp },
+  { key: 'delivered', icon: Truck },
+].map((st) => ({ ...st, label: statusLabel(st.key) }));
 
-function getStatusVariant(status: string): 'ok' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple' {
-  if (status === 'delivered') return 'ok';
-  if (status === 'cancelled') return 'danger';
-  if (status === 'quality_inspection' || status === 'ready_for_delivery') return 'info';
-  if (status === 'pending') return 'warning';
-  if (['cutting', 'assembly', 'sanding', 'finishing', 'material_preparation', 'designing', 'in_production'].includes(status)) return 'purple';
-  return 'neutral';
-}
-
-function getStageIndex(status: string): number {
-  const map: Record<string, number> = {
-    pending: 0, confirmed: 1, designing: 2, material_preparation: 2,
-    cutting: 2, assembly: 2, sanding: 2, finishing: 2, in_production: 2,
-    quality_inspection: 3, ready_for_delivery: 4, delivered: 5, cancelled: -1,
-  };
-  return map[status] ?? 0;
-}
+// -1 for cancelled (nothing highlighted)
+const getStageIndex = (status: string) => QUEUE_STAGES.findIndex((st) => st.key === status);
 
 export default function CustomerOverviewContent() {
   const { user } = useAuth();
@@ -195,7 +168,7 @@ export default function CustomerOverviewContent() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <StatusBadge variant={getStatusVariant(st)} label={STATUS_LABELS[st] || st} />
+                      <StatusBadge variant={statusVariant(st)} label={statusLabel(st)} />
                       {order.queue_position && (
                         <span className="text-xs text-muted-foreground">Queue #{order.queue_position}</span>
                       )}
@@ -235,8 +208,8 @@ export default function CustomerOverviewContent() {
                     </div>
                   </div>
                   <StatusBadge
-                    variant={getStatusVariant(activeStatus)}
-                    label={STATUS_LABELS[activeStatus] || activeStatus}
+                    variant={statusVariant(activeStatus)}
+                    label={statusLabel(activeStatus)}
                     dot
                   />
                 </div>
@@ -244,7 +217,7 @@ export default function CustomerOverviewContent() {
                 {/* Progress Bar */}
                 <div className="mb-4">
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                    <span>Production Progress</span>
+                    <span>Process Progress</span>
                     <span className="font-bold text-foreground">{completionPct}%</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">

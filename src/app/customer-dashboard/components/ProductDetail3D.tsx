@@ -6,6 +6,7 @@ import {
   Layers, Palette, Weight, Wrench, Heart, Clock, Hash, CheckCircle2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { statusLabel } from '@/lib/orders';
 import Icon from '@/components/ui/AppIcon';
 
 
@@ -122,7 +123,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
     { icon: Heart, label: 'Care', value: product?.care_instructions || product?.specifications?.care || 'Wipe with dry cloth' },
     { icon: Clock, label: 'Est. Completion', value: order?.due_date || product?.estimated_production_days ? `${product?.estimated_production_days} days` : 'TBD', highlight: true },
     { icon: Hash, label: 'Queue Position', value: order?.queue_position ? `#${order.queue_position}` : '—', highlight: true },
-    { icon: CheckCircle2, label: 'Order Status', value: order?.extended_status || order?.status || 'Pending', highlight: true },
+    { icon: CheckCircle2, label: 'Order Status', value: statusLabel(order?.extended_status || order?.status || 'pending'), highlight: true },
   ];
 
   const viewModes = [
@@ -263,7 +264,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
             </div>
             <div className="flex justify-between text-xs">
               <span className="text-slate-600 dark:text-white/60">Status</span>
-              <span className="font-semibold text-slate-800 dark:text-white capitalize">{order?.extended_status || order?.status || 'Pending'}</span>
+              <span className="font-semibold text-slate-800 dark:text-white">{statusLabel(order?.extended_status || order?.status || 'pending')}</span>
             </div>
           </div>
 

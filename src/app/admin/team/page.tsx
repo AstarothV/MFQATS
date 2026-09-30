@@ -54,7 +54,7 @@ const teamMembers: TeamMember[] = [
   {
     id: 'JT',
     name: 'James Thompson',
-    role: 'Finishing Specialist',
+    role: 'Quality Inspector',
     status: 'break',
     currentTask: 'None',
     efficiency: 91,
@@ -63,7 +63,7 @@ const teamMembers: TeamMember[] = [
   {
     id: 'LK',
     name: 'Lisa Kim',
-    role: 'Assembly Worker',
+    role: 'Inspection Technician',
     status: 'active',
     currentTask: 'WP-2851 - Walnut Bookshelf',
     efficiency: 87,
@@ -388,7 +388,7 @@ export default function AdminTeamPage() {
                     <td className="px-4 py-4 text-muted-foreground max-w-xs truncate">
                       {assignments.find((assignment) => assignment.staffId === member?.id)?.projectLabel ||
                         (member?.status === 'active'
-                          ? 'Current order in production'
+                          ? 'Current order in process'
                           : member?.status === 'break'
                             ? 'Ready for assignment on return'
                             : member?.status === 'idle'

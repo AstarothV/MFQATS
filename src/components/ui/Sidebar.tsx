@@ -49,7 +49,7 @@ const navByRole = {
   ],
   admin: [
     { label: 'Admin Overview', href: '/admin-dashboard', icon: LayoutDashboard },
-    { label: 'Production', href: '/real-time-production-dashboard', icon: BarChart3 },
+    { label: 'Inspection Progress', href: '/real-time-production-dashboard', icon: BarChart3 },
     { label: 'User Management', href: '/admin/users', icon: Users },
     { label: 'Product Catalog', href: '/catalog', icon: Box },
     { label: 'Order Management', href: '/orders', icon: Package },

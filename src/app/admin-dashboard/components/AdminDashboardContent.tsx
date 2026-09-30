@@ -8,6 +8,7 @@ import {
 import { DollarSign, Package, Users, Bell, FileText, TrendingUp, Loader2, AlertTriangle } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
+import { isProcessStage, statusLabel, statusVariant } from '@/lib/orders';
 import Link from 'next/link';
 
 const COLORS = ['#7C3AED', '#A78BFA', '#F59E0B', '#22C55E', '#38BDF8'];
@@ -43,7 +44,7 @@ export default function AdminDashboardContent() {
 
   // Compute stats
   const totalRevenue = orders.reduce((s, o) => s + (o.amount || 0), 0);
-  const inProductionCount = orders.filter((o) => o.status === 'in_production').length;
+  const inProductionCount = orders.filter((o) => isProcessStage(o.extended_status)).length;
   const staffCount = users.filter((u) => u.role === 'staff').length;
   const defectRate = orders.length > 0 ? ((defects.length / orders.length) * 100).toFixed(1) : '0.0';
 
@@ -65,7 +66,7 @@ export default function AdminDashboardContent() {
 
   const summaryCards = [
     { label: 'Total Revenue', value: `$${(totalRevenue / 1000).toFixed(0)}K`, icon: DollarSign, delta: '+18%', detail: 'All orders combined' },
-    { label: 'Orders in Progress', value: inProductionCount.toString(), icon: Package, delta: `${orders.length} total`, detail: 'Currently in production' },
+    { label: 'Orders in Progress', value: inProductionCount.toString(), icon: Package, delta: `${orders.length} total`, detail: 'Currently in the inspection process' },
     { label: 'Active Staff', value: staffCount.toString(), icon: Users, delta: `${users.length} total users`, detail: 'Production team' },
     { label: 'Defect Rate', value: `${defectRate}%`, icon: Bell, delta: `${defects.length} defects`, detail: 'Quality score' },
   ];
@@ -88,7 +89,7 @@ export default function AdminDashboardContent() {
           <p className="text-sm text-muted-foreground uppercase tracking-[0.3em] mb-2">Administrator Overview</p>
           <h1 className="text-3xl font-bold text-foreground">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-            Monitor revenue, orders, production efficiency, and supplier readiness in one premium woodworks management view.
+            Monitor revenue, orders, inspection progress, and supplier readiness in one premium woodworks management view.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 lg:flex-nowrap lg:shrink-0 lg:justify-end">
@@ -96,7 +97,7 @@ export default function AdminDashboardContent() {
             <FileText size={16} /> Export Reports
           </Link>
           <Link href="/real-time-production-dashboard" className="btn-primary flex items-center gap-2">
-            <TrendingUp size={16} /> Production Monitor
+            <TrendingUp size={16} /> Inspection Monitor
           </Link>
         </div>
       </div>
@@ -229,8 +230,8 @@ export default function AdminDashboardContent() {
                       <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
                       <td className="px-4 py-4">
                         <StatusBadge
-                          variant={order.status === 'pending' ? 'warning' : order.status === 'delivered' ? 'ok' : order.status === 'quality_check' ? 'info' : 'neutral'}
-                          label={order.status?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                          variant={statusVariant(order.extended_status || order.status)}
+                          label={statusLabel(order.extended_status || order.status)}
                         />
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>

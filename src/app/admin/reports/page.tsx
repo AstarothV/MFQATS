@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Download, Loader2, CheckCircle2, AlertTriangle, BarChart3, Package, RotateCcw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isProcessStage, statusLabel } from '@/lib/orders';
 import Icon from '@/components/ui/AppIcon';
 
 
@@ -56,15 +57,15 @@ export default function AdminReportsPage() {
     let filename = '';
 
     if (reportType === 'production') {
-      csvContent = 'Order Ref,Customer,Product,Status,Stage,Amount,Due Date\n';
+      csvContent = 'Order Ref,Customer,Product,Status,Progress,Amount,Due Date\n';
       data.orders.forEach((o) => {
-        csvContent += `${o.order_ref},${o.customer_name},${o.product_name},${o.status},${o.current_stage},${o.amount},${o.due_date || ''}\n`;
+        csvContent += `${o.order_ref},${o.customer_name},${o.product_name},${statusLabel(o.extended_status || o.status)},${o.completion_pct ?? 0}%,${o.amount},${o.due_date || ''}\n`;
       });
-      filename = 'production_report.csv';
+      filename = 'inspection_progress_report.csv';
     } else if (reportType === 'defects') {
-      csvContent = 'Defect Type,Stage,Severity,Confidence,Resolved,Date\n';
+      csvContent = 'Defect Type,Severity,Confidence,Resolved,Date\n';
       data.defects.forEach((d) => {
-        csvContent += `${d.defect_type},${d.stage_name},${d.severity},${d.confidence_score}%,${d.is_resolved},${d.created_at}\n`;
+        csvContent += `${d.defect_type},${d.severity},${d.confidence_score}%,${d.is_resolved},${d.created_at}\n`;
       });
       filename = 'defect_report.csv';
     } else if (reportType === 'inventory') {
@@ -74,9 +75,9 @@ export default function AdminReportsPage() {
       });
       filename = 'inventory_report.csv';
     } else if (reportType === 'rework') {
-      csvContent = 'Stage,Reason,Status,Created\n';
+      csvContent = 'Reason,Status,Created\n';
       data.reworks.forEach((r) => {
-        csvContent += `${r.stage_name},${r.reason},${r.rework_status},${r.created_at}\n`;
+        csvContent += `${r.reason},${r.rework_status},${r.created_at}\n`;
       });
       filename = 'rework_report.csv';
     }
@@ -98,7 +99,7 @@ export default function AdminReportsPage() {
   const reports = [
     {
       id: 'production',
-      title: 'Production Report',
+      title: 'Inspection Progress Report',
       description: 'All orders, stages, completion rates, and delivery status',
       icon: Package,
       count: data.orders.length,
@@ -152,7 +153,7 @@ export default function AdminReportsPage() {
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Administration</p>
           <h1 className="text-3xl font-bold text-foreground">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-2">Generate and export production, QA, defect, and inventory reports.</p>
+          <p className="text-sm text-muted-foreground mt-2">Generate and export inspection progress, QA, defect, and inventory reports.</p>
         </div>
 
         {loading ? (
@@ -199,12 +200,12 @@ export default function AdminReportsPage() {
 
             {/* Summary Stats */}
             <div className="card-dark rounded-3xl border border-border p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Production Summary</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Order Summary</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Orders', value: data.orders.length },
-                  { label: 'In Production', value: data.orders.filter((o) => o.status === 'in_production').length },
-                  { label: 'Delivered', value: data.orders.filter((o) => o.status === 'delivered').length },
+                  { label: 'In Process', value: data.orders.filter((o) => isProcessStage(o.extended_status)).length },
+                  { label: 'Delivered', value: data.orders.filter((o) => (o.extended_status || o.status) === 'delivered').length },
                   { label: 'Defect Rate', value: data.orders.length > 0 ? `${Math.round((data.defects.length / data.orders.length) * 100)}%` : '0%' },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center p-4 rounded-2xl bg-muted/30">

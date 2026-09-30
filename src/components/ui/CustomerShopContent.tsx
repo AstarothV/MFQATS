@@ -144,7 +144,6 @@ export default function CustomerShopContent() {
         amount: cartTotal,
         status: 'pending',
         extended_status: 'pending',
-        current_stage: 'cutting',
         completion_pct: 0,
         delivery_address: deliveryForm.address,
         delivery_city: deliveryForm.city,

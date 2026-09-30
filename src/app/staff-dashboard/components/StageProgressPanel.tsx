@@ -4,21 +4,20 @@ import { CheckCircle2, Circle, Loader2, Lock, ChevronRight, X } from 'lucide-rea
 import StatusBadge from '@/components/ui/StatusBadge';
 
 const stages = [
-  { id: 'stage-cutting', name: 'Cutting', status: 'complete', time: '38m', staff: 'MR' },
-  { id: 'stage-assembly', name: 'Assembly', status: 'complete', time: '1h 12m', staff: 'MR' },
-  { id: 'stage-sanding', name: 'Sanding', status: 'active', time: '1h 24m', staff: 'MR' },
-  { id: 'stage-finishing', name: 'Finishing', status: 'pending', time: '~50m est', staff: '—' },
-  { id: 'stage-qa', name: 'QA Check', status: 'locked', time: '—', staff: '—' },
-  { id: 'stage-ship', name: 'Ready to Ship', status: 'locked', time: '—', staff: '—' },
+  { id: 'stage-upload', name: 'Upload', status: 'complete', time: '6m', staff: 'MR' },
+  { id: 'stage-reconstruction', name: '3D Reconstruction', status: 'complete', time: '24m', staff: 'MR' },
+  { id: 'stage-detect', name: 'Detect Defects', status: 'active', time: '4m', staff: 'MR' },
+  { id: 'stage-results', name: 'Results', status: 'pending', time: '~10m est', staff: '—' },
+  { id: 'stage-recommendation', name: 'Recommendation', status: 'locked', time: '—', staff: '—' },
 ];
 
 const checklist = [
-  { id: 'check-grit-start', label: 'Start with 80-grit sandpaper', done: true },
-  { id: 'check-grain', label: 'Sand along the wood grain direction', done: true },
-  { id: 'check-grit-120', label: 'Progress to 120-grit, check surface', done: true },
-  { id: 'check-grit-220', label: 'Final pass with 220-grit', done: false },
-  { id: 'check-dust', label: 'Vacuum dust and wipe with tack cloth', done: false },
-  { id: 'check-qa-photo', label: 'Take QA inspection photo', done: false },
+  { id: 'check-order', label: 'Select the order being inspected', done: true },
+  { id: 'check-surface', label: 'Wipe sawdust off the surface and check the lighting', done: true },
+  { id: 'check-image', label: 'Capture or upload the inspection image', done: true },
+  { id: 'check-detect', label: 'Run defect detection', done: false },
+  { id: 'check-review', label: 'Review the detected defects and confidence scores', done: false },
+  { id: 'check-save', label: 'Save the scan result', done: false },
 ];
 
 export default function StageProgressPanel() {
@@ -82,7 +81,7 @@ export default function StageProgressPanel() {
                   )}
                 </div>
                 <span
-                  className={`text-2xs text-center leading-tight ${
+                  className={`text-2xs text-center leading-tight whitespace-nowrap ${
                     stage.status === 'active' ?'text-accent font-semibold'
                       : stage.status === 'complete' ?'text-success' :'text-muted-foreground'
                   }`}
@@ -105,7 +104,7 @@ export default function StageProgressPanel() {
 
       {/* Current Stage Checklist */}
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-foreground">Sanding Checklist</p>
+        <p className="text-sm font-semibold text-foreground">Detect Defects Checklist</p>
         <div className="flex items-center gap-2">
           <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
@@ -145,7 +144,7 @@ export default function StageProgressPanel() {
           className={`btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm ${allDone ? 'ring-2 ring-success/50' : ''}`}
         >
           {allDone ? <CheckCircle2 size={14} /> : <ChevronRight size={14} />}
-          {allDone ? 'Submit QA' : 'Open QA Checklist'}
+          {allDone ? 'Submit Checklist' : 'Open Checklist'}
         </button>
         <button
           onClick={() => setModal('note')}
@@ -167,14 +166,14 @@ export default function StageProgressPanel() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-3">
-              <h4 className="text-base font-bold text-foreground">QA Checklist — WP-2847</h4>
+              <h4 className="text-base font-bold text-foreground">Checklist — WP-2847</h4>
               <button onClick={() => setModal(null)} className="text-muted-foreground hover:text-foreground">
                 <X size={16} />
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               {allDone
-                ? 'All sanding checks complete. Ready to submit QA for WP-2847 (Oak Dining Table).'
+                ? 'All Detect Defects checks complete. Ready to submit for WP-2847 (Oak Dining Table).'
                 : `${completedCount} of ${checks.length} checks completed. Complete all items before submitting.`}
             </p>
             {allDone ? (
@@ -182,7 +181,7 @@ export default function StageProgressPanel() {
                 onClick={() => setModal(null)}
                 className="btn-primary w-full text-sm flex items-center justify-center gap-2"
               >
-                <CheckCircle2 size={14} /> Submit QA Pass
+                <CheckCircle2 size={14} /> Submit Checklist
               </button>
             ) : (
               <button onClick={() => setModal(null)} className="btn-secondary w-full text-sm">
