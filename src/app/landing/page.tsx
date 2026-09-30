@@ -57,7 +57,7 @@ const orderSteps = [
 { step: 1, title: 'Browse & Select', desc: 'Explore our handcrafted furniture catalog. Use AR preview to see pieces in your space.', icon: Eye },
 { step: 2, title: 'Customize & Order', desc: 'Choose materials, dimensions, and finishes. Add to cart and place your order.', icon: ShoppingBag },
 { step: 3, title: 'We Craft It', desc: 'Our master woodworkers build your furniture with precision quality control at every stage.', icon: Hammer },
-{ step: 4, title: 'Track & Receive', desc: 'Monitor real-time production progress and receive your furniture with white-glove delivery.', icon: Truck }];
+{ step: 4, title: 'Track & Receive', desc: 'Monitor real-time inspection progress and receive your furniture with white-glove delivery.', icon: Truck }];
 
 
 const testimonials = [
@@ -86,9 +86,9 @@ const testimonials = [
 
 const whyChoose = [
 { icon: Award, title: 'Master Craftsmanship', desc: 'Every piece is handcrafted by skilled woodworkers with 10+ years of experience.' },
-{ icon: Shield, title: 'Quality Guaranteed', desc: 'AI-powered quality inspection at every production stage ensures perfection.' },
+{ icon: Shield, title: 'Quality Guaranteed', desc: 'AI-powered defect detection checks every piece before it is released.' },
 { icon: Smartphone, title: 'AR Visualization', desc: 'Preview furniture in your actual space with true-to-scale AR technology.' },
-{ icon: Layers, title: 'Real-Time Tracking', desc: 'Monitor your order through every production stage with live updates.' },
+{ icon: Layers, title: 'Real-Time Tracking', desc: 'Monitor your order through every stage of the inspection process with live updates.' },
 { icon: Zap, title: 'Fast Production', desc: 'Efficient workshop processes deliver your custom furniture in 14-21 days.' },
 { icon: Users, title: 'Dedicated Support', desc: 'Direct chat with our production team for any questions or updates.' }];
 
@@ -228,7 +228,7 @@ export default function LandingPage() {
                 { label: 'Years of Experience', value: '20+' },
                 { label: 'Products Crafted', value: '10,000+' },
                 { label: 'Wood Species Used', value: '15+' },
-                { label: 'Quality Checkpoints', value: '7 Stages' }].
+                { label: 'Inspection Process', value: '5 Stages' }].
                 map((item) =>
                 <div key={item.label} className="rounded-2xl border border-border bg-card p-4">
                     <p className="text-xl font-bold text-primary">{item.value}</p>

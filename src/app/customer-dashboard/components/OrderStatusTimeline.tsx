@@ -2,38 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, Loader2, Lock, Clock, ChevronDown, ChevronUp, Hash } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { PROCESS_STAGES, statusLabel } from '@/lib/orders';
 
 interface OrderStatusTimelineProps {
   order?: any;
 }
-
-const STAGE_ORDER = ['cutting', 'assembly', 'sanding', 'staining', 'finishing', 'quality_check', 'shipping'];
-
-const STAGE_LABELS: Record<string, string> = {
-  cutting: 'Cutting',
-  assembly: 'Assembly',
-  sanding: 'Sanding',
-  staining: 'Staining',
-  finishing: 'Finishing',
-  quality_check: 'Quality Check',
-  shipping: 'Ready to Ship',
-};
-
-const EXTENDED_STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  designing: 'Designing',
-  material_preparation: 'Material Preparation',
-  cutting: 'Cutting',
-  assembly: 'Assembly',
-  sanding: 'Sanding',
-  finishing: 'Finishing',
-  quality_inspection: 'Quality Inspection',
-  ready_for_delivery: 'Ready for Delivery',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
-  in_production: 'In Production',
-};
 
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -74,55 +47,27 @@ const stagePalette: Record<string, { text: string; badge: string; track: string;
 export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
   const supabase = createClient();
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [stages, setStages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!order?.id) return;
-    const fetchStages = async () => {
-      setLoading(true);
-      const { data } = await supabase
-        .from('production_stages')
-        .select('*')
-        .eq('order_id', order.id)
-        .order('created_at', { ascending: true });
-      setStages(data || []);
-      setLoading(false);
-    };
-    fetchStages();
-  }, [order?.id, supabase]);
-
-  // PERT-based Estimated Delivery Date (supabase function order_eta); null once delivered/cancelled
+  // PERT-based estimated completion date (supabase function order_eta); null once delivered/cancelled
   const [eta, setEta] = useState<string | null>(null);
   useEffect(() => {
     if (!order?.id) return;
     supabase.rpc('order_eta', { p_order_id: order.id }).then(({ data }) => setEta(data ?? null));
   }, [order?.id, order?.extended_status, supabase]);
 
-  const currentStageIndex = STAGE_ORDER.indexOf(order?.current_stage || 'cutting');
-  const completionPct = order?.completion_pct || Math.round(((currentStageIndex + 1) / STAGE_ORDER.length) * 100);
+  const extendedStatus = order?.extended_status || order?.status || 'pending';
+  const extendedStatusLabel = statusLabel(extendedStatus);
 
-  const getStageStatus = (stageName: string, idx: number) => {
+  // Where the order is in the five-stage process: before it (pending/confirmed) = -1, delivered = past the end.
+  const stageIndex = PROCESS_STAGES.findIndex((st) => st.key === extendedStatus);
+  const currentStageIndex = extendedStatus === 'delivered' ? PROCESS_STAGES.length : extendedStatus === 'cancelled' ? -2 : stageIndex;
+  const completionPct = order?.completion_pct ?? 0;
+
+  const getStageStatus = (idx: number) => {
     if (idx < currentStageIndex) return 'complete';
     if (idx === currentStageIndex) return 'active';
     if (idx === currentStageIndex + 1) return 'pending';
     return 'locked';
   };
-
-  const getStageData = (stageName: string) => {
-    return stages.find((s) => s.stage_name === stageName);
-  };
-
-  const extendedStatus = order?.extended_status || order?.status || 'pending';
-  const extendedStatusLabel = EXTENDED_STATUS_LABELS[extendedStatus] || extendedStatus;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 size={24} className="animate-spin text-purple-600 dark:text-purple-300" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-5">
@@ -164,7 +109,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
         </div>
         <div className="text-right shrink-0">
           <p className="text-xs text-slate-500 dark:text-slate-400" title="Estimated with PERT from today, based on how long each remaining stage usually takes">
-            Estimated Delivery
+            Estimated Completion
           </p>
           <p className="text-base font-bold text-slate-900 dark:text-white">
             {eta ? fmtDate(eta) : extendedStatus === 'delivered' ? 'Delivered' : order?.due_date ? fmtDate(order.due_date) : 'TBD'}
@@ -175,14 +120,14 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
 
       {/* Timeline */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors">
-        <h3 className="mb-5 text-base font-semibold text-foreground">Production Timeline</h3>
+        <h3 className="mb-5 text-base font-semibold text-foreground">Inspection Process</h3>
         <div className="space-y-0">
-          {STAGE_ORDER.map((stageName, idx) => {
-            const status = getStageStatus(stageName, idx);
-            const stageData = getStageData(stageName);
-            const isLast = idx === STAGE_ORDER.length - 1;
+          {PROCESS_STAGES.map((stage, idx) => {
+            const stageName = stage.key;
+            const status = getStageStatus(idx);
+            const isLast = idx === PROCESS_STAGES.length - 1;
             const isExpanded = expanded === stageName;
-            const hasDetails = stageData || status === 'active';
+            const hasDetails = true;
 
             return (
               <div key={stageName} className="flex gap-4">
@@ -220,7 +165,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
                     <div className="flex items-center justify-between">
                       <div>
                         <span className={`text-sm font-semibold ${stagePalette[status as keyof typeof stagePalette].text}`}>
-                          {STAGE_LABELS[stageName]}
+                          {stage.label}
                         </span>
                         {status === 'active' && (
                           <span className="ml-2 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/15 dark:text-purple-200">
@@ -229,11 +174,6 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        {stageData?.completed_at && (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(stageData.completed_at).toLocaleDateString()}
-                          </span>
-                        )}
                         {hasDetails && (isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />)}
                       </div>
                     </div>
@@ -241,22 +181,9 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
 
                   {isExpanded && hasDetails && (
                     <div className="mt-2 animate-fade-in space-y-1.5 rounded-xl border border-border bg-muted p-3 dark:bg-muted/80">
-                      {stageData?.started_at && (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-slate-900 dark:text-white">Started:</span>{' '}
-                          {new Date(stageData.started_at).toLocaleString()}
-                        </p>
-                      )}
-                      {stageData?.duration_minutes && (
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-slate-900 dark:text-white">Duration:</span> {stageData.duration_minutes}m
-                        </p>
-                      )}
-                      {stageData?.notes && (
-                        <p className="text-xs text-muted-foreground">{stageData.notes}</p>
-                      )}
-                      {status === 'active' && !stageData && (
-                        <p className="text-xs text-purple-700 dark:text-purple-300">Currently in progress — our team is working on your order.</p>
+                      <p className="text-xs text-muted-foreground">{stage.description}</p>
+                      {status === 'active' && (
+                        <p className="text-xs text-purple-700 dark:text-purple-300">Currently in progress.</p>
                       )}
                     </div>
                   )}

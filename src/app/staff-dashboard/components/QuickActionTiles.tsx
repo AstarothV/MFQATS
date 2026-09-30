@@ -14,10 +14,10 @@ const actions = [
     id: 'action-next-task',
     icon: Play,
     label: 'Start Next Task',
-    desc: 'WP-2851 · Assembly',
+    desc: 'WP-2851 · Upload',
     color: 'text-success',
     bg: 'bg-muted/20 border-border hover:bg-muted/40',
-    modal: { title: 'Starting WP-2851', body: 'Task WP-2851 (Walnut Bookshelf Unit · Assembly) has been started. Timer is now running.' },
+    modal: { title: 'Starting WP-2851', body: 'Task WP-2851 (Walnut Bookshelf Unit · Upload) has been started. Timer is now running.' },
   },
   {
     id: 'action-camera',
@@ -44,7 +44,7 @@ const actions = [
     desc: 'WP-2847 pending',
     color: 'text-warning',
     bg: 'bg-muted/20 border-border hover:bg-muted/40',
-    modal: { title: 'QA Checklist — WP-2847', body: 'Opening QA checklist for WP-2847 (Oak Dining Table · Sanding stage). 3 of 6 checks completed.' },
+    modal: { title: 'Checklist — WP-2847', body: 'Opening the checklist for WP-2847 (Oak Dining Table · Detect Defects). 3 of 6 checks completed.' },
   },
   {
     id: 'action-help',

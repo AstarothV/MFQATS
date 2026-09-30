@@ -7,13 +7,13 @@ import {
 
 // BACKEND INTEGRATION: Replace with GET /api/qa/defects/frequency?range=7d
 const data = [
-  { type: 'Surface Crack', count: 14, stage: 'Sanding' },
-  { type: 'Joint Gap', count: 9, stage: 'Assembly' },
-  { type: 'Finish Bleed', count: 7, stage: 'Finishing' },
-  { type: 'Dim. Error', count: 6, stage: 'Cutting' },
-  { type: 'Scratch', count: 11, stage: 'Sanding' },
-  { type: 'Residue', count: 5, stage: 'Finishing' },
-  { type: 'Knot Void', count: 3, stage: 'Cutting' },
+  { type: 'Surface Crack', count: 14, stage: 'Detect Defects' },
+  { type: 'Joint Gap', count: 9, stage: 'Detect Defects' },
+  { type: 'Finish Bleed', count: 7, stage: 'Detect Defects' },
+  { type: 'Dim. Error', count: 6, stage: 'Detect Defects' },
+  { type: 'Scratch', count: 11, stage: 'Detect Defects' },
+  { type: 'Residue', count: 5, stage: 'Detect Defects' },
+  { type: 'Knot Void', count: 3, stage: 'Detect Defects' },
 ];
 
 const barColors = [

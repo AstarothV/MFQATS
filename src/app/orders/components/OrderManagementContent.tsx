@@ -4,27 +4,11 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
-import { moveOrderStage } from '@/lib/orders';
+import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 
-const EXTENDED_STATUSES = [
-  'pending', 'confirmed', 'designing', 'material_preparation',
-  'cutting', 'assembly', 'sanding', 'finishing',
-  'quality_inspection', 'ready_for_delivery', 'delivered', 'cancelled'
-];
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  confirmed: 'Confirmed',
-  designing: 'Designing',
-  material_preparation: 'Material Prep',
-  cutting: 'Cutting',
-  assembly: 'Assembly',
-  sanding: 'Sanding',
-  finishing: 'Finishing',
-  quality_inspection: 'Quality Inspection',
-  ready_for_delivery: 'Ready for Delivery',
-  delivered: 'Delivered',
-  cancelled: 'Cancelled',
+const GATE_HINTS: Record<string, string> = {
+  scan_done: 'Needs a defect scan saved for this order during Detect Defects',
+  scan_passed: 'Needs the latest defect scan to pass',
 };
 
 export default function OrderManagementContent() {
@@ -59,7 +43,7 @@ export default function OrderManagementContent() {
   useEffect(() => { fetchOrders(); }, []);
 
   // FSM edges (supabase/migrations/*_order_stage_fsm.sql). The database rejects any other move; this only greys out buttons.
-  const [transitions, setTransitions] = useState<{ from_status: string; to_status: string; requires_qa_pass: boolean }[]>([]);
+  const [transitions, setTransitions] = useState<{ from_status: string; to_status: string; gate: string | null }[]>([]);
   useEffect(() => {
     supabase.from('order_status_transitions').select('*').then(({ data, error }) => {
       if (error) showToast('error', `Could not load stage rules: ${error.message}`);
@@ -82,7 +66,7 @@ export default function OrderManagementContent() {
     return orders.filter(order => {
       const matchSearch = order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
         order.customer_name?.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = filterStatus === 'All' || order.extended_status === filterStatus || order.status === filterStatus;
+      const matchStatus = filterStatus === 'All' || (order.extended_status || 'pending') === filterStatus;
       return matchSearch && matchStatus;
     });
   }, [orders, search, filterStatus]);
@@ -94,7 +78,7 @@ export default function OrderManagementContent() {
     try {
       await moveOrderStage(supabase, orders.find(o => o.id === orderId) || { id: orderId }, newStatus);
 
-      showToast('success', `Order status updated to ${STATUS_LABELS[newStatus]}`);
+      showToast('success', `Order moved to ${statusLabel(newStatus)}`);
       fetchOrders();
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to update status');
@@ -106,14 +90,6 @@ export default function OrderManagementContent() {
   async function approveOrder(orderId: string) {
     await updateOrderStatus(orderId, 'confirmed');
   }
-
-  const getStatusVariant = (status: string) => {
-    if (status === 'delivered') return 'ok';
-    if (status === 'cancelled') return 'danger';
-    if (status === 'quality_inspection') return 'info';
-    if (status === 'pending') return 'warning';
-    return 'neutral';
-  };
 
   const nextMoves = transitions.filter(t => t.from_status === (activeOrder?.extended_status || 'pending'));
   const canMoveTo = (status: string) => nextMoves.some(t => t.to_status === status);
@@ -130,17 +106,17 @@ export default function OrderManagementContent() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Order Management</p>
-          <h1 className="text-3xl font-bold text-foreground">Track work orders and delivery stages</h1>
+          <h1 className="text-3xl font-bold text-foreground">Track orders through the inspection process</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {['All', 'pending', 'in_production', 'quality_inspection', 'delivered'].map(status => (
+          {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered'].map(status => (
             <button
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
               className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
             >
-              {status === 'All' ? 'All' : STATUS_LABELS[status] || status}
+              {status === 'All' ? 'All' : statusLabel(status)}
             </button>
           ))}
         </div>
@@ -191,8 +167,8 @@ export default function OrderManagementContent() {
                         <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
                         <td className="px-4 py-4">
                           <StatusBadge
-                            variant={getStatusVariant(order.extended_status || order.status)}
-                            label={STATUS_LABELS[order.extended_status || order.status] || order.status}
+                            variant={statusVariant(order.extended_status || order.status)}
+                            label={statusLabel(order.extended_status || order.status)}
                           />
                         </td>
                         <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>
@@ -216,8 +192,8 @@ export default function OrderManagementContent() {
                       <p className="text-sm text-muted-foreground mt-1">{activeOrder.order_ref}</p>
                     </div>
                     <StatusBadge
-                      variant={getStatusVariant(activeOrder.extended_status || activeOrder.status)}
-                      label={STATUS_LABELS[activeOrder.extended_status || activeOrder.status] || activeOrder.status}
+                      variant={statusVariant(activeOrder.extended_status || activeOrder.status)}
+                      label={statusLabel(activeOrder.extended_status || activeOrder.status)}
                     />
                   </div>
                   <div className="space-y-3 text-sm text-muted-foreground">
@@ -245,7 +221,7 @@ export default function OrderManagementContent() {
                     )}
                     <div className="rounded-3xl bg-muted p-4">
                       <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-3">
-                        <span>Production progress</span>
+                        <span>Process progress</span>
                         <span>{activeOrder.completion_pct || 0}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-border overflow-hidden">
@@ -257,23 +233,22 @@ export default function OrderManagementContent() {
 
                 {/* Update Status */}
                 <section className="card-dark rounded-3xl border border-border p-6">
-                  <h3 className="text-base font-semibold text-foreground mb-4">Update Production Stage</h3>
+                  <h3 className="text-base font-semibold text-foreground mb-4">Update Process Stage</h3>
                   <div className="grid grid-cols-2 gap-2">
-                    {EXTENDED_STATUSES.filter(s => s !== 'cancelled').map(status => (
+                    {ORDER_STATUSES.filter(s => s !== 'cancelled').map(status => (
                       <button
                         key={status}
                         type="button"
                         onClick={() => updateOrderStatus(activeOrder.id, status)}
                         disabled={updating || !canMoveTo(status)}
-                        title={transitions.find(t => t.from_status === (activeOrder.extended_status || 'pending') && t.to_status === status)?.requires_qa_pass
-                          ? 'Needs a passing Quality Scan (stage "Quality Check")' : undefined}
+                        title={GATE_HINTS[nextMoves.find(t => t.to_status === status)?.gate || '']}
                         className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                           (activeOrder.extended_status || 'pending') === status
                             ? 'bg-primary text-primary-foreground' :'bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50'
                         }`}
                       >
                         {updating && <Loader2 size={10} className="inline animate-spin mr-1" />}
-                        {STATUS_LABELS[status]}
+                        {statusLabel(status)}
                       </button>
                     ))}
                   </div>
@@ -297,11 +272,12 @@ export default function OrderManagementContent() {
                     )}
                     <button
                       type="button"
-                      onClick={() => updateOrderStatus(activeOrder.id, 'ready_for_delivery')}
-                      disabled={updating || !canMoveTo('ready_for_delivery')}
+                      onClick={() => updateOrderStatus(activeOrder.id, 'delivered')}
+                      disabled={updating || !canMoveTo('delivered')}
+                      title={GATE_HINTS.scan_passed}
                       className="btn-secondary w-full flex items-center justify-center gap-2"
                     >
-                      <Truck size={16} /> Mark Ready for Delivery
+                      <Truck size={16} /> Mark as Delivered
                     </button>
                     <button
                       type="button"

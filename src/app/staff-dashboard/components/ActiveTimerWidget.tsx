@@ -55,7 +55,7 @@ export default function ActiveTimerWidget() {
           <p className="text-5xl font-bold tabular-nums tracking-tight leading-none">
             {formatTime(elapsed)}
           </p>
-          <p className="text-xs text-muted-foreground mt-2 font-medium">Stage: Sanding · Est. 45 min remaining</p>
+          <p className="text-xs text-muted-foreground mt-2 font-medium">Stage: Detect Defects · Est. 45 min remaining</p>
           {overThreshold && (
             <p className="text-xs text-warning mt-1 font-medium animate-pulse-subtle">
               ⚠ Elapsed exceeds stage threshold

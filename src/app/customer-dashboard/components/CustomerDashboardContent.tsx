@@ -7,6 +7,7 @@ import ProductDetail3D from './ProductDetail3D';
 import InquirySystem from '@/components/ui/InquirySystem';
 import { Package, Image, Box, Loader2, MessageSquare, ShoppingBag } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { statusLabel as orderStatusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
@@ -66,8 +67,7 @@ export default function CustomerDashboardContent() {
     );
   }
 
-  const statusLabel = order?.extended_status?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) ||
-    order?.status?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()) || 'Pending';
+  const statusLabel = orderStatusLabel(order?.extended_status || order?.status || 'pending');
 
   return (
     <div className="space-y-6">

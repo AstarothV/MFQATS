@@ -26,7 +26,7 @@ export default function ProductionHeader() {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Production Dashboard</h1>
+        <h1 className="text-2xl font-bold text-foreground">Inspection Progress</h1>
         <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
           <span className={`w-2 h-2 rounded-full ${refreshing ? 'bg-warning animate-pulse' : 'bg-success animate-pulse-subtle'} inline-block`} />
           {refreshing ? 'Refreshing...' : 'Live · Last updated 14:36:03 · Mon 11 May 2026'}

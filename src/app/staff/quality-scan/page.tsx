@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Shield, Target, Activity, ArrowRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { moveOrderStage } from '@/lib/orders';
+import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 
@@ -39,7 +39,6 @@ interface DetectResponse {
   defect_count: number;
 }
 
-const STAGE_OPTIONS = ['cutting', 'assembly', 'sanding', 'staining', 'finishing', 'quality_check'];
 // Same-origin path that next.config.mjs forwards to the Python server, so it also works on phones via an https link.
 const YOLO_API_URL = process.env.NEXT_PUBLIC_YOLO_API_URL || '/staff/yolo';
 const LIVE_SCAN_INTERVAL_MS = 1000;
@@ -122,7 +121,6 @@ export default function QualityScanPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [selectedStage, setSelectedStage] = useState('sanding');
   const [notes, setNotes] = useState('');
   const [history, setHistory] = useState<DetectionLog[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -303,14 +301,15 @@ export default function QualityScanPage() {
   const selectedOrder = orders.find((o) => o.id === selectedOrderId);
   const [releasing, setReleasing] = useState(false);
 
-  // one click after a passing Quality Check scan; the database quality gate still verifies the scan
+  // A saved scan completes Detect Defects, so the order can go on to Results (the database checks the scan exists).
+  const inDetectDefects = selectedOrder?.extended_status === 'detect_defects';
   async function releaseOrder() {
     if (!selectedOrder) return;
     setReleasing(true);
     try {
-      await moveOrderStage(supabase, selectedOrder, 'ready_for_delivery');
-      setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: 'ready_for_delivery' } : o)));
-      showToast('success', `${selectedOrder.order_ref} moved to Ready for Delivery`);
+      await moveOrderStage(supabase, selectedOrder, 'results');
+      setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: 'results' } : o)));
+      showToast('success', `${selectedOrder.order_ref} moved to Results`);
     } catch (err: any) {
       showToast('error', err?.message || 'Could not move the order');
     } finally {
@@ -324,7 +323,6 @@ export default function QualityScanPage() {
     try {
       const { error } = await supabase.from('detection_logs').insert({
         order_id: selectedOrderId || null,
-        stage_name: selectedStage,
         inspector_id: user.id,
         scan_mode: mode === 'live' ? 'live_camera' : 'image_upload',
         image_url: capturedImage || uploadedImage || '',
@@ -343,8 +341,7 @@ export default function QualityScanPage() {
       if (realDefects.length > 0 && selectedOrderId) {
         const defectInserts = realDefects.map((d) => ({
           order_id: selectedOrderId,
-          stage_name: selectedStage,
-          defect_type: d.class_name,
+            defect_type: d.class_name,
           description: `${formatLabel(d.class_name)} detected with ${d.confidence_score}% confidence`,
           severity: d.severity,
           confidence_score: d.confidence_score,
@@ -368,7 +365,7 @@ export default function QualityScanPage() {
       showToast('success',
         !selectedOrderId ? 'Detection saved (not linked to an order)'
         : result === 'fail' ? 'Saved. A rework task was created and the admin was notified.'
-        : selectedStage === 'quality_check' ? 'Saved. Quality gate passed and the admin was notified.'
+        : inDetectDefects ? 'Saved. Detect Defects is complete and the admin was notified.'
         : 'Detection saved successfully');
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to save detection');
@@ -470,16 +467,14 @@ export default function QualityScanPage() {
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Production Stage</label>
-            <select
-              value={selectedStage}
-              onChange={(e) => setSelectedStage(e.target.value)}
-              className="input-dark w-full"
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Process Stage</label>
+            {/* read-only: a scan is the Detect Defects step, the stage comes from the selected order */}
+            <div
+              className="input-dark w-full truncate text-muted-foreground"
+              title={selectedOrder && !inDetectDefects ? 'Only scans saved while the order is at Detect Defects complete that stage' : undefined}
             >
-              {STAGE_OPTIONS.map((s) => (
-                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1).replace('_', ' ')}</option>
-              ))}
-            </select>
+              {selectedOrder ? statusLabel(selectedOrder.extended_status) : 'Select an order'}
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Order (Optional)</label>
@@ -490,7 +485,7 @@ export default function QualityScanPage() {
             >
               <option value="">Select order...</option>
               {orders.map((o) => (
-                <option key={o.id} value={o.id}>{o.order_ref} — {o.product_name}</option>
+                <option key={o.id} value={o.id}>{o.order_ref} — {o.product_name} ({statusLabel(o.extended_status)})</option>
               ))}
             </select>
           </div>
@@ -710,8 +705,8 @@ export default function QualityScanPage() {
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Stage</span>
-                  <span className="font-semibold text-foreground capitalize">{selectedStage.replace('_', ' ')}</span>
+                  <span className="text-sm text-muted-foreground">Process Stage</span>
+                  <span className="font-semibold text-foreground">{selectedOrder ? statusLabel(selectedOrder.extended_status) : '—'}</span>
                 </div>
               </div>
             </div>
@@ -776,26 +771,35 @@ export default function QualityScanPage() {
                   <p className="text-xs text-muted-foreground">
                     {selectedOrderId ? 'Saving creates a rework task for this order and notifies the admin.' : 'Select an order above to create a rework task.'}
                   </p>
+                  {saved && inDetectDefects && selectedOrder && (
+                    <button
+                      onClick={releaseOrder}
+                      disabled={releasing}
+                      className="w-full btn-secondary flex items-center justify-center gap-2 text-sm"
+                    >
+                      {releasing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Move {selectedOrder.order_ref} to Results
+                    </button>
+                  )}
                 </div>
               </div>
             )}
             {result === 'pass' && (
               <div className="card-dark rounded-3xl border border-border p-5">
-                <h3 className="text-base font-semibold text-foreground mb-3">QA Actions</h3>
+                <h3 className="text-base font-semibold text-foreground mb-3">Result Actions</h3>
                 <button
                   onClick={saveDetection}
                   disabled={saving || saved}
                   className="w-full btn-primary flex items-center justify-center gap-2 text-sm"
                 >
-                  <CheckCircle2 size={14} /> Approve QA & Save
+                  <CheckCircle2 size={14} /> Approve & Save Result
                 </button>
-                {saved && selectedStage === 'quality_check' && selectedOrder?.extended_status === 'quality_inspection' && (
+                {saved && inDetectDefects && selectedOrder && (
                   <button
                     onClick={releaseOrder}
                     disabled={releasing}
                     className="mt-2 w-full btn-secondary flex items-center justify-center gap-2 text-sm"
                   >
-                    {releasing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Move {selectedOrder.order_ref} to Ready for Delivery
+                    {releasing ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Move {selectedOrder.order_ref} to Results
                   </button>
                 )}
               </div>
@@ -820,7 +824,6 @@ export default function QualityScanPage() {
                     <tr>
                       <th className="px-4 py-3">Date</th>
                       <th className="px-4 py-3">Order</th>
-                      <th className="px-4 py-3">Stage</th>
                       <th className="px-4 py-3">Mode</th>
                       <th className="px-4 py-3">Defects</th>
                       <th className="px-4 py-3">Confidence</th>
@@ -835,9 +838,6 @@ export default function QualityScanPage() {
                         </td>
                         <td className="px-4 py-3 text-foreground font-medium">
                           {log.orders?.order_ref || '—'}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground capitalize">
-                          {log.stage_name?.replace('_', ' ')}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground capitalize">
                           {log.scan_mode?.replace('_', ' ')}

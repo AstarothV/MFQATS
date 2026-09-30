@@ -25,7 +25,7 @@ const initialTasks: AssignedTask[] = [
     workpieceId: 'WP-2847',
     name: 'Oak Dining Table',
     order: 'ORD-4421',
-    stage: 'Sanding',
+    stage: 'Detect Defects',
     priority: 'urgent',
     estimatedMin: 45,
     elapsedMin: 84,
@@ -37,7 +37,7 @@ const initialTasks: AssignedTask[] = [
     workpieceId: 'WP-2851',
     name: 'Walnut Bookshelf Unit',
     order: 'ORD-4418',
-    stage: 'Assembly',
+    stage: 'Upload',
     priority: 'normal',
     estimatedMin: 90,
     elapsedMin: 0,
@@ -49,7 +49,7 @@ const initialTasks: AssignedTask[] = [
     workpieceId: 'WP-2839',
     name: 'Cherry Side Table',
     order: 'ORD-4409',
-    stage: 'Finishing',
+    stage: 'Results',
     priority: 'low',
     estimatedMin: 60,
     elapsedMin: 0,
@@ -61,7 +61,7 @@ const initialTasks: AssignedTask[] = [
     workpieceId: 'WP-2856',
     name: 'Maple Coffee Table',
     order: 'ORD-4425',
-    stage: 'Cutting',
+    stage: '3D Reconstruction',
     priority: 'normal',
     estimatedMin: 35,
     elapsedMin: 0,
@@ -77,11 +77,11 @@ const priorityVariant = {
 } as const;
 
 const stageColor: Record<string, string> = {
-  Cutting: 'text-info',
-  Assembly: 'text-warning',
-  Sanding: 'text-accent',
-  Finishing: 'text-success',
-  'QA Check': 'text-primary',
+  Upload: 'text-info',
+  '3D Reconstruction': 'text-warning',
+  'Detect Defects': 'text-accent',
+  Results: 'text-success',
+  Recommendation: 'text-primary',
 };
 
 export default function AssignedTasksList() {
@@ -216,7 +216,7 @@ export default function AssignedTasksList() {
                 <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
                   <button
                     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition-all active:scale-95"
-                    onClick={(e) => { e.stopPropagation(); showToast(`QA Checklist opened for ${task.workpieceId}`); }}
+                    onClick={(e) => { e.stopPropagation(); showToast(`Checklist opened for ${task.workpieceId}`); }}
                   >
                     <ChevronRight size={11} /> Open QA
                   </button>

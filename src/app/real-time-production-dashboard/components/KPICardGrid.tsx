@@ -41,7 +41,7 @@ const kpiData = [
     label: 'Active Bottlenecks',
     value: '3',
     unit: 'stations',
-    delta: 'Sanding · Finishing · S4',
+    delta: 'Detect Defects · Results · S4',
     deltaPositive: false,
     variant: 'danger' as const,
     sparkData: [0, 1, 1, 2, 2, 3, 3],

@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Timer } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { statusLabel } from '@/lib/orders';
 
 // PERT + WMA per stage, computed in the database (supabase/migrations/*_production_timeline_pert_wma.sql).
 interface StageStat {
@@ -15,18 +16,26 @@ interface StageStat {
   wma_hours: number | null;
 }
 
-const label = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 const hrs = (h: number | null) => (h == null ? '—' : `${Number(h).toFixed(1)}h`);
 
 export default function StageTimelinePanel() {
   const supabase = createClient();
   const [stats, setStats] = useState<StageStat[]>([]);
   const [error, setError] = useState('');
+  const [counts, setCounts] = useState<Record<string, number>>({});  // orders currently at each status
 
   useEffect(() => {
     supabase.rpc('stage_timeline_stats').then(({ data, error }) => {
       if (error) setError(error.message);
       else setStats(data || []);
+    });
+    supabase.from('orders').select('extended_status').then(({ data }) => {
+      const c: Record<string, number> = {};
+      (data || []).forEach((o: { extended_status: string | null }) => {
+        const k = o.extended_status || 'pending';
+        c[k] = (c[k] || 0) + 1;
+      });
+      setCounts(c);
     });
   }, [supabase]);
 
@@ -34,7 +43,7 @@ export default function StageTimelinePanel() {
     <div className="card-dark p-5">
       <div className="flex items-center gap-2 mb-1">
         <Timer size={16} className="text-primary" />
-        <h2 className="text-base font-semibold text-foreground">Production Timeline (PERT + WMA)</h2>
+        <h2 className="text-base font-semibold text-foreground">Process Timeline (PERT + WMA)</h2>
       </div>
       <p className="text-xs text-muted-foreground mb-4">
         Te = (O + 4M + P) / 6 per stage. WMA weighs the latest 5 cycles most, showing whether the stage is currently running faster or slower than expected.
@@ -45,6 +54,7 @@ export default function StageTimelinePanel() {
           <thead>
             <tr className="text-left text-xs text-muted-foreground uppercase tracking-wider border-b border-border">
               <th className="py-2 pr-3">Stage</th>
+              <th className="py-2 pr-3" title="Orders at this stage right now">Orders now</th>
               <th className="py-2 pr-3">Cycles</th>
               <th className="py-2 pr-3">O</th>
               <th className="py-2 pr-3">M</th>
@@ -59,12 +69,13 @@ export default function StageTimelinePanel() {
               const pace = s.wma_hours == null ? null : s.wma_hours <= s.expected_hours ? 'Faster' : 'Slower';
               return (
                 <tr key={s.status} className="border-b border-border/50">
-                  <td className="py-2 pr-3 font-medium text-foreground">
-                    {label(s.status)}
+                  <td className="py-2 pr-3 font-medium text-foreground whitespace-nowrap">
+                    {statusLabel(s.status)}
                     {s.source === 'default' && (
                       <span className="ml-2 text-[10px] text-muted-foreground" title="Fewer than 3 finished cycles; using the starting estimate">estimate</span>
                     )}
                   </td>
+                  <td className="py-2 pr-3 tabular-nums font-semibold text-foreground">{counts[s.status] || 0}</td>
                   <td className="py-2 pr-3 tabular-nums">{s.samples}</td>
                   <td className="py-2 pr-3 tabular-nums">{hrs(s.optimistic_hours)}</td>
                   <td className="py-2 pr-3 tabular-nums">{hrs(s.most_likely_hours)}</td>

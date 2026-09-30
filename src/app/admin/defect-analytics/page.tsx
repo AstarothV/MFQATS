@@ -66,11 +66,11 @@ export default function AdminDefectAnalyticsPage() {
             .sort((a, b) => b.count - a.count)
         );
 
-        // Aggregate by stage
+        // Aggregate by severity. (Every defect is found in the Detect Defects stage, so a per-stage split no longer applies.)
         const stageMap: Record<string, number> = {};
         data.forEach((d) => {
-          if (d.stage_name) {
-            stageMap[d.stage_name] = (stageMap[d.stage_name] || 0) + 1;
+          if (d.severity) {
+            stageMap[d.severity] = (stageMap[d.severity] || 0) + 1;
           }
         });
         setStageStats(
@@ -142,11 +142,11 @@ export default function AdminDefectAnalyticsPage() {
                 )}
               </div>
 
-              {/* Defects by Stage */}
+              {/* Defects by Severity */}
               <div className="card-dark rounded-3xl border border-border p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Defects by Production Stage</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Defects by Severity</h3>
                 {stageStats.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No stage data available</p>
+                  <p className="text-sm text-muted-foreground text-center py-8">No severity data available</p>
                 ) : (
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -176,7 +176,6 @@ export default function AdminDefectAnalyticsPage() {
                     <thead className="border-b border-border text-xs uppercase tracking-[0.18em] text-muted-foreground">
                       <tr>
                         <th className="px-4 py-3">Type</th>
-                        <th className="px-4 py-3">Stage</th>
                         <th className="px-4 py-3">Severity</th>
                         <th className="px-4 py-3">Confidence</th>
                         <th className="px-4 py-3">Status</th>
@@ -187,7 +186,6 @@ export default function AdminDefectAnalyticsPage() {
                       {defects.slice(0, 20).map((d) => (
                         <tr key={d.id} className="hover:bg-muted/50 transition-colors">
                           <td className="px-4 py-3 font-medium text-foreground capitalize">{d.defect_type?.replace(/_/g, ' ')}</td>
-                          <td className="px-4 py-3 text-muted-foreground capitalize">{d.stage_name?.replace(/_/g, ' ')}</td>
                           <td className="px-4 py-3">
                             <StatusBadge
                               variant={d.severity === 'critical' || d.severity === 'high' ? 'danger' : d.severity === 'medium' ? 'warning' : 'info'}

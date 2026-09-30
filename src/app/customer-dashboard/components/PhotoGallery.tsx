@@ -20,18 +20,9 @@ interface PhotoGalleryProps {
   orderId?: string;
 }
 
-const FILTER_TABS = [
-  { key: 'All', label: 'All' },
-  { key: 'In Production', label: 'In Production' },
-  { key: 'Finished', label: 'Finished' },
-  { key: 'Delivered', label: 'Delivered' },
-];
-
-const STAGE_FILTER_MAP: Record<string, string[]> = {
-  'In Production': ['cutting', 'assembly', 'sanding', 'staining', 'finishing', 'material_preparation', 'designing', 'in_production'],
-  'Finished': ['quality_inspection', 'quality_check', 'ready_for_delivery', 'finished'],
-  'Delivered': ['delivered', 'shipped', 'pickup'],
-};
+// Photos are inspection documentation; they are no longer grouped by workshop stage.
+const FILTER_TABS = [{ key: 'All', label: 'All' }];
+const STAGE_FILTER_MAP: Record<string, string[]> = {};
 
 function PhotoSkeleton() {
   return (
@@ -63,11 +54,11 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
         image_url: p.image_url || '',
         caption: p.caption || '',
         tags: Array.isArray(p.tags) ? p.tags : (typeof p.tags === 'string' ? (() => { try { return JSON.parse(p.tags); } catch { return []; } })() : []),
-        stage_name: p.stage_name || '',
+        stage_name: '',  // older rows carry workshop stage names that are no longer part of the process
         created_at: p.created_at,
         uploaded_by: p.uploaded_by || '',
         uploader_name: p.uploader_name || p.uploaded_by_name || 'Staff',
-        production_stage: p.production_stage || p.stage_name || '',
+        production_stage: '',
         notes: p.notes || p.caption || '',
       })));
     }
@@ -133,7 +124,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
           <div>
             <h3 className="text-base font-semibold text-foreground">Order Photo Gallery</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {photos.length} photo{photos.length !== 1 ? 's' : ''} · Production documentation
+              {photos.length} photo{photos.length !== 1 ? 's' : ''} · Inspection documentation
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -144,7 +135,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex flex-wrap gap-2">
+        <div className={FILTER_TABS.length > 1 ? 'flex flex-wrap gap-2' : 'hidden'}>
           {FILTER_TABS.map(tab => (
             <button
               key={tab.key}
@@ -174,7 +165,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
           </div>
           <p className="text-sm font-semibold text-foreground">No photos yet</p>
           <p className="mt-1.5 text-xs text-muted-foreground max-w-xs mx-auto">
-            Photos will appear here as your order progresses through production stages
+            Photos will appear here as your order moves through the inspection process
           </p>
         </div>
       ) : filtered.length === 0 ? (
@@ -182,7 +173,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted">
             <Tag size={20} className="text-muted-foreground" />
           </div>
-          <p className="text-sm font-medium text-foreground">No photos in this stage</p>
+          <p className="text-sm font-medium text-foreground">No photos match this filter</p>
           <p className="mt-1 text-xs text-muted-foreground">Try selecting a different filter</p>
           <button
             onClick={() => setActiveFilter('All')}
@@ -210,7 +201,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
               ) : (
                 <img
                   src={photo.image_url}
-                  alt={photo.caption || `${formatStage(photo.stage_name)} production photo`}
+                  alt={photo.caption || 'Inspection photo'}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   loading="lazy"
                   onError={() => handleImgError(photo.id)}
@@ -261,7 +252,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
               ) : (
                 <img
                   src={lightboxPhoto.image_url}
-                  alt={lightboxPhoto.caption || 'Production photo'}
+                  alt={lightboxPhoto.caption || 'Inspection photo'}
                   className="w-full h-full object-contain"
                   onError={() => handleImgError(lightboxPhoto.id)}
                 />

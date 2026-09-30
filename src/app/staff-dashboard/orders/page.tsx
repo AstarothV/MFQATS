@@ -9,7 +9,7 @@ export default function StaffOrderWorkflowPage() {
         <div className="rounded-3xl border border-border bg-card p-6">
           <h1 className="text-2xl font-semibold text-foreground">Order Workflow</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            View your assigned work orders and track progress on the production line.
+            View your assigned work orders and track their progress through the inspection process.
           </p>
         </div>
         <OrderManagementContent />

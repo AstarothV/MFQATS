@@ -4,17 +4,17 @@ import { AlertTriangle, CheckCircle2, ChevronRight, Circle, Loader2, Lock, Wrenc
 import StatusBadge from '@/components/ui/StatusBadge';
 
 const workpieces = [
-  { id: 'wp-2847', workpieceId: 'WP-2847', name: 'Oak Dining Table', stage: 'Sanding', staff: 'MR', elapsed: 84, threshold: 60, station: 'S-07', defect: false, status: 'warning' as const },
-  { id: 'wp-2848', workpieceId: 'WP-2848', name: 'Walnut Dresser', stage: 'Finishing', staff: 'JT', elapsed: 52, threshold: 50, station: 'S-03', defect: false, status: 'warning' as const },
-  { id: 'wp-2849', workpieceId: 'WP-2849', name: 'Pine Bed Frame', stage: 'Assembly', staff: 'DK', elapsed: 38, threshold: 90, station: 'S-01', defect: false, status: 'ok' as const },
-  { id: 'wp-2850', workpieceId: 'WP-2850', name: 'Cherry Side Table', stage: 'Cutting', staff: 'RL', elapsed: 22, threshold: 35, station: 'S-02', defect: false, status: 'ok' as const },
-  { id: 'wp-2851', workpieceId: 'WP-2851', name: 'Walnut Bookshelf', stage: 'Assembly', staff: 'MR', elapsed: 0, threshold: 90, station: 'S-07', defect: false, status: 'neutral' as const },
-  { id: 'wp-2841', workpieceId: 'WP-2841', name: 'Maple Cabinet', stage: 'QA Check', staff: 'SK', elapsed: 18, threshold: 25, station: 'QA-1', defect: true, status: 'danger' as const },
-  { id: 'wp-2835', workpieceId: 'WP-2835', name: 'Birch Nightstand', stage: 'QA Check', staff: 'SK', elapsed: 14, threshold: 25, station: 'QA-1', defect: false, status: 'ok' as const },
+  { id: 'wp-2847', workpieceId: 'WP-2847', name: 'Oak Dining Table', stage: 'Detect Defects', staff: 'MR', elapsed: 84, threshold: 60, station: 'S-07', defect: false, status: 'warning' as const },
+  { id: 'wp-2848', workpieceId: 'WP-2848', name: 'Walnut Dresser', stage: 'Results', staff: 'JT', elapsed: 52, threshold: 50, station: 'S-03', defect: false, status: 'warning' as const },
+  { id: 'wp-2849', workpieceId: 'WP-2849', name: 'Pine Bed Frame', stage: '3D Reconstruction', staff: 'DK', elapsed: 38, threshold: 90, station: 'S-01', defect: false, status: 'ok' as const },
+  { id: 'wp-2850', workpieceId: 'WP-2850', name: 'Cherry Side Table', stage: 'Upload', staff: 'RL', elapsed: 22, threshold: 35, station: 'S-02', defect: false, status: 'ok' as const },
+  { id: 'wp-2851', workpieceId: 'WP-2851', name: 'Walnut Bookshelf', stage: '3D Reconstruction', staff: 'MR', elapsed: 0, threshold: 90, station: 'S-07', defect: false, status: 'neutral' as const },
+  { id: 'wp-2841', workpieceId: 'WP-2841', name: 'Maple Cabinet', stage: 'Recommendation', staff: 'SK', elapsed: 18, threshold: 25, station: 'S-09', defect: true, status: 'danger' as const },
+  { id: 'wp-2835', workpieceId: 'WP-2835', name: 'Birch Nightstand', stage: 'Recommendation', staff: 'SK', elapsed: 14, threshold: 25, station: 'S-09', defect: false, status: 'ok' as const },
   { id: 'wp-2839', workpieceId: 'WP-2839', name: 'Cherry Side Table', stage: 'Rework', staff: 'JT', elapsed: 31, threshold: 45, station: 'RW-1', defect: true, status: 'danger' as const },
-  { id: 'wp-2853', workpieceId: 'WP-2853', name: 'Teak Patio Chair', stage: 'Sanding', staff: 'DK', elapsed: 67, threshold: 60, station: 'S-05', defect: false, status: 'warning' as const },
-  { id: 'wp-2854', workpieceId: 'WP-2854', name: 'Ash Writing Desk', stage: 'Finishing', staff: 'RL', elapsed: 41, threshold: 50, station: 'S-04', defect: false, status: 'ok' as const },
-  { id: 'wp-2855', workpieceId: 'WP-2855', name: 'Bamboo Shelf Unit', stage: 'Cutting', staff: 'PV', elapsed: 15, threshold: 35, station: 'S-06', defect: false, status: 'ok' as const },
+  { id: 'wp-2853', workpieceId: 'WP-2853', name: 'Teak Patio Chair', stage: 'Detect Defects', staff: 'DK', elapsed: 67, threshold: 60, station: 'S-05', defect: false, status: 'warning' as const },
+  { id: 'wp-2854', workpieceId: 'WP-2854', name: 'Ash Writing Desk', stage: 'Results', staff: 'RL', elapsed: 41, threshold: 50, station: 'S-04', defect: false, status: 'ok' as const },
+  { id: 'wp-2855', workpieceId: 'WP-2855', name: 'Bamboo Shelf Unit', stage: 'Upload', staff: 'PV', elapsed: 15, threshold: 35, station: 'S-06', defect: false, status: 'ok' as const },
   { id: 'wp-2856', workpieceId: 'WP-2856', name: 'Maple Coffee Table', stage: 'Queued', staff: '—', elapsed: 0, threshold: 60, station: 'S-08', defect: false, status: 'neutral' as const },
 ];
 
@@ -29,75 +29,75 @@ const statusBg: Record<string, string> = {
   ok: 'bg-success/5', warning: 'bg-warning/5', danger: 'bg-danger/8', neutral: '',
 };
 const stageTag: Record<string, string> = {
-  Cutting: 'text-info', Assembly: 'text-warning', Sanding: 'text-accent',
-  Finishing: 'text-success', 'QA Check': 'text-primary', Rework: 'text-danger', Queued: 'text-muted-foreground',
+  Upload: 'text-info', '3D Reconstruction': 'text-warning', 'Detect Defects': 'text-accent',
+  Results: 'text-success', Recommendation: 'text-primary', Rework: 'text-danger', Queued: 'text-muted-foreground',
 };
 
-const pipelineStages = ['Cutting', 'Assembly', 'Sanding', 'Finishing', 'QA Check', 'Ready to Ship'];
+const pipelineStages = ['Upload', '3D Reconstruction', 'Detect Defects', 'Results', 'Recommendation'];
 
 const detailChecklistMap: Record<string, string[]> = {
-  Sanding: [
-    'Start with 80-grit sandpaper',
-    'Sand along the wood grain direction',
-    'Progress to 120-grit, check surface',
-    'Final pass with 220-grit',
-    'Vacuum dust and wipe with tack cloth',
-    'Take QA inspection photo',
+  Upload: [
+    'Select the order being inspected',
+    'Wipe sawdust off the surface and check the lighting',
+    'Capture the furniture from the required angles',
+    'Check that every image is sharp and complete',
+    'Upload the images to the order',
+    'Hand off to 3D Reconstruction',
   ],
-  Assembly: [
-    'Confirm joinery alignment',
-    'Tighten all fasteners',
-    'Check frame squareness',
-    'Log fitment notes for QA',
-    'Clear station for next workpiece',
-    'Hand off to sanding',
+  '3D Reconstruction': [
+    'Confirm all required images are present',
+    'Start the reconstruction',
+    'Wait for processing to finish',
+    'Inspect the 3D representation for gaps',
+    'Re-capture any missing angles',
+    'Hand off to Detect Defects',
   ],
-  Cutting: [
-    'Verify cut list against order',
-    'Inspect stock for defects',
-    'Measure each cut twice',
-    'Label finished parts',
-    'Stack parts by order kit',
-    'Move to assembly queue',
+  'Detect Defects': [
+    'Select the order being inspected',
+    'Wipe sawdust off the surface and check the lighting',
+    'Capture or upload the inspection image',
+    'Run defect detection',
+    'Review the detected defects and confidence scores',
+    'Save the scan result',
   ],
-  Finishing: [
-    'Inspect surface for dust',
-    'Apply first finish coat',
-    'Check even coverage',
-    'Allow proper drying time',
-    'Buff edges and corners',
-    'Prepare for QA review',
+  Results: [
+    'Open the saved scan',
+    'Check each detected defect on the annotated image',
+    'Review the confidence scores',
+    'Confirm the pass or fail result',
+    'Add inspector notes',
+    'Hand off to Recommendation',
   ],
-  'QA Check': [
-    'Inspect finish quality',
-    'Confirm dimensions and fit',
-    'Review customer spec sheet',
-    'Capture approval photo',
-    'Record pass or rework notes',
-    'Release for shipment',
+  Recommendation: [
+    'Read the recommended action for each defect',
+    'Confirm whether the item can be released',
+    'Create or review the rework task if needed',
+    'Inform the supervisor of the outcome',
+    'Record the decision',
+    'Release the item or send it back to Upload',
   ],
   Rework: [
-    'Identify defect source',
-    'Remove affected finish',
-    'Repair surface inconsistency',
-    'Recheck dimensions',
-    'Reapply finish if needed',
-    'Return to QA check',
+    'Read the recommended fix',
+    'Correct the defect',
+    'Check the corrected area',
+    'Record what was done',
+    'Mark the rework task resolved',
+    'Send the item back to Upload for re-inspection',
   ],
   Queued: [
-    'Confirm materials are ready',
+    'Confirm the item is ready for inspection',
     'Assign station and staff',
     'Review order priority',
-    'Move into production queue',
+    'Move into the Upload queue',
   ],
 };
 
 const stageStepProgress: Record<string, number> = {
-  Cutting: 1,
-  Assembly: 2,
-  Sanding: 3,
-  Finishing: 4,
-  'QA Check': 5,
+  Upload: 1,
+  '3D Reconstruction': 2,
+  'Detect Defects': 3,
+  Results: 4,
+  Recommendation: 5,
   Rework: 2,
   Queued: 0,
 };
@@ -121,7 +121,7 @@ function getChecklist(stage: string) {
 }
 
 function getCompletedChecklistCount(stage: string) {
-  return stage === 'Sanding' ? 3 : stage === 'Assembly' ? 2 : stage === 'Cutting' ? 1 : stage === 'Finishing' ? 4 : stage === 'QA Check' ? 5 : stage === 'Rework' ? 2 : 0;
+  return stage === 'Detect Defects' ? 3 : stage === '3D Reconstruction' ? 2 : stage === 'Upload' ? 1 : stage === 'Results' ? 4 : stage === 'Recommendation' ? 5 : stage === 'Rework' ? 2 : 0;
 }
 
 function formatStageTime(stage: string, wp: typeof workpieces[number]) {
@@ -129,12 +129,10 @@ function formatStageTime(stage: string, wp: typeof workpieces[number]) {
     return wp.elapsed > 0 ? `${wp.elapsed}m` : '—';
   }
 
-  if (stage === 'Cutting') return '38m';
-  if (stage === 'Assembly') return '1h 12m';
-  if (stage === 'Sanding') return '1h 24m';
-  if (stage === 'Finishing') return '~50m est';
-  if (stage === 'QA Check') return '—';
-  if (stage === 'Ready to Ship') return '—';
+  if (stage === 'Upload') return '6m';
+  if (stage === '3D Reconstruction') return '24m';
+  if (stage === 'Detect Defects') return '4m';
+  if (stage === 'Results') return '~10m est';
   return '—';
 }
 
@@ -276,7 +274,7 @@ export default function WorkstationGrid() {
             <div className="space-y-6 p-6">
               <div className="flex flex-wrap items-center gap-2">
                 {pipelineStages.map((stage, idx) => {
-                  const currentIndex = pipelineStages.indexOf(detailWp.stage === 'Queued' ? 'Ready to Ship' : detailWp.stage);
+                  const currentIndex = pipelineStages.indexOf(detailWp.stage);
                   const status = detailWp.stage === 'Queued'
                     ? 'locked'
                     : idx < currentIndex
@@ -290,7 +288,7 @@ export default function WorkstationGrid() {
 
                   return (
                     <React.Fragment key={stage}>
-                      <div className="flex min-w-[68px] flex-col items-center text-center">
+                      <div className="flex min-w-[68px] flex-col items-center text-center whitespace-nowrap">
                         <div
                           className={`mb-1 flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
                             status === 'complete'

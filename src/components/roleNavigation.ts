@@ -88,7 +88,7 @@ export const roleNavigationConfig: RoleNavigationConfig = {
       },
       {
         id: 'staff-view-qa',
-        label: 'QA Check',
+        label: 'Quality Scan',
         href: '/staff-dashboard?action=qa',
         icon: Eye,
         description: 'View recent QA results',
@@ -124,11 +124,11 @@ export const roleNavigationConfig: RoleNavigationConfig = {
       },
       {
         id: 'admin-production',
-        label: 'Production',
+        label: 'Inspection Progress',
         href: '/real-time-production-dashboard',
         icon: BarChart3,
         category: 'Analytics',
-        description: 'Real-time production metrics',
+        description: 'Real-time inspection progress',
         badge: 'Live',
         badgeVariant: 'success',
       },

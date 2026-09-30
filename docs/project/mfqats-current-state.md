@@ -283,7 +283,7 @@ The master prompt's phase order stays in place, with two corrections based on th
 | Question | Decision |
 |---|---|
 | C1/C2 Architecture | **Flutter + Laravel API + Python (FastAPI) inference service.** Supabase Postgres and Supabase Auth stay in place; Laravel verifies Supabase JWTs. |
-| C3 Stages | **Two levels.** Physical workshop stages (cutting → … → shipping) are the production FSM. Every stage's QA gate runs the inspection pipeline **Upload → 3D Reconstruction → Detect Defects → Result (+ Recommendation)**. |
+| C3 Stages | **Superseded on 2026-09-30: one workflow.** The only process stages are **Upload → 3D Reconstruction → Detect Defects → Results → Recommendation**. An order is `pending → confirmed → [the five stages] → delivered` (or `cancelled`); the workshop stages (cutting … shipping) are no longer tracked. Defined in `src/lib/orders.ts` and enforced by `supabase/migrations/20260930000006_five_stage_process.sql`. *(Earlier decision: two levels, workshop stages as the FSM with the inspection pipeline at each QA gate.)* |
 | YOLO | **No weights or dataset yet.** Build the inference interface, a clearly labelled mock adapter, and training scaffolding. Metrics stay "Not yet measured". |
 | Git | **No git.** Mitigation: a baseline snapshot archive before the first change, plus a `docs/CHANGELOG.md` entry per task. |
 

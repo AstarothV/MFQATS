@@ -144,7 +144,6 @@ export default function AdminReworkPage() {
                 <thead className="border-b border-border text-xs uppercase tracking-[0.18em] text-muted-foreground">
                   <tr>
                     <th className="px-4 py-3">Order</th>
-                    <th className="px-4 py-3">Stage</th>
                     <th className="px-4 py-3">Reason</th>
                     <th className="px-4 py-3">Assigned To</th>
                     <th className="px-4 py-3">Status</th>
@@ -159,7 +158,6 @@ export default function AdminReworkPage() {
                         <p className="font-semibold text-foreground">{rework.orders?.order_ref || '—'}</p>
                         <p className="text-xs text-muted-foreground">{rework.orders?.product_name}</p>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground capitalize">{rework.stage_name?.replace('_', ' ')}</td>
                       <td className="px-4 py-3 text-muted-foreground max-w-xs">
                         <p className="truncate text-xs">{rework.reason}</p>
                       </td>
@@ -217,7 +215,6 @@ export default function AdminReworkPage() {
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Order</span><span className="font-semibold text-foreground">{selectedRework.orders?.order_ref}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Product</span><span className="font-semibold text-foreground">{selectedRework.orders?.product_name}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Stage</span><span className="font-semibold text-foreground capitalize">{selectedRework.stage_name?.replace('_', ' ')}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Status</span><StatusBadge variant={statusVariant[selectedRework.rework_status]} label={selectedRework.rework_status} /></div>
                 <div>
                   <p className="text-muted-foreground mb-1">Reason</p>

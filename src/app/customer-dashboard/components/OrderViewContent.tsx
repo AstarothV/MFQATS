@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, Search, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, Truck, AlertCircle, TrendingUp, Eye, X, FileText, Image, Box, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { statusLabel, statusVariant } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Link from 'next/link';
@@ -52,29 +53,12 @@ interface HistoryLog {
 
 type TabKey = 'queue' | 'gallery' | '3d' | 'inquiry';
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending', confirmed: 'Confirmed', designing: 'Designing',
-  material_preparation: 'Material Prep', cutting: 'Cutting', assembly: 'Assembly',
-  sanding: 'Sanding', finishing: 'Finishing', quality_inspection: 'Quality Inspection',
-  ready_for_delivery: 'Ready for Delivery', delivered: 'Delivered',
-  cancelled: 'Cancelled', in_production: 'In Production',
-};
-
 const EVENT_ICONS: Record<string, React.ElementType> = {
   order_created: Package, order_confirmed: CheckCircle2, queue_moved: TrendingUp,
   production_started: TrendingUp, stage_completed: CheckCircle2, quality_check: Eye,
   production_completed: CheckCircle2, ready_for_delivery: Package,
   delivered: Truck, cancelled: X, status_updated: Clock, note_added: FileText,
 };
-
-function getStatusVariant(status: string): 'ok' | 'warning' | 'danger' | 'info' | 'neutral' | 'purple' {
-  if (status === 'delivered') return 'ok';
-  if (status === 'cancelled') return 'danger';
-  if (status === 'quality_inspection' || status === 'ready_for_delivery') return 'info';
-  if (status === 'pending') return 'warning';
-  if (['cutting', 'assembly', 'sanding', 'finishing', 'material_preparation', 'designing', 'in_production', 'confirmed'].includes(status)) return 'purple';
-  return 'neutral';
-}
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'queue', label: 'Order Queue', icon: Package },
@@ -193,7 +177,7 @@ export default function OrderViewContent() {
           {selectedOrder && (
             <div className="flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/15 dark:text-purple-200">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
-              {STATUS_LABELS[st] || st || 'Pending'}
+              {statusLabel(st || 'pending')}
             </div>
           )}
           <Link
@@ -255,7 +239,7 @@ export default function OrderViewContent() {
                         <p className="text-xs font-semibold text-foreground truncate">{order.product_name}</p>
                         <p className="text-[10px] text-muted-foreground">#{order.order_ref}</p>
                       </div>
-                      <StatusBadge variant={getStatusVariant(orderSt)} label={STATUS_LABELS[orderSt] || orderSt} />
+                      <StatusBadge variant={statusVariant(orderSt)} label={statusLabel(orderSt)} />
                     </button>
                   );
                 })}
@@ -327,7 +311,7 @@ export default function OrderViewContent() {
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { label: 'Order Ref', value: `#${selectedOrder.order_ref}` },
-                  { label: 'Status', value: STATUS_LABELS[st] || st || 'Pending' },
+                  { label: 'Status', value: statusLabel(st || 'pending') },
                   { label: 'Queue', value: selectedOrder.queue_position ? `#${selectedOrder.queue_position}` : '—' },
                   { label: 'Progress', value: `${selectedOrder.completion_pct || 0}%` },
                 ].map(item => (
@@ -387,7 +371,7 @@ export default function OrderViewContent() {
                           )}
                           {log.new_status && (
                             <span className="inline-block mt-1 text-[10px] bg-muted rounded-full px-2 py-0.5 text-muted-foreground">
-                              → {STATUS_LABELS[log.new_status] || log.new_status}
+                              → {statusLabel(log.new_status)}
                             </span>
                           )}
                           <p className="text-[10px] text-muted-foreground/60 mt-1">
