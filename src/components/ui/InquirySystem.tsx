@@ -5,6 +5,7 @@ import { MessageSquare, Send, Search, Plus, Loader2, X, AlertCircle, CheckCircle
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { SkeletonRegion, ListSkeleton, ChatSkeleton } from '@/components/ui/LoadingSkeleton';
 
 interface Inquiry {
   id: string;
@@ -358,9 +359,10 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-purple-600 dark:text-purple-300" />
-        </div>
+        <SkeletonRegion label="Loading inquiries" className="flex flex-col gap-4 xl:flex-row">
+          <div className="xl:w-[40%]"><ListSkeleton rows={5} dense /></div>
+          <div className="flex-1 rounded-2xl border border-border bg-card p-4"><ChatSkeleton /></div>
+        </SkeletonRegion>
       ) : (
         <div className="flex flex-col gap-4 xl:flex-row">
           {/* Inquiries List */}
