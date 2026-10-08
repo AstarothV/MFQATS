@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, Loader2, CheckCheck, Clock, Package, ChevronDown, User, Shield, Wrench } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { SkeletonRegion, ChatSkeleton } from '@/components/ui/LoadingSkeleton';
 
 interface Message {
   id: string;
@@ -38,7 +39,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(preselectedOrderId || null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -73,13 +74,13 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
       const { data } = await query;
       if (data) {
         setOrders(data);
-        if (!selectedOrderId && data.length > 0) {
-          setSelectedOrderId(data[0].id);
-        }
+        setSelectedOrderId((current) => current ?? data[0]?.id ?? null);
       }
+      // No order to open means nothing else will load: leave the loading state for the empty state.
+      if (!data?.length) setLoading(false);
     };
     fetchOrders();
-  }, [user, userRole, supabase, selectedOrderId]);
+  }, [user, userRole, supabase]);
 
   useEffect(() => {
     if (!selectedOrderId || !user) return;
@@ -211,9 +212,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 size={20} className="animate-spin text-accent" />
-          </div>
+          <SkeletonRegion label="Loading messages"><ChatSkeleton /></SkeletonRegion>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <MessageSquare size={32} className="text-muted-foreground mb-3" />

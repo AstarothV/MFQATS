@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleton';
 
 interface Product {
   id: string;
@@ -410,9 +411,7 @@ export default function CustomerShopContent() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 size={24} className="animate-spin text-accent" />
-        </div>
+        <SkeletonRegion label="Loading products"><CardGridSkeleton /></SkeletonRegion>
       ) : filteredProducts.length === 0 ? (
         <div className="card-dark rounded-3xl border border-border p-16 text-center">
           <Package size={32} className="mx-auto mb-3 text-muted-foreground" />

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Package, Truck, AlertTriangle, CheckCircle2, Plus, Edit2, Trash2, Loader2, X } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
+import { SkeletonRegion, ListSkeleton } from '@/components/ui/LoadingSkeleton';
 
 interface InventoryItem {
   id: string;
@@ -262,9 +263,7 @@ export default function InventoryManagementContent() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-3">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 size={24} className="animate-spin text-accent" />
-            </div>
+            <SkeletonRegion label="Loading inventory"><ListSkeleton rows={6} /></SkeletonRegion>
           ) : items.length === 0 ? (
             <div className="text-center py-16 card-dark rounded-3xl border border-border">
               <Package size={32} className="text-muted-foreground mx-auto mb-3" />

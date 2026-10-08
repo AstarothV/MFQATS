@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { clearPageCache } from '@/lib/pageCache';
 
 
 interface UserProfile {
@@ -81,6 +82,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         fetchProfile(session.user.id);
       } else {
         setProfile(null);
+        clearPageCache();
       }
       setLoading(false);
     });
@@ -134,6 +136,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setProfile(null);
+    clearPageCache();
   };
 
   const getCurrentUser = async () => {

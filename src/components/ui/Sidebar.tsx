@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -74,7 +74,14 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
   const router = useRouter();
   const { signOut } = useAuth();
   const nav = navByRole[role];
-  const activePath = currentPath || pathname;
+  // Highlight the clicked item immediately, before the route commits.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  useEffect(() => setPendingHref(null), [pathname]);
+  const activePath = pendingHref || currentPath || pathname;
+  // Longest matching href wins, so a parent ('/staff-dashboard') isn't lit alongside its child.
+  const activeHref = nav
+    .filter((i) => activePath === i.href || activePath.startsWith(i.href + '/'))
+    .reduce<string | null>((best, i) => (!best || i.href.length > best.length ? i.href : best), null);
 
   async function handleLogout() {
     try {
@@ -88,7 +95,7 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
   return (
     <>
       <aside
-        className={`fixed top-16 bottom-0 left-0 z-50 ${collapsed ? 'w-20 p-4' : 'w-72 p-6'} overflow-y-auto border-r border-border bg-card shadow-2xl transition-all duration-200 lg:translate-x-0 ${
+        className={`fixed top-16 bottom-0 left-0 z-50 ${collapsed ? 'w-20 p-4' : 'w-72 p-6'} overflow-y-auto overscroll-contain border-r border-border bg-card shadow-2xl transition-[width,padding,transform] duration-200 ease-out motion-reduce:transition-none lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -116,23 +123,29 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
           </button>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="space-y-1" aria-label="Main navigation">
           {nav.map((item) => {
             const NavIcon = item.icon;
-            const isActive = activePath === item.href || activePath.startsWith(item.href + '/');
+            const isActive = item.href === activeHref;
             return (
               <Link
                 key={item.label}
                 href={item.href}
-                onClick={onClose}
-                className={`flex items-center ${collapsed ? 'justify-center px-0 py-2.5 my-1' : 'gap-3 px-4 py-2.5 my-1'} rounded-2xl text-sm font-medium transition-all duration-150 ${
+                onClick={(e) => {
+                  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) setPendingHref(item.href);
+                  onClose();
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={collapsed ? item.label : undefined}
+                title={collapsed ? item.label : undefined}
+                className={`flex items-center ${collapsed ? 'justify-center px-0 py-2.5 my-1' : 'gap-3 px-4 py-2.5 my-1'} rounded-2xl text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                   isActive
                     ? 'bg-muted text-foreground ring-1 ring-border shadow-sm'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
-                <NavIcon size={18} />
-                {!collapsed && <span>{item.label}</span>}
+                <NavIcon size={18} className="shrink-0" aria-hidden="true" />
+                {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             );
           })}
@@ -142,7 +155,9 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
           <button
             type="button"
             onClick={handleLogout}
-            className={`flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-danger hover:bg-danger/10 transition-all ${collapsed ? 'w-full justify-center' : 'w-full justify-between'}`}
+            aria-label="Sign Out"
+            title={collapsed ? 'Sign Out' : undefined}
+            className={`flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-danger hover:bg-danger/10 transition-colors ${collapsed ? 'w-full justify-center' : 'w-full justify-between'}`}
           >
             {!collapsed && <span>Sign Out</span>}
             <LogOut size={18} />
