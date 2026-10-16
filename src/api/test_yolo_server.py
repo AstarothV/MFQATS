@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from yolo_server import build_response, merge_duplicates, summarize, to_detections  # noqa: E402
+from yolo_server import build_response, detect_image, merge_duplicates, summarize, tile_windows, to_detections  # noqa: E402
 
 NAMES = {0: "Live_Knot", 1: "Crack", 2: "person", 3: "Unfinished Sanding", 4: "joint-misalignment"}
 
@@ -38,12 +38,68 @@ def test_merge_across_models():
     assert got == [("Live_Knot", "wood.pt"), ("crack", "coated.pt"), ("scratch", "coated.pt")], got
     assert summarize(merged)["defect_count"] == 3
 
+    # "Holes" (one dataset) and "hole" (another) are the same defect, with the same severity
+    holes = to_detections({0: "Holes", 1: "hole"}, [[0.4, 0.4, 0.5, 0.5], [0.41, 0.4, 0.5, 0.5]], [0.6, 0.5], [0, 1])
+    assert len(merge_duplicates(holes)) == 1 and holes[0]["severity"] == "medium"
+
     # same name but far apart -> two separate cracks
     far = to_detections({0: "Crack"}, [[0, 0, 0.1, 0.1], [0.8, 0.8, 0.9, 0.9]], [0.9, 0.8], [0, 0], "wood.pt")
     assert len(merge_duplicates(far)) == 2
 
 
+class BlobModel:
+    """Stand-in for a YOLO model: "detects" white blobs, but like YOLO it first shrinks each image to 640 px,
+    so a blob that ends up under 4 px across is invisible to it."""
+    names = {0: "scratch"}
+
+    def predict(self, crops, conf, verbose):
+        import cv2
+        import numpy as np
+        from types import SimpleNamespace as NS
+
+        results = []
+        for crop in crops:
+            scale = min(1.0, 640 / max(crop.size))
+            small = np.asarray(crop.convert("L").resize((round(crop.width * scale), round(crop.height * scale))))
+            count, _, stats, _ = cv2.connectedComponentsWithStats((small > 128).astype(np.uint8))
+            boxes = [[x / small.shape[1], y / small.shape[0], (x + w) / small.shape[1], (y + h) / small.shape[0]]
+                     for x, y, w, h, _ in stats[1:] if min(w, h) >= 4]
+            results.append(NS(names=self.names, boxes=NS(xyxyn=NS(tolist=lambda b=boxes: b),
+                                                          conf=NS(tolist=lambda n=len(boxes): [0.9] * n),
+                                                          cls=NS(tolist=lambda n=len(boxes): [0] * n))))
+        return results
+
+
+def test_tiles_find_small_defects():
+    from PIL import Image, ImageDraw
+
+    for w, h in [(2000, 1500), (1500, 2000), (641, 900), (5000, 3000)]:
+        windows = tile_windows(w, h)
+        covered = set()
+        for x, y, tw, th in windows:
+            assert tw <= 640 and th <= 640 and x + tw <= w and y + th <= h
+            covered |= {(cx, cy) for cx in range(x // 10, (x + tw) // 10) for cy in range(y // 10, (y + th) // 10)}
+        assert len(covered) == (w // 10) * (h // 10), (w, h)  # every part of the photo is in some tile
+
+    photo = Image.new("RGB", (2000, 1500), (90, 70, 50))
+    draw = ImageDraw.Draw(photo)
+    draw.rectangle([1500, 900, 1507, 905], fill="white")  # a small scratch: 8 x 6 px
+    draw.rectangle([200, 200, 899, 599], fill="white")    # a big defect, crossing several tile seams
+    models = [("blob.pt", BlobModel(), 0.25)]
+
+    whole_only = detect_image(photo, tiled=False, models=models)
+    assert whole_only["defect_count"] == 1, whole_only  # shrunk to 640 px, the small scratch disappears
+
+    tiled = detect_image(photo, tiled=True, models=models)
+    boxes = sorted((d["bounding_box"] for d in tiled["detections"]), key=lambda b: b["width"])
+    assert len(boxes) == 2, boxes  # the big one is not split into pieces, and the small one is found
+    small, big = boxes
+    assert abs(small["x"] * 2000 - 1500) <= 2 and abs(small["y"] * 1500 - 900) <= 2 and small["width"] * 2000 < 15, small
+    assert abs(big["x"] * 2000 - 200) <= 4 and abs((big["x"] + big["width"]) * 2000 - 900) <= 4, big
+
+
 if __name__ == "__main__":
     test_build_response()
     test_merge_across_models()
+    test_tiles_find_small_defects()
     print("ok")

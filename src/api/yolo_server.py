@@ -3,6 +3,10 @@
 Runs EVERY model in src/api/weights/*.pt on each image and merges the results, so new defect types can be added by
 dropping in another trained model. Each model's confidence threshold is set in src/api/weights/models.json.
 
+Small defects: the models look at 640 px, so a whole phone photo is shrunk about 3x and thin scratches vanish. A
+photo is therefore checked twice: whole (for big defects) and in overlapping 640 px tiles at full detail (for small
+ones), and the two sets of boxes are merged. Live camera frames skip the tiles to stay fast.
+
 Also serves /api/measure (marker-based measurement, see measure.py), /api/surface (dents and warping, see surface.py)
 and /api/reconstruct (3D model from photos, see sfm.py).
 
@@ -13,6 +17,7 @@ import base64
 import binascii
 import io
 import json
+import math
 import re
 import threading
 import traceback
@@ -31,6 +36,11 @@ MODELS_CONFIG = WEIGHTS_DIR / "models.json"   # {"<file>.pt": <confidence thresh
 FALLBACK_WEIGHTS = "yolo12n.pt"  # COCO base model: runs, but knows no wood defects
 DEFAULT_CONF = 0.25              # for a model missing from models.json
 DUPLICATE_IOU = 0.5              # same defect name + boxes overlapping this much = one defect
+CONTAINED = 0.6                  # ...or this much of the smaller box lies inside the other (a tile's piece of a big defect)
+TILE = 640                       # the models' training size: a tile is shown to them at full detail
+TILE_OVERLAP = 0.25              # neighbouring tiles share this much, so a defect on a seam is whole in one of them
+# ponytail: bigger photos are scaled down to this first; time per photo grows with the number of tiles.
+MAX_TILED_SIDE = 2048
 
 # class (lowercased, spaces/hyphens -> "_") -> (severity, rework recommendation)
 DEFECT_INFO = {
@@ -47,6 +57,7 @@ DEFECT_INFO = {
     "scratch": ("medium", "Re-sand the area with 180–220 grit and refinish."),
     "dent": ("medium", "Steam the dent with a damp cloth and iron, then re-sand."),
     "hole": ("medium", "Fill the hole with matching wood filler, let it cure, sand flush, and touch up the coating."),
+    "chip": ("medium", "Fill the chipped spot with wood filler or touch-up putty, sand flush, and touch up the finish."),
     "blister": ("medium", "Sand the blistered coating flush, clean the dust, and recoat in thin layers at controlled humidity."),
     "unfinished_sanding": ("low", "Complete sanding through 220 grit before applying finish."),
     "joint_misalignment": ("high", "Disassemble and re-align the joint, re-glue, and clamp square."),
@@ -54,8 +65,12 @@ DEFECT_INFO = {
 DEFAULT_INFO = ("medium", "Inspect this area manually before proceeding to the next stage.")
 
 
+CLASS_ALIASES = {"holes": "hole"}  # the same defect named differently by different datasets
+
+
 def class_key(name):
-    return re.sub(r"[\s-]+", "_", name.strip().lower())
+    key = re.sub(r"[\s-]+", "_", name.strip().lower())
+    return CLASS_ALIASES.get(key, key)
 
 
 @asynccontextmanager
@@ -126,15 +141,63 @@ def iou(a, b):
     return inter / union if union > 0 else 0.0
 
 
+def contained(a, b):
+    """Share of the smaller box that lies inside the other."""
+    ix = max(0.0, min(a["x"] + a["width"], b["x"] + b["width"]) - max(a["x"], b["x"]))
+    iy = max(0.0, min(a["y"] + a["height"], b["y"] + b["height"]) - max(a["y"], b["y"]))
+    smaller = min(a["width"] * a["height"], b["width"] * b["height"])
+    return ix * iy / smaller if smaller > 0 else 0.0
+
+
 def merge_duplicates(detections):
-    """Two models boxing the same spot with the same defect name -> keep only the most confident one.
-    Different names on the same spot (e.g. crack vs scratch) are both kept for the inspector to judge."""
+    """The same defect found twice (by two models, or by the whole photo and a tile) -> one detection: the most
+    confident one, with its box grown to cover both. Different names on the same spot (e.g. crack vs scratch) are
+    both kept for the inspector to judge."""
     kept = []
     for d in sorted(detections, key=lambda d: -d["confidence_score"]):
-        if not any(class_key(k["class_name"]) == class_key(d["class_name"])
-                   and iou(k["bounding_box"], d["bounding_box"]) >= DUPLICATE_IOU for k in kept):
+        for k in kept:
+            a, b = k["bounding_box"], d["bounding_box"]
+            if class_key(k["class_name"]) == class_key(d["class_name"]) and (iou(a, b) >= DUPLICATE_IOU or contained(a, b) >= CONTAINED):
+                x, y = min(a["x"], b["x"]), min(a["y"], b["y"])
+                k["bounding_box"] = {
+                    "x": x, "y": y,
+                    "width": round(max(a["x"] + a["width"], b["x"] + b["width"]) - x, 4),
+                    "height": round(max(a["y"] + a["height"], b["y"] + b["height"]) - y, 4),
+                }
+                break
+        else:
             kept.append(d)
     return kept
+
+
+def tile_windows(width, height, tile=TILE, overlap=TILE_OVERLAP):
+    """(x, y, w, h) windows of at most tile x tile pixels that cover the image, neighbours overlapping by `overlap`."""
+    def starts(size):
+        if size <= tile:
+            return [0]
+        n = math.ceil((size - tile) / (tile * (1 - overlap))) + 1
+        return [round(i * (size - tile) / (n - 1)) for i in range(n)]  # evenly spread; the last one ends at the edge
+    return [(x, y, min(tile, width), min(tile, height)) for y in starts(height) for x in starts(width)]
+
+
+def detect_image(image, tiled=True, models=None):
+    """Run every model on the whole photo and, when `tiled`, on overlapping full-detail tiles; merge the results."""
+    if tiled and max(image.size) > MAX_TILED_SIDE:
+        image = image.copy()
+        image.thumbnail((MAX_TILED_SIDE, MAX_TILED_SIDE))
+    width, height = image.size
+    windows = [(0, 0, width, height)]
+    if tiled and max(width, height) > TILE * 1.25:  # a photo near the models' own size gains nothing from tiles
+        windows += tile_windows(width, height)
+    crops = [image if i == 0 else image.crop((x, y, x + w, y + h)) for i, (x, y, w, h) in enumerate(windows)]
+    detections = []
+    for name, model, conf in models or get_models():
+        for (x, y, w, h), r in zip(windows, model.predict(crops, conf=conf, verbose=False)):
+            # tile-relative boxes -> whole-photo fractions
+            boxes = [[(x + x1 * w) / width, (y + y1 * h) / height, (x + x2 * w) / width, (y + y2 * h) / height]
+                     for x1, y1, x2, y2 in r.boxes.xyxyn.tolist()]
+            detections += to_detections(r.names, boxes, r.boxes.conf.tolist(), r.boxes.cls.tolist(), name)
+    return summarize(merge_duplicates(detections))
 
 
 def summarize(detections):
@@ -178,12 +241,12 @@ def health():
 
 @app.post("/api/detect")
 async def detect(request: Request):
+    """Multipart `file`, or JSON {"image": ..., "tiled": true}. "tiled": false (live camera frames) skips the tiles."""
     image = await read_image(request)
-    detections = []
-    for name, model, conf in get_models():
-        r = model.predict(image, conf=conf, verbose=False)[0]
-        detections += to_detections(r.names, r.boxes.xyxyn.tolist(), r.boxes.conf.tolist(), r.boxes.cls.tolist(), name)
-    return summarize(merge_duplicates(detections))
+    tiled = True
+    if not request.headers.get("content-type", "").startswith("multipart/"):
+        tiled = (await request.json()).get("tiled", True) is not False
+    return detect_image(image, tiled)
 
 
 @app.post("/api/measure")

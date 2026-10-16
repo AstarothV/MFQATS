@@ -52,13 +52,14 @@ const formatLabel = (s: string) => s.replace(/_/g, ' ');
 // Thrown when the FastAPI server can't be reached (network failure, or the Next.js proxy can't connect to it).
 class BackendOfflineError extends Error {}
 
-async function detectDefects(imageData: string): Promise<DetectResponse> {
+// tiled: also check the photo in full-detail tiles for small defects (slower, so live frames skip it)
+async function detectDefects(imageData: string, tiled = true): Promise<DetectResponse> {
   let res: Response;
   try {
     res = await fetch(`${YOLO_API_URL}/api/detect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageData }),
+      body: JSON.stringify({ image: imageData, tiled }),
     });
   } catch {
     throw new BackendOfflineError();
@@ -166,7 +167,7 @@ export default function QualityScanPage() {
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -235,7 +236,7 @@ export default function QualityScanPage() {
       if (!frame) return;
       inFlightRef.current = true;
       try {
-        const res = await detectDefects(frame);
+        const res = await detectDefects(frame, false);
         setBackendOffline(false);
         // ignore responses that land after the scan was paused/captured
         if (scanIntervalRef.current === id) setDetections(res.detections);
