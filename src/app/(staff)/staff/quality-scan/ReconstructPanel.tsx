@@ -40,7 +40,7 @@ interface JobStatus {
 
 const SERVER_DOWN = 'Could not reach the reconstruction server. Make sure the Python server is running.';
 
-async function api<T>(url: string, init?: RequestInit): Promise<T> {
+export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
     res = await fetch(url, init);
@@ -57,10 +57,10 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
-const postJson = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+export const postJson = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // Photo file -> JPEG data URL, scaled down so uploads stay small.
-function shrink(file: File): Promise<string> {
+export function shrink(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();

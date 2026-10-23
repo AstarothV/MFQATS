@@ -43,7 +43,7 @@ const navByRole = {
     { label: 'Workshop', href: '/staff-dashboard', icon: LayoutDashboard },
     { label: 'Assigned Tasks', href: '/staff-dashboard/assigned-tasks', icon: ClipboardCheck },
     { label: 'Order Workflow', href: '/staff-dashboard/orders', icon: Package },
-    { label: 'Quality Scan (AI)', href: '/staff/quality-scan', icon: Camera },
+    { label: 'Quality Scan', href: '/staff/quality-scan', icon: Camera },
     { label: 'Inventory', href: '/staff-dashboard/inventory', icon: ShoppingBag },
     { label: 'Messages', href: '/staff/chat', icon: MessageSquare },
   ],

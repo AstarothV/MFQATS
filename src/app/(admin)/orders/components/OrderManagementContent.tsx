@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 
+import { peso } from '@/lib/money';
 const GATE_HINTS: Record<string, string> = {
   scan_done: 'Needs a defect scan saved for this order during Detect Defects',
   scan_passed: 'Needs the latest defect scan to pass',
@@ -173,7 +174,7 @@ export default function OrderManagementContent() {
                           />
                         </td>
                         <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>
-                        <td className="px-4 py-4 font-semibold text-foreground">${order.amount?.toLocaleString()}</td>
+                        <td className="px-4 py-4 font-semibold text-foreground">{peso(order.amount)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -208,7 +209,7 @@ export default function OrderManagementContent() {
                     </div>
                     <div className="flex justify-between gap-4">
                       <span>Order value</span>
-                      <span className="text-foreground font-semibold">${activeOrder.amount?.toLocaleString()}</span>
+                      <span className="text-foreground font-semibold">{peso(activeOrder.amount)}</span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span>Due date</span>

@@ -26,7 +26,7 @@ const roleRedirect: Record<string, string> = {
 };
 
 const features = [
-  { icon: Hammer, label: 'AI-Assisted QA', desc: 'YOLOv8 defect detection on every piece' },
+  { icon: Hammer, label: 'Automated QA', desc: 'YOLOv12 defect detection on every piece' },
   { icon: Layers, label: 'Live WIP Tracking', desc: 'Real-time workstation visibility' },
   { icon: Zap, label: 'Auto Time Logging', desc: 'Persistent per-task elapsed timers' },
 ];
@@ -174,7 +174,7 @@ export default function LoginPageClient() {
             Crafting Excellence,<br />One Piece at a Time
           </h1>
           <p className="text-white/70 text-base max-w-sm">
-            AI-powered quality control, real-time production tracking, and AR furniture visualization.
+            Automated quality control, real-time production tracking, and 3D furniture inspection.
           </p>
         </div>
         <div className="relative space-y-4">

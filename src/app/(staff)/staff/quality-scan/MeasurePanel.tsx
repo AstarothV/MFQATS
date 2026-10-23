@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Ruler, Camera, Save, Loader2, AlertTriangle, Printer } from 'lucide-react';
+import { Ruler, Camera, Save, Loader2, AlertTriangle, Printer, Maximize2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -16,6 +16,16 @@ const DIMS: { key: Dim; label: string }[] = [
   { key: 'length', label: 'Length' },
   { key: 'width', label: 'Width' },
   { key: 'height', label: 'Height' },
+];
+const FURNITURE = ['Chair', 'Table', 'Door', 'Cabinet', 'Bed', 'Shelf', 'Other'];
+// which side of the piece the photo is taken from, and the sizes that side shows face-on
+const VIEWS: { key: string; label: string; dims: Dim[] }[] = [
+  { key: 'front', label: 'Front', dims: ['length', 'height'] },
+  { key: 'back', label: 'Back', dims: ['length', 'height'] },
+  { key: 'left', label: 'Left', dims: ['width', 'height'] },
+  { key: 'right', label: 'Right', dims: ['width', 'height'] },
+  { key: 'top', label: 'Top', dims: ['length', 'width'] },
+  { key: 'under', label: 'Under', dims: ['length', 'width'] },
 ];
 const MARKER_PDF = '/assets/mfqats-marker-150mm.pdf';
 const MAX_PHOTO_PX = 2000; // long side sent to the server: enough for the marker's corners, small enough to upload quickly
@@ -36,6 +46,8 @@ interface Props {
   showToast: (type: 'success' | 'error', message: string) => void;
 }
 
+const chip = (on: boolean) =>
+  `rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`;
 const toNumber = (s: string) => (s.trim() !== '' && Number.isFinite(Number(s)) ? Number(s) : null);
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -61,6 +73,18 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
   const [markerMm, setMarkerMm] = useState('150');
   const [toleranceCm, setToleranceCm] = useState('1');
   const [saving, setSaving] = useState(false);
+  const [furniture, setFurniture] = useState<string | null>(null);
+  const [view, setView] = useState<string | null>(null);
+  const [full, setFull] = useState(false); // photo fills the screen for precise tapping
+
+  // Esc leaves full screen; the page behind does not scroll while it is open.
+  useEffect(() => {
+    if (!full) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFull(false);
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+  }, [full]);
 
   // Expected size comes from the ordered product; staff can still correct it.
   useEffect(() => {
@@ -180,6 +204,12 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
     if (points.length === 2) measureNow(points);
   }
 
+  function chooseView(key: string) {
+    setView(key);
+    const first = VIEWS.find((v) => v.key === key)!.dims[0];
+    chooseDim(first); // start on a size this side actually shows
+  }
+
   function chooseDim(d: Dim) {
     setActive(d);
     setPoints([]); // the next two taps measure this dimension
@@ -257,7 +287,7 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
       lctx.lineTo(LOUPE_PX, LOUPE_PX / 2);
       lctx.stroke();
     }
-  }, [photoTick, marker, points, drag, measured, active, busy]);
+  }, [photoTick, marker, points, drag, measured, active, busy, full]);
 
   const tolerance = toNumber(toleranceCm) ?? 1;
   const variance = (d: Dim) => {
@@ -292,7 +322,7 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
       variance_height: variance('height'),
       tolerance_cm: tolerance,
       measurement_status: verdicts.length === 0 ? 'pending' : verdicts.every(Boolean) ? 'within_tolerance' : 'out_of_tolerance',
-      notes: `Marker measurement (PnP), ${toNumber(markerMm) ?? 150} mm marker${warnings.length ? '. Low confidence: ' + warnings.join(' ') : ''}`,
+      notes: `${furniture ?? 'Furniture'}, ${view ?? 'unspecified'} view. Marker measurement (PnP), ${toNumber(markerMm) ?? 150} mm marker${warnings.length ? '. Low confidence: ' + warnings.join(' ') : ''}`,
     });
     setSaving(false);
     if (saveError) showToast('error', `Could not save the measurement: ${saveError.message}`);
@@ -313,6 +343,32 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
         <a href={MARKER_PDF} target="_blank" rel="noopener noreferrer" className="btn-secondary flex items-center gap-2 text-sm">
           <Printer size={14} /> Print marker
         </a>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <span className="block mb-1.5 text-xs uppercase tracking-wider text-muted-foreground">Furniture</span>
+          <div role="group" aria-label="Furniture type" className="flex flex-wrap gap-2">
+            {FURNITURE.map((f) => (
+              <button key={f} onClick={() => setFurniture(f)} aria-pressed={furniture === f} className={chip(furniture === f)}>{f}</button>
+            ))}
+          </div>
+        </div>
+        {furniture && (
+          <div>
+            <span className="block mb-1.5 text-xs uppercase tracking-wider text-muted-foreground">Photo taken from</span>
+            <div role="group" aria-label="Side of the piece the photo shows" className="flex flex-wrap gap-2">
+              {VIEWS.map((v) => (
+                <button key={v.key} onClick={() => chooseView(v.key)} aria-pressed={view === v.key} className={chip(view === v.key)}>{v.label}</button>
+              ))}
+            </div>
+            {view && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                From the {view}, you can measure {VIEWS.find((v) => v.key === view)!.dims.map((d) => DIMS.find((x) => x.key === d)!.label.toLowerCase()).join(' and ')}.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -337,7 +393,25 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
       )}
 
       {photoTick > 0 && (
-        <div className="relative flex justify-center rounded-xl bg-black">
+        <div
+          role={full ? 'dialog' : undefined}
+          aria-modal={full || undefined}
+          aria-label={full ? 'Measure in full screen' : undefined}
+          className={full ? 'fixed inset-0 z-[100] flex flex-col bg-black' : 'relative flex justify-center rounded-xl bg-black'}
+        >
+          {full && (
+            <div className="flex flex-wrap items-center gap-2 p-3">
+              {DIMS.map(({ key, label }) => (
+                <button key={key} onClick={() => chooseDim(key)} aria-pressed={active === key} className={chip(active === key)}>
+                  {label}{measured[key] != null ? `: ${measured[key]!.toFixed(1)} cm` : ''}
+                </button>
+              ))}
+              <button onClick={() => setFull(false)} aria-label="Exit full screen" className="ml-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25">
+                <X size={18} />
+              </button>
+            </div>
+          )}
+          <div className={full ? 'relative flex flex-1 min-h-0 items-center justify-center' : 'contents'}>
           <canvas
             ref={viewRef}
             onPointerDown={onPointerDown}
@@ -345,7 +419,7 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             aria-label="Photo to measure. Tap the two ends of the edge."
-            className={`max-w-full max-h-[70vh] touch-none ${marker ? 'cursor-crosshair' : ''}`}
+            className={`max-w-full ${full ? 'max-h-full' : 'max-h-[70vh]'} touch-none ${marker ? 'cursor-crosshair' : ''}`}
           />
           <canvas
             ref={loupeRef}
@@ -360,6 +434,12 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
               <Loader2 size={14} className="animate-spin" /> {marker ? 'Measuring…' : 'Looking for the marker…'}
             </div>
           )}
+          {!full && (
+            <button onClick={() => setFull(true)} aria-label="Measure in full screen" className="absolute bottom-2 right-2 flex h-10 w-10 items-center justify-center rounded-full bg-black/70 text-white hover:bg-black/90">
+              <Maximize2 size={16} />
+            </button>
+          )}
+          </div>
         </div>
       )}
 

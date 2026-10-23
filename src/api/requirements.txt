@@ -4,3 +4,4 @@ python-multipart
 pillow
 ultralytics>=8.3.78
 opencv-python>=4.7
+gradio_client>=2.7.2

@@ -20,7 +20,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: 'MWQATS — MVCA Wood Quality Assurance & Tracking System',
   description:
-    'Enterprise manufacturing QA platform with AI-powered defect detection, AR measurement, real-time production tracking, and role-based access control.',
+    'Enterprise manufacturing QA platform with automated defect detection, marker-based measurement, real-time production tracking, and role-based access control.',
   icons: {
     icon: [{ url: '/favicon.ico', type: 'image/x-icon' }],
   },

@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Star, ArrowRight, Menu, X, Hammer, Layers, Zap, Shield, Truck, Award, Phone, Mail, MapPin, Eye, ShoppingBag, Users, CheckCircle2, Smartphone } from 'lucide-react';
+import { Star, ArrowRight, Menu, X, Hammer, Layers, Zap, Shield, Truck, Award, Phone, Mail, MapPin, Eye, ShoppingBag, Users, CheckCircle2, Ruler, ScanSearch } from 'lucide-react';
 
+import { peso } from '@/lib/money';
 const navLinks = [
 { label: 'Home', href: '#home' },
 { label: 'Products', href: '#products' },
@@ -18,7 +19,7 @@ const featuredProducts = [
 {
   name: 'Oak Dining Table',
   category: 'Tables',
-  price: 1240,
+  price: 78100,
   image: 'https://img.rocket.new/generatedImages/rocket_gen_img_13d329e25-1772441226671.png',
   alt: 'Solid oak dining table with curved legs and natural wood grain finish',
   rating: 4.8,
@@ -27,7 +28,7 @@ const featuredProducts = [
 {
   name: 'Walnut Bookshelf',
   category: 'Storage',
-  price: 890,
+  price: 56100,
   image: 'https://img.rocket.new/generatedImages/rocket_gen_img_17c6d1e91-1772199203166.png',
   alt: 'Modern walnut bookshelf with five adjustable shelves and minimalist design',
   rating: 4.6,
@@ -36,7 +37,7 @@ const featuredProducts = [
 {
   name: 'Cherry Coffee Table',
   category: 'Tables',
-  price: 650,
+  price: 41000,
   image: 'https://img.rocket.new/generatedImages/rocket_gen_img_164fe4caf-1764651052330.png',
   alt: 'Cherry wood coffee table with hidden storage compartment and tapered legs',
   rating: 4.7,
@@ -45,7 +46,7 @@ const featuredProducts = [
 {
   name: 'Cherry Bed Frame',
   category: 'Beds',
-  price: 1580,
+  price: 99500,
   image: "https://img.rocket.new/generatedImages/rocket_gen_img_10dfcefad-1772601618690.png",
   alt: 'Luxury cherrywood bed frame with low-profile rails and reinforced joinery',
   rating: 4.9,
@@ -54,17 +55,25 @@ const featuredProducts = [
 
 
 const orderSteps = [
-{ step: 1, title: 'Browse & Select', desc: 'Explore our handcrafted furniture catalog. Use AR preview to see pieces in your space.', icon: Eye },
+{ step: 1, title: 'Browse & Select', desc: 'Explore our handcrafted furniture catalog and view the photos and dimensions of every piece.', icon: Eye },
 { step: 2, title: 'Customize & Order', desc: 'Choose materials, dimensions, and finishes. Add to cart and place your order.', icon: ShoppingBag },
 { step: 3, title: 'We Craft It', desc: 'Our master woodworkers build your furniture with precision quality control at every stage.', icon: Hammer },
 { step: 4, title: 'Track & Receive', desc: 'Monitor real-time inspection progress and receive your furniture with white-glove delivery.', icon: Truck }];
+
+
+const inspectionStages = [
+{ title: 'Upload', desc: 'Photos of the finished piece' },
+{ title: '3D Reconstruction', desc: 'A 3D model of the surface' },
+{ title: 'Detect Defects', desc: 'Cracks, dents, and warping found' },
+{ title: 'Results', desc: 'Pass or fail against tolerance' },
+{ title: 'Recommendation', desc: 'Rework steps if anything fails' }];
 
 
 const testimonials = [
 {
   name: 'Claire Leblanc',
   role: 'Interior Designer',
-  text: 'The quality of MVCA furniture is unmatched. The AR preview feature helped me visualize exactly how the dining table would look in my client\'s home.',
+  text: 'The quality of MVCA furniture is unmatched. The dining table arrived in exactly the dimensions I specified for my client\'s home.',
   rating: 5,
   avatar: 'CL'
 },
@@ -86,8 +95,8 @@ const testimonials = [
 
 const whyChoose = [
 { icon: Award, title: 'Master Craftsmanship', desc: 'Every piece is handcrafted by skilled woodworkers with 10+ years of experience.' },
-{ icon: Shield, title: 'Quality Guaranteed', desc: 'AI-powered defect detection checks every piece before it is released.' },
-{ icon: Smartphone, title: 'AR Visualization', desc: 'Preview furniture in your actual space with true-to-scale AR technology.' },
+{ icon: Shield, title: 'Quality Guaranteed', desc: 'Computer-vision defect detection checks every piece before it is released.' },
+{ icon: Ruler, title: 'Dimension Checks', desc: 'Every piece is measured against the size you ordered before it is released.' },
 { icon: Layers, title: 'Real-Time Tracking', desc: 'Monitor your order through every stage of the inspection process with live updates.' },
 { icon: Zap, title: 'Fast Production', desc: 'Efficient workshop processes deliver your custom furniture in 14-21 days.' },
 { icon: Users, title: 'Dedicated Support', desc: 'Direct chat with our production team for any questions or updates.' }];
@@ -170,7 +179,7 @@ export default function LandingPage() {
         <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary mb-8">
-            <Zap size={14} /> AI-Powered Quality Assurance & Tracking
+            <Zap size={14} /> Automated Quality Assurance & Tracking
           </div>
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
             Handcrafted Furniture
@@ -179,7 +188,7 @@ export default function LandingPage() {
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
             MVCA WoodWorks combines master craftsmanship with cutting-edge technology. 
-            Preview furniture in AR, track production in real-time, and receive quality-guaranteed pieces.
+            Track production in real-time and receive inspected, quality-guaranteed pieces.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/sign-up-login-screen?tab=register" className="btn-primary text-base px-8 py-4 flex items-center gap-2">
@@ -189,11 +198,10 @@ export default function LandingPage() {
               Login to Dashboard
             </Link>
           </div>
-          <div className="mt-12 grid grid-cols-3 gap-8 max-w-lg mx-auto">
+          <div className="mt-12 grid grid-cols-2 gap-8 max-w-sm mx-auto">
             {[
             { value: '500+', label: 'Happy Customers' },
-            { value: '14 Days', label: 'Avg. Production' },
-            { value: '99%', label: 'Quality Pass Rate' }].
+            { value: '14 Days', label: 'Avg. Production' }].
             map((stat) =>
             <div key={stat.label} className="text-center">
                 <p className="text-2xl font-bold text-foreground">{stat.value}</p>
@@ -219,8 +227,8 @@ export default function LandingPage() {
                 to create pieces that last generations.
               </p>
               <p className="text-muted-foreground mb-6">
-                We've integrated AI-powered quality assurance, real-time production tracking, and 
-                augmented reality visualization to give our customers complete transparency and confidence 
+                We've integrated automated quality assurance, real-time production tracking, and 
+                3D surface inspection to give our customers complete transparency and confidence 
                 in every purchase.
               </p>
               <div className="grid grid-cols-2 gap-4">
@@ -290,7 +298,7 @@ export default function LandingPage() {
                     <span className="text-xs text-muted-foreground">({product.reviews})</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-lg font-bold text-foreground">${product.price.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-foreground">{peso(product.price)}</span>
                     <Link href="/sign-up-login-screen?tab=register" className="text-xs text-primary font-semibold hover:underline">
                       Order Now →
                     </Link>
@@ -342,22 +350,22 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* AR Preview Showcase */}
+      {/* Quality Inspection Showcase */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 to-background p-8 lg:p-12">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               <div>
-                <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">AR Technology</p>
+                <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Quality Inspection</p>
                 <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
-                  See It In Your Space Before You Buy
+                  Inspected Before It Reaches You
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  Our true-to-scale AR visualization lets you place any furniture piece in your actual room. 
-                  See exact dimensions, rotate, zoom, and compare sizes before placing your order.
+                  Every piece goes through our inspection process before delivery. We scan it for surface defects,
+                  build a 3D model to check for dents and warping, and measure it against the size you ordered.
                 </p>
                 <ul className="space-y-3 mb-8">
-                  {['True-to-scale dimensions from product specs', 'Place in your real environment', 'Rotate and zoom for full view', 'Works on mobile and tablet'].map((feat) =>
+                  {['Defect detection for cracks, knots, and finish flaws', '3D surface check for dents and warping', 'Measured against your ordered dimensions', 'Follow each inspection stage from your dashboard'].map((feat) =>
                   <li key={feat} className="flex items-center gap-3 text-sm text-foreground">
                       <CheckCircle2 size={16} className="text-success shrink-0" />
                       {feat}
@@ -365,22 +373,22 @@ export default function LandingPage() {
                   )}
                 </ul>
                 <Link href="/sign-up-login-screen?tab=register" className="btn-primary inline-flex items-center gap-2">
-                  <Smartphone size={16} /> Try AR Preview
+                  <ScanSearch size={16} /> Track Your Order
                 </Link>
               </div>
               <div className="relative">
                 <div className="rounded-3xl bg-gradient-to-br from-violet-200 via-purple-200 to-white dark:from-purple-950 dark:via-violet-900 dark:to-slate-950 p-8 min-h-[300px] flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-32 h-24 mx-auto rounded-2xl border border-violet-300/60 bg-violet-400/25 backdrop-blur-sm flex items-center justify-center mb-4">
-                      <div className="text-center">
-                        <div className="text-4xl">🪑</div>
-                        <p className="text-xs text-foreground/80 mt-1">Oak Dining Table</p>
-                      </div>
-                    </div>
-                    <div className="mx-auto h-3 w-32 rounded-full bg-violet-500/40 blur-sm mb-4" />
-                    <p className="text-sm text-muted-foreground">180 × 90 × 75 cm</p>
-                    <p className="text-xs text-muted-foreground mt-1">True-to-scale AR Preview</p>
-                  </div>
+                  <ol className="w-full max-w-xs space-y-3" aria-label="Inspection stages">
+                    {inspectionStages.map((stage, i) =>
+                    <li key={stage.title} className="flex items-center gap-3 rounded-2xl border border-violet-300/60 bg-violet-400/20 backdrop-blur-sm px-4 py-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">{i + 1}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{stage.title}</p>
+                          <p className="text-xs text-foreground/70">{stage.desc}</p>
+                        </div>
+                      </li>
+                    )}
+                  </ol>
                 </div>
               </div>
             </div>
@@ -477,7 +485,7 @@ export default function LandingPage() {
             <div className="rounded-3xl border border-border bg-card p-6">
               <h3 className="text-lg font-semibold text-foreground mb-4">Ready to Order?</h3>
               <p className="text-sm text-muted-foreground mb-6">
-                Create an account to browse our full catalog, use AR preview, and place your custom order.
+                Create an account to browse our full catalog, track your order, and place your custom order.
               </p>
               <div className="space-y-3">
                 <Link href="/sign-up-login-screen?tab=register" className="btn-primary w-full flex items-center justify-center gap-2">

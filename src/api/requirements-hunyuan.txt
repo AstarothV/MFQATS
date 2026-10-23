@@ -1,0 +1,26 @@
+# Local Hunyuan3D server (src/api/hunyuan_local.py). Needs an NVIDIA GPU with 4 GB+ video memory and Python 3.12.
+# Setup, from the project root:
+#   uv venv .venv-hunyuan --python 3.12
+#   uv pip install --python .venv-hunyuan\Scripts\python.exe torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu126
+#   uv pip install --python .venv-hunyuan\Scripts\python.exe -r src\api\requirements-hunyuan.txt
+# transformers 5 renamed the image encoder's layers (the weights stop loading) and diffusers 0.36+ needs
+# huggingface_hub 1.x, which transformers 4.x does not allow: keep these three pinned together.
+git+https://github.com/Tencent-Hunyuan/Hunyuan3D-2@f8db63096c8282cb27354314d896feba5ba6ff8a
+transformers==4.57.1
+diffusers==0.35.2
+huggingface_hub==0.36.2
+accelerate==1.15.0
+einops
+omegaconf
+trimesh==5.1.1
+pymeshlab==2025.7.post1
+pygltflib
+xatlas
+opencv-python
+rembg==2.0.86
+onnxruntime==1.31.0
+fastapi
+uvicorn[standard]
+ninja
+pybind11
+tqdm
