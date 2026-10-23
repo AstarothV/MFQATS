@@ -10,6 +10,7 @@ import Link from 'next/link';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { CustomerOverviewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkeleton';
 
+import { peso } from '@/lib/money';
 interface Order {
   id: string;
   order_ref: string;
@@ -261,7 +262,7 @@ export default function CustomerOverviewContent() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Order Value</p>
-                  <p className="text-base font-bold text-foreground">${selectedOrder.amount?.toLocaleString()}</p>
+                  <p className="text-base font-bold text-foreground">{peso(selectedOrder.amount)}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Queue Position</p>

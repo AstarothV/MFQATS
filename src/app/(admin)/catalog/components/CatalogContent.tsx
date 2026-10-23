@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleton';
 
+import { peso } from '@/lib/money';
 interface Product {
   id: string;
   product_ref: string;
@@ -327,9 +328,9 @@ export default function CatalogContent() {
                 <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <span className="text-lg font-bold text-foreground">${product.price.toLocaleString()}</span>
+                    <span className="text-lg font-bold text-foreground">{peso(product.price)}</span>
                     {product.original_price > product.price && (
-                      <span className="text-xs text-muted-foreground line-through ml-2">${product.original_price.toLocaleString()}</span>
+                      <span className="text-xs text-muted-foreground line-through ml-2">{peso(product.original_price)}</span>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground">{product.estimated_production_days}d lead</span>
@@ -395,11 +396,11 @@ export default function CatalogContent() {
                 <input value={form.material_type} onChange={e => setForm(f => ({ ...f, material_type: e.target.value }))} className="input-dark w-full mt-1" placeholder="Solid Oak" />
               </label>
               <label className="space-y-1 text-sm text-muted-foreground">
-                Price (USD) *
+                Price (PHP ₱) *
                 <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1240" />
               </label>
               <label className="space-y-1 text-sm text-muted-foreground">
-                Original Price (USD)
+                Original Price (PHP ₱)
                 <input type="number" value={form.original_price} onChange={e => setForm(f => ({ ...f, original_price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1399" />
               </label>
               <div className="md:col-span-2">
@@ -483,7 +484,7 @@ export default function CatalogContent() {
               <div className="grid grid-cols-2 gap-3">
                 <div><p className="text-muted-foreground">Category</p><p className="font-semibold text-foreground">{selectedProduct.category}</p></div>
                 <div><p className="text-muted-foreground">Material</p><p className="font-semibold text-foreground">{selectedProduct.material_type}</p></div>
-                <div><p className="text-muted-foreground">Price</p><p className="font-semibold text-foreground">${selectedProduct.price.toLocaleString()}</p></div>
+                <div><p className="text-muted-foreground">Price</p><p className="font-semibold text-foreground">{peso(selectedProduct.price)}</p></div>
                 <div><p className="text-muted-foreground">Lead Time</p><p className="font-semibold text-foreground">{selectedProduct.estimated_production_days} days</p></div>
                 <div><p className="text-muted-foreground">Dimensions</p><p className="font-semibold text-foreground">{selectedProduct.length_cm}L × {selectedProduct.width_cm}W × {selectedProduct.height_cm}H cm</p></div>
                 <div><p className="text-muted-foreground">AR Support</p><p className="font-semibold text-foreground">{selectedProduct.ar_model_support ? 'Yes' : 'No'}</p></div>

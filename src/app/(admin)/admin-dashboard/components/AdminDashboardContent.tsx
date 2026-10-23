@@ -5,16 +5,20 @@ import {
   AreaChart, Area, ResponsiveContainer, CartesianGrid, Tooltip, XAxis, YAxis,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { DollarSign, Package, Users, Bell, FileText, TrendingUp, AlertTriangle } from 'lucide-react';
+import { PhilippinePeso, Package, Users, Bell, FileText, TrendingUp, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { PageSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { readPageCache, writePageCache } from '@/lib/pageCache';
 import { isProcessStage, statusLabel, statusVariant } from '@/lib/orders';
+import { defectRate, fetchInspectionCounts } from '@/lib/inspections';
+import { peso, pesoShort } from '@/lib/money';
 import Link from 'next/link';
 
 const COLORS = ['#7C3AED', '#A78BFA', '#F59E0B', '#22C55E', '#38BDF8'];
+const SHOW_MONEY_KEY = 'mfqats-show-money';
+const HIDDEN = '••••';
 
 export default function AdminDashboardContent() {
   const supabase = createClient();
@@ -23,48 +27,75 @@ export default function AdminDashboardContent() {
   const [cached] = useState(() => readPageCache<Record<string, any[]>>(user?.id, 'admin-dashboard'));
   const [loading, setLoading] = useState(!cached);
   const [orders, setOrders] = useState<any[]>(cached?.orders ?? []);
-  const [defects, setDefects] = useState<any[]>(cached?.defects ?? []);
   const [users, setUsers] = useState<any[]>(cached?.users ?? []);
   const [notifications, setNotifications] = useState<any[]>(cached?.notifications ?? []);
   const [inventory, setInventory] = useState<any[]>(cached?.inventory ?? []);
+  const [inspections, setInspections] = useState<{ failed: number; total: number }>(cached?.inspections?.[0] ?? { failed: 0, total: 0 });
+  // Money is hidden until shown (someone may be looking at the screen); the choice is remembered on this browser.
+  const [showMoney, setShowMoney] = useState(false);
+  useEffect(() => {
+    try { setShowMoney(localStorage.getItem(SHOW_MONEY_KEY) === '1'); } catch { /* storage blocked: stay hidden */ }
+  }, []);
+  function toggleMoney() {
+    setShowMoney((v) => {
+      try { localStorage.setItem(SHOW_MONEY_KEY, v ? '0' : '1'); } catch { /* storage blocked */ }
+      return !v;
+    });
+  }
+  const money = (text: string) => (showMoney ? text : HIDDEN);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [ordersRes, defectsRes, usersRes, notifRes, inventoryRes] = await Promise.all([
-        supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('defects').select('*').order('created_at', { ascending: false }).limit(50),
+      const [ordersRes, usersRes, notifRes, inventoryRes, counts] = await Promise.all([
+        // ponytail: every order is loaded for the totals; switch the sums to a SQL view if orders reach the thousands
+        supabase.from('orders').select('*').order('created_at', { ascending: false }),
         supabase.from('user_profiles').select('*').eq('is_active', true),
         supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(5),
         supabase.from('inventory').select('*').eq('is_active', true),
+        fetchInspectionCounts(supabase),
       ]);
       setOrders(ordersRes.data || []);
-      setDefects(defectsRes.data || []);
       setUsers(usersRes.data || []);
       setNotifications(notifRes.data || []);
       setInventory(inventoryRes.data || []);
+      setInspections(counts);
       writePageCache(user?.id, 'admin-dashboard', {
         orders: ordersRes.data || [],
-        defects: defectsRes.data || [],
         users: usersRes.data || [],
         notifications: notifRes.data || [],
         inventory: inventoryRes.data || [],
+        inspections: [counts],
       });
       setLoading(false);
     };
     fetchData();
   }, [supabase, user?.id]);
 
-  // Compute stats
-  const totalRevenue = orders.reduce((s, o) => s + (o.amount || 0), 0);
+  // Compute stats. Revenue leaves out cancelled orders: they were never paid.
+  const paid = orders.filter((o) => (o.extended_status || o.status) !== 'cancelled');
+  const totalRevenue = paid.reduce((s, o) => s + Number(o.amount || 0), 0);
   const inProductionCount = orders.filter((o) => isProcessStage(o.extended_status)).length;
   const staffCount = users.filter((u) => u.role === 'staff').length;
-  const defectRate = orders.length > 0 ? ((defects.length / orders.length) * 100).toFixed(1) : '0.0';
 
-  // Revenue trend (last 6 months - simulated from orders)
-  const revenueTrend = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'].map((month, i) => ({
-    month,
-    value: Math.round(totalRevenue * (0.6 + i * 0.08) / 6),
-  }));
+  // Revenue per calendar month (by order date), the last six months up to this one
+  const now = new Date();
+  const revenueTrend = Array.from({ length: 6 }, (_, i) => {
+    const month = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    const value = paid
+      .filter((o) => {
+        const d = new Date(o.created_at);
+        return d.getFullYear() === month.getFullYear() && d.getMonth() === month.getMonth();
+      })
+      .reduce((s, o) => s + Number(o.amount || 0), 0);
+    return { month: month.toLocaleString('en-PH', { month: 'short' }), value };
+  });
+  const thisMonth = revenueTrend[5].value;
+  const lastMonth = revenueTrend[4].value;
+  // a % only means something when both months have orders; otherwise say what happened
+  const growth =
+    thisMonth === 0 ? 'No orders yet this month'
+    : lastMonth === 0 ? 'No orders last month'
+    : `${thisMonth >= lastMonth ? '+' : ''}${(((thisMonth - lastMonth) / lastMonth) * 100).toFixed(1)}% vs last month`;
 
   // Product mix from orders
   const productMix = orders.reduce((acc: Record<string, number>, o) => {
@@ -77,10 +108,10 @@ export default function AdminDashboardContent() {
   const lowStockItems = inventory.filter((i) => i.stock_level < i.min_stock);
 
   const summaryCards = [
-    { label: 'Total Revenue', value: `$${(totalRevenue / 1000).toFixed(0)}K`, icon: DollarSign, delta: '+18%', detail: 'All orders combined' },
+    { label: 'Total Revenue', value: money(pesoShort(totalRevenue)), icon: PhilippinePeso, delta: money(growth), detail: `${paid.length} orders, excluding cancelled`, sensitive: true },
     { label: 'Orders in Progress', value: inProductionCount.toString(), icon: Package, delta: `${orders.length} total`, detail: 'Currently in the inspection process' },
     { label: 'Active Staff', value: staffCount.toString(), icon: Users, delta: `${users.length} total users`, detail: 'Production team' },
-    { label: 'Defect Rate', value: `${defectRate}%`, icon: Bell, delta: `${defects.length} defects`, detail: 'Quality score' },
+    { label: 'Defect Rate', value: `${defectRate(inspections).toFixed(1)}%`, icon: Bell, delta: `${inspections.failed} of ${inspections.total} failed`, detail: 'Inspections that failed' },
   ];
 
   if (loading) {
@@ -117,7 +148,19 @@ export default function AdminDashboardContent() {
             <div key={card.label} className="card-dark p-5 rounded-3xl border border-border shadow-sm">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <div>
-                  <h2 className="text-2xl font-semibold text-foreground">{card.value}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-semibold text-foreground">{card.value}</h2>
+                    {card.sensitive && (
+                      <button
+                        onClick={toggleMoney}
+                        aria-label={showMoney ? 'Hide amounts' : 'Show amounts'}
+                        aria-pressed={showMoney}
+                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        {showMoney ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
                 </div>
                 <div className="rounded-2xl bg-muted p-3 text-primary">
@@ -152,9 +195,18 @@ export default function AdminDashboardContent() {
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Revenue Trend</h2>
-              <p className="text-sm text-muted-foreground mt-1">Sales performance across the last six months.</p>
+              <p className="text-sm text-muted-foreground mt-1">Revenue per month from orders placed, excluding cancelled orders.</p>
             </div>
-            <StatusBadge variant="ok" label="Stable Growth" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleMoney}
+                aria-label={showMoney ? 'Hide amounts' : 'Show amounts'}
+                aria-pressed={showMoney}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                {showMoney ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
@@ -167,8 +219,8 @@ export default function AdminDashboardContent() {
                 </defs>
                 <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#A3A3A3' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A3A3A3' }} />
-                <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} labelStyle={{ color: '#F5F5F5' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A3A3A3' }} tickFormatter={(v) => money(pesoShort(Number(v)))} />
+                <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} labelStyle={{ color: '#F5F5F5' }} formatter={(v) => [money(peso(Number(v))), 'Revenue']} />
                 <Area type="monotone" dataKey="value" stroke="#7C3AED" strokeWidth={3} fill="url(#revenueGradient)" />
               </AreaChart>
             </ResponsiveContainer>
@@ -242,7 +294,7 @@ export default function AdminDashboardContent() {
                         />
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>
-                      <td className="px-4 py-4 text-foreground font-semibold">${order.amount?.toLocaleString()}</td>
+                      <td className="px-4 py-4 text-foreground font-semibold">{money(peso(order.amount))}</td>
                     </tr>
                   ))}
                 </tbody>

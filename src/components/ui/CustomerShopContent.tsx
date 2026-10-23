@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleton';
 
+import { peso } from '@/lib/money';
 interface Product {
   id: string;
   product_ref: string;
@@ -253,13 +254,13 @@ export default function CustomerShopContent() {
                 {cart.map(item => (
                   <div key={item.product.id} className="flex justify-between gap-3 text-sm">
                     <span className="text-muted-foreground truncate">{item.product.name} × {item.quantity}</span>
-                    <span className="font-semibold text-foreground whitespace-nowrap">${(item.product.price * item.quantity).toLocaleString()}</span>
+                    <span className="font-semibold text-foreground whitespace-nowrap">{peso((item.product.price * item.quantity))}</span>
                   </div>
                 ))}
               </div>
               <div className="border-t border-border pt-3 flex justify-between text-base font-bold text-foreground">
                 <span>Total</span>
-                <span>${cartTotal.toLocaleString()}</span>
+                <span>{peso(cartTotal)}</span>
               </div>
               <button
                 type="button"
@@ -333,7 +334,7 @@ export default function CustomerShopContent() {
                             <Plus size={12} />
                           </button>
                         </div>
-                        <span className="font-bold text-foreground">${(item.product.price * item.quantity).toLocaleString()}</span>
+                        <span className="font-bold text-foreground">{peso((item.product.price * item.quantity))}</span>
                       </div>
                       <input
                         value={item.customization}
@@ -351,7 +352,7 @@ export default function CustomerShopContent() {
               <div className="space-y-2 mb-4 text-sm">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal ({cartCount} items)</span>
-                  <span>${cartTotal.toLocaleString()}</span>
+                  <span>{peso(cartTotal)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Delivery</span>
@@ -360,7 +361,7 @@ export default function CustomerShopContent() {
               </div>
               <div className="border-t border-border pt-3 flex justify-between font-bold text-foreground">
                 <span>Total</span>
-                <span>${cartTotal.toLocaleString()}</span>
+                <span>{peso(cartTotal)}</span>
               </div>
               <button type="button" onClick={() => setStep('checkout')} className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
                 Proceed to Checkout <ArrowRight size={16} />
@@ -463,9 +464,9 @@ export default function CustomerShopContent() {
                   </div>
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-xl font-bold text-foreground">${product.price.toLocaleString()}</span>
+                      <span className="text-xl font-bold text-foreground">{peso(product.price)}</span>
                       {product.original_price > product.price && (
-                        <span className="text-sm text-muted-foreground line-through">${product.original_price.toLocaleString()}</span>
+                        <span className="text-sm text-muted-foreground line-through">{peso(product.original_price)}</span>
                       )}
                     </div>
                     <span className="text-xs text-muted-foreground">{product.estimated_production_days}d lead time</span>

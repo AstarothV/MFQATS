@@ -8,26 +8,30 @@ photo is therefore checked twice: whole (for big defects) and in overlapping 640
 ones), and the two sets of boxes are merged. Live camera frames skip the tiles to stay fast.
 
 Also serves /api/measure (marker-based measurement, see measure.py), /api/surface (dents and warping, see surface.py)
-and /api/reconstruct (3D model from photos, see sfm.py).
+and /api/reconstruct (3D model from photos, see sfm.py) and /api/model3d (3D model of a whole piece, via Hunyuan3D).
 
-Run from the project root:
-    uvicorn src.api.yolo_server:app --reload --port 8000
+Run from the project root (--env-file passes the optional HF_TOKEN from .env, used by /api/model3d):
+    uvicorn src.api.yolo_server:app --reload --port 8000 --env-file .env
 """
 import base64
 import binascii
 import io
 import json
 import math
+import os
 import re
+import tempfile
 import threading
 import traceback
+import urllib.error
+import urllib.request
 import uuid
 from contextlib import asynccontextmanager
 from functools import cache
 from pathlib import Path
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
 
@@ -376,3 +380,126 @@ async def reconstruct_run(job_id: str, request: Request):
 def reconstruct_status(job_id: str):
     job = get_job(job_id)
     return {k: job.get(k) for k in ("status", "progress", "message", "error", "result")}
+
+
+# ---- 3D model of the whole piece from photos (Tencent Hunyuan3D-2mv on a free Hugging Face Space) ----
+# Unlike /api/reconstruct this is a generative model: it looks right but has no real-world scale, so it is for viewing,
+# not for measuring. Free GPU time is limited per day; HF_TOKEN (a free Hugging Face account token) raises the limit.
+# When the online demo fails (time used up, or the demo is down), the same photos go to the same model running on this
+# computer's GPU (hunyuan_local.py, its own server on LOCAL_3D_URL), which has no daily limit.
+# ponytail: shape only (untextured). The Space's texture step is broken as of 2026-10; switch api_name to
+# "/generation_all" (returns the textured model second) once it works again.
+HF_SPACE = "tencent/Hunyuan3D-2mv"
+VIEWS = ("front", "left", "back", "right")
+LOCAL_3D_URL = os.environ.get("LOCAL_3D_URL", "http://localhost:8001")
+AI_JOBS = {}
+MAX_AI_JOBS = 8
+
+
+def build_online(job, photos):
+    """-> .glb bytes from the free Hugging Face demo. Raises on any failure."""
+    from gradio_client import Client, handle_file  # lazy: only this feature needs it
+
+    with tempfile.TemporaryDirectory() as tmp:
+        files = {}
+        for view, data in zip(VIEWS, photos):
+            if data is not None:
+                path = Path(tmp) / f"{view}.jpg"
+                path.write_bytes(data)
+                files[view] = handle_file(str(path))
+        job["message"] = "Building the 3D model"
+        result = Client(HF_SPACE, token=os.environ.get("HF_TOKEN") or None, verbose=False).predict(
+            caption="", image=None,
+            mv_image_front=files.get("front"), mv_image_back=files.get("back"),
+            mv_image_left=files.get("left"), mv_image_right=files.get("right"),
+            steps=30, guidance_scale=5, seed=1234, octree_resolution=256, check_box_rembg=True, num_chunks=8000,
+            api_name="/shape_generation")
+        model = result[0]["value"] if isinstance(result[0], dict) else result[0]  # a gradio update or a plain path
+        return Path(model).read_bytes()
+
+
+def build_local(photos):
+    """-> .glb bytes from hunyuan_local.py. Raises urllib errors if it is not running or fails."""
+    images = [None if p is None else "data:image/jpeg;base64," + base64.b64encode(p).decode() for p in photos]
+    request = urllib.request.Request(f"{LOCAL_3D_URL}/generate", data=json.dumps({"images": images}).encode(),
+                                     headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(request, timeout=900) as r:  # the first build also loads the model
+        return r.read()
+
+
+def run_ai_job(job, photos):
+    try:
+        job["model"] = build_online(job, photos)
+        job["status"], job["message"] = "done", "Done"
+        return
+    except Exception as e:
+        online_error = str(e)
+        print(f"[model3d] online demo failed, trying this computer's GPU: {online_error[:200]}")
+    job["message"] = "The free online time is used up or unavailable, so this computer is building it (1 to 5 minutes)"
+    try:
+        job["model"] = build_local(photos)
+        job["status"], job["message"] = "done", "Done"
+    except urllib.error.HTTPError as e:
+        try:
+            detail = json.loads(e.read()).get("detail")
+        except ValueError:
+            detail = None
+        job["status"], job["error"] = "failed", f"This computer could not build the model: {detail or f'HTTP {e.code}'}"
+    except (urllib.error.URLError, OSError):
+        if "quota" in online_error.lower():
+            text = "Today's free 3D model time is used up."
+        else:
+            text = "The online 3D model service is unavailable right now."
+        job["status"], job["error"] = "failed", (
+            f"{text} Start the local 3D server to build on this computer instead "
+            r"(.venv-hunyuan\Scripts\python.exe -m uvicorn src.api.hunyuan_local:app --port 8001), or try again later.")
+
+
+def get_ai_job(task_id):
+    job = AI_JOBS.get(task_id)
+    if job is None:
+        raise HTTPException(404, "That 3D model was not found. Build it again.")
+    return job
+
+
+@app.post("/api/model3d")
+def model3d_start(body: dict):
+    """JSON {"images": [front, left, back, right]}: JPEG data URLs or null. One photo, or a front photo plus at least
+    one more -> {"task": id}. The model is built in the background; poll GET /api/model3d/{task}."""
+    images = body.get("images")
+    if not isinstance(images, list) or len(images) != len(VIEWS):
+        raise HTTPException(400, "Send the photos as [front, left, back, right].")
+    if not all(i is None or (isinstance(i, str) and i.startswith("data:image/")) for i in images):
+        raise HTTPException(400, "Each photo must be an image data URL.")
+    count = sum(i is not None for i in images)
+    if count == 0:
+        raise HTTPException(422, "Add at least one photo.")
+    if count > 1 and images[0] is None:
+        raise HTTPException(422, "With more than one photo, one of them must be the front.")
+    try:
+        photos = [None if i is None else base64.b64decode(i.split(",", 1)[1]) for i in images]
+    except (IndexError, binascii.Error):
+        raise HTTPException(400, "A photo could not be read.")
+    if count == 1:
+        photos = [next(p for p in photos if p is not None), None, None, None]  # a single photo is used as the front
+    while len(AI_JOBS) >= MAX_AI_JOBS:
+        del AI_JOBS[next(iter(AI_JOBS))]  # oldest first
+    task_id = uuid.uuid4().hex
+    AI_JOBS[task_id] = job = {"status": "running", "message": "Sending the photos", "error": None, "model": None}
+    threading.Thread(target=run_ai_job, args=(job, photos), daemon=True).start()
+    return {"task": task_id}
+
+
+@app.get("/api/model3d/{task_id}")
+def model3d_status(task_id: str):
+    job = get_ai_job(task_id)
+    return {"status": job["status"], "message": job["message"], "error": job["error"], "ready": job["model"] is not None}
+
+
+@app.get("/api/model3d/{task_id}/model.glb")
+def model3d_file(task_id: str):
+    job = get_ai_job(task_id)
+    if job["model"] is None:
+        raise HTTPException(404, "The 3D model is not ready yet.")
+    return Response(job["model"], media_type="model/gltf-binary",
+                    headers={"Content-Disposition": f'attachment; filename="mfqats-{task_id[:8]}.glb"'})

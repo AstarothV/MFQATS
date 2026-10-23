@@ -6,6 +6,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { SkeletonRegion, ListSkeleton } from '@/components/ui/LoadingSkeleton';
 
+import { peso } from '@/lib/money';
 interface InventoryItem {
   id: string;
   item_ref: string;
@@ -297,7 +298,7 @@ export default function InventoryManagementContent() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
                       <div><p className="text-muted-foreground">Location</p><p className="font-semibold text-foreground">{item.location}</p></div>
                       <div><p className="text-muted-foreground">Min Stock</p><p className="font-semibold text-foreground">{item.min_stock} {item.unit}</p></div>
-                      <div><p className="text-muted-foreground">Cost/Unit</p><p className="font-semibold text-foreground">${item.cost_per_unit}</p></div>
+                      <div><p className="text-muted-foreground">Cost/Unit</p><p className="font-semibold text-foreground">{peso(item.cost_per_unit)}</p></div>
                       <div><p className="text-muted-foreground">Last Updated</p><p className="font-semibold text-foreground">{new Date(item.last_updated).toLocaleDateString()}</p></div>
                     </div>
                     <div className="flex gap-2">

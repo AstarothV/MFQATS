@@ -11,6 +11,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import MeasurePanel from './MeasurePanel';
 import SurfacePanel from './SurfacePanel';
 import ReconstructPanel from './ReconstructPanel';
+import Model3DPanel from './Model3DPanel';
 
 interface Detection {
   id: string;
@@ -460,10 +461,10 @@ export default function QualityScanPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">AI Quality Inspection</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Quality Inspection</p>
             <h1 className="text-3xl font-bold text-foreground">YOLO Defect Detection</h1>
             <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
-              Real-time furniture defect detection using AI computer vision. Point camera at workpiece to detect cracks, scratches, dents, and other defects.
+              Real-time furniture defect detection using computer vision. Point camera at workpiece to detect cracks, scratches, dents, and other defects.
             </p>
           </div>
           <div className="flex gap-3">
@@ -481,7 +482,7 @@ export default function QualityScanPage() {
           <div role="alert" className="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4">
             <AlertTriangle size={18} className="text-warning shrink-0 mt-0.5" />
             <div className="flex-1 text-sm">
-              <p className="font-semibold text-foreground">AI detection server is offline</p>
+              <p className="font-semibold text-foreground">Detection server is offline</p>
               <p className="text-muted-foreground mt-1">
                 Couldn&apos;t reach the Python YOLO server on the computer running this site. Start it from the project root, then try again:
               </p>
@@ -595,7 +596,7 @@ export default function QualityScanPage() {
                       <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 size={32} className="text-accent animate-spin" />
-                          <p className="text-white text-sm font-semibold">Analyzing with AI...</p>
+                          <p className="text-white text-sm font-semibold">Analyzing image...</p>
                         </div>
                       </div>
                     )}
@@ -608,7 +609,7 @@ export default function QualityScanPage() {
                           <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                             <div className="flex flex-col items-center gap-3">
                               <Loader2 size={32} className="text-accent animate-spin" />
-                              <p className="text-white text-sm font-semibold">Analyzing with AI...</p>
+                              <p className="text-white text-sm font-semibold">Analyzing image...</p>
                             </div>
                           </div>
                         )}
@@ -759,6 +760,7 @@ export default function QualityScanPage() {
             )}
 
             <MeasurePanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} showToast={showToast} />
+            <Model3DPanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} />
             <ReconstructPanel apiUrl={YOLO_API_URL} />
             <SurfacePanel apiUrl={YOLO_API_URL} />
           </div>

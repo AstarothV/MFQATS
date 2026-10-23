@@ -3,7 +3,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from yolo_server import build_response, detect_image, merge_duplicates, summarize, tile_windows, to_detections  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+from yolo_server import (  # noqa: E402
+    build_response, detect_image, merge_duplicates, model3d_start, model3d_status, summarize, tile_windows, to_detections,
+)
 
 NAMES = {0: "Live_Knot", 1: "Crack", 2: "person", 3: "Unfinished Sanding", 4: "joint-misalignment"}
 
@@ -98,8 +101,47 @@ def test_tiles_find_small_defects():
     assert abs(big["x"] * 2000 - 200) <= 4 and abs((big["x"] + big["width"]) * 2000 - 900) <= 4, big
 
 
+def test_model3d_rejects_bad_requests():
+    def status(call):
+        try:
+            call()
+        except HTTPException as e:
+            return e.status_code
+        raise AssertionError("expected an HTTPException")
+
+    photo = "data:image/jpeg;base64,AAAA"
+    assert status(lambda: model3d_start({"images": [photo]})) == 400  # not the 4 slots
+    assert status(lambda: model3d_start({"images": [None] * 4})) == 422
+    assert status(lambda: model3d_start({"images": [None, photo, photo, None]})) == 422  # several photos but no front
+    assert status(lambda: model3d_start({"images": ["https://example.com/a.jpg", None, None, None]})) == 400
+    assert status(lambda: model3d_status("not-a-job")) == 404
+
+def test_model3d_falls_back_to_this_computer():
+    import yolo_server
+
+    def quota(job, photos):
+        raise RuntimeError("You have exceeded your ZeroGPU quota")
+
+    online, local, url = yolo_server.build_online, yolo_server.build_local, yolo_server.LOCAL_3D_URL
+    yolo_server.build_online = quota
+    try:
+        yolo_server.LOCAL_3D_URL = "http://127.0.0.1:9"  # nothing listens here: the local server is "not running"
+        job = {"status": "running", "message": "", "error": None, "model": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None])
+        assert job["status"] == "failed" and "used up" in job["error"] and "hunyuan_local" in job["error"], job
+
+        yolo_server.build_local = lambda photos: b"glTF..."  # the local server answers
+        job = {"status": "running", "message": "", "error": None, "model": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None])
+        assert job["status"] == "done" and job["model"] == b"glTF...", job
+    finally:
+        yolo_server.build_online, yolo_server.build_local, yolo_server.LOCAL_3D_URL = online, local, url
+
+
 if __name__ == "__main__":
     test_build_response()
     test_merge_across_models()
     test_tiles_find_small_defects()
+    test_model3d_rejects_bad_requests()
+    test_model3d_falls_back_to_this_computer()
     print("ok")

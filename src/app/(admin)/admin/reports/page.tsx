@@ -5,6 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { Download, Loader2, CheckCircle2, AlertTriangle, BarChart3, Package, RotateCcw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { isProcessStage, statusLabel } from '@/lib/orders';
+import { defectRate, fetchInspectionCounts, type InspectionCounts } from '@/lib/inspections';
 import Icon from '@/components/ui/AppIcon';
 import { SkeletonRegion, ReportCardsSkeleton } from '@/components/ui/LoadingSkeleton';
 
@@ -21,6 +22,7 @@ interface ReportData {
 export default function AdminReportsPage() {
   const supabase = createClient();
   const [data, setData] = useState<ReportData>({ orders: [], defects: [], users: [], reworks: [], inventory: [] });
+  const [inspections, setInspections] = useState<InspectionCounts>({ failed: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -33,13 +35,15 @@ export default function AdminReportsPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [ordersRes, defectsRes, usersRes, reworksRes, inventoryRes] = await Promise.all([
+      const [ordersRes, defectsRes, usersRes, reworksRes, inventoryRes, counts] = await Promise.all([
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
         supabase.from('defects').select('*').order('created_at', { ascending: false }),
         supabase.from('user_profiles').select('*').eq('role', 'staff'),
         supabase.from('rework_logs').select('*').order('created_at', { ascending: false }),
         supabase.from('inventory').select('*').order('name'),
+        fetchInspectionCounts(supabase),
       ]);
+      setInspections(counts);
       setData({
         orders: ordersRes.data || [],
         defects: defectsRes.data || [],
@@ -205,7 +209,7 @@ export default function AdminReportsPage() {
                   { label: 'Total Orders', value: data.orders.length },
                   { label: 'In Process', value: data.orders.filter((o) => isProcessStage(o.extended_status)).length },
                   { label: 'Delivered', value: data.orders.filter((o) => (o.extended_status || o.status) === 'delivered').length },
-                  { label: 'Defect Rate', value: data.orders.length > 0 ? `${Math.round((data.defects.length / data.orders.length) * 100)}%` : '0%' },
+                  { label: 'Defect Rate', value: `${defectRate(inspections).toFixed(1)}%` },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center p-4 rounded-2xl bg-muted/30">
                     <p className="text-2xl font-bold text-foreground">{stat.value}</p>

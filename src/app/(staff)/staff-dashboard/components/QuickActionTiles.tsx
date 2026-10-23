@@ -23,10 +23,10 @@ const actions = [
     id: 'action-camera',
     icon: Camera,
     label: 'Camera Inspect',
-    desc: 'AI defect detection',
+    desc: 'YOLO defect detection',
     color: 'text-accent',
     bg: 'bg-muted/20 border-border hover:bg-muted/40',
-    modal: { title: 'Camera Inspect', body: 'Opening AI camera interface for WP-2847. YOLOv8 defect detection is active. Point camera at the workpiece surface.' },
+    modal: { title: 'Camera Inspect', body: 'Opening the inspection camera for WP-2847. YOLOv12 defect detection is active. Point camera at the workpiece surface.' },
   },
   {
     id: 'action-gallery',
