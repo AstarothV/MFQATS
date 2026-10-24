@@ -382,14 +382,17 @@ def reconstruct_status(job_id: str):
     return {k: job.get(k) for k in ("status", "progress", "message", "error", "result")}
 
 
-# ---- 3D model of the whole piece from photos (Tencent Hunyuan3D-2mv on a free Hugging Face Space) ----
+# ---- 3D model of the whole piece from photos (free Hugging Face Spaces) ----
 # Unlike /api/reconstruct this is a generative model: it looks right but has no real-world scale, so it is for viewing,
 # not for measuring. Free GPU time is limited per day; HF_TOKEN (a free Hugging Face account token) raises the limit.
-# When the online demo fails (time used up, or the demo is down), the same photos go to the same model running on this
-# computer's GPU (hunyuan_local.py, its own server on LOCAL_3D_URL), which has no daily limit.
-# ponytail: shape only (untextured). The Space's texture step is broken as of 2026-10; switch api_name to
-# "/generation_all" (returns the textured model second) once it works again.
+#   with colors: TRELLIS (shape + photo texture, ~45 s, uses more of the daily time)
+#   shape only:  Tencent Hunyuan3D-2mv (untextured, slightly sharper shape); also the fallback when colors fail
+# When the online demos fail (time used up, or down), the shape is built by the same Hunyuan model on this computer's
+# GPU (hunyuan_local.py, its own server on LOCAL_3D_URL), which has no daily limit. Colors need a 16 GB+ GPU, so the
+# local fallback is shape only.
+# ponytail: Hunyuan's own texture step ("/generation_all") is broken on its Space as of 2026-10; TRELLIS covers colors.
 HF_SPACE = "tencent/Hunyuan3D-2mv"
+COLOR_SPACE = "trellis-community/TRELLIS"
 VIEWS = ("front", "left", "back", "right")
 LOCAL_3D_URL = os.environ.get("LOCAL_3D_URL", "http://localhost:8001")
 AI_JOBS = {}
@@ -418,6 +421,34 @@ def build_online(job, photos):
         return Path(model).read_bytes()
 
 
+def build_online_color(job, photos):
+    """-> textured .glb bytes from the free TRELLIS demo. Raises on any failure."""
+    from gradio_client import Client, handle_file
+
+    with tempfile.TemporaryDirectory() as tmp:
+        files = []
+        for view, data in zip(VIEWS, photos):
+            if data is not None:
+                path = Path(tmp) / f"{view}.jpg"
+                path.write_bytes(data)
+                files.append(handle_file(str(path)))
+        client = Client(COLOR_SPACE, token=os.environ.get("HF_TOKEN") or None, verbose=False)
+        client.predict(api_name="/start_session")
+        # The demo's web page cuts out the background when a photo is uploaded; generation alone does not, so without
+        # this step the room (floor, other furniture) is built into the model.
+        job["message"] = "Removing the backgrounds"
+        files = [handle_file(client.predict(image=f, api_name="/preprocess_image")) for f in files]
+        job["message"] = "Building the 3D model with colors"
+        if len(files) > 1:
+            client.predict(api_name="/lambda_1")  # the demo's "multiple images" tab; without it only one photo is used
+        result = client.predict(
+            image=files[0] if len(files) == 1 else None,
+            multiimages=[{"image": f, "caption": None} for f in files] if len(files) > 1 else [],
+            seed=0, ss_guidance_strength=7.5, ss_sampling_steps=12, slat_guidance_strength=3, slat_sampling_steps=12,
+            multiimage_algo="stochastic", mesh_simplify=0.95, texture_size=1024, api_name="/generate_and_extract_glb")
+        return Path(result[1]).read_bytes()  # [preview video, textured .glb, same .glb for download]
+
+
 def build_local(photos):
     """-> .glb bytes from hunyuan_local.py. Raises urllib errors if it is not running or fails."""
     images = [None if p is None else "data:image/jpeg;base64," + base64.b64encode(p).decode() for p in photos]
@@ -427,7 +458,16 @@ def build_local(photos):
         return r.read()
 
 
-def run_ai_job(job, photos):
+def run_ai_job(job, photos, color=False):
+    if color:
+        try:
+            job["model"] = build_online_color(job, photos)
+            job["colored"], job["status"], job["message"] = True, "done", "Done"
+            return
+        except Exception as e:
+            print(f"[model3d] colors failed, building the shape only: {str(e)[:200]}")
+            job["note"] = ("Colors were not available this time (the free online time may be running low), "
+                           "so this model is the shape only.")
     try:
         job["model"] = build_online(job, photos)
         job["status"], job["message"] = "done", "Done"
@@ -464,8 +504,8 @@ def get_ai_job(task_id):
 
 @app.post("/api/model3d")
 def model3d_start(body: dict):
-    """JSON {"images": [front, left, back, right]}: JPEG data URLs or null. One photo, or a front photo plus at least
-    one more -> {"task": id}. The model is built in the background; poll GET /api/model3d/{task}."""
+    """JSON {"images": [front, left, back, right], "color": true}: JPEG data URLs or null. One photo, or a front photo
+    plus at least one more -> {"task": id}. The model is built in the background; poll GET /api/model3d/{task}."""
     images = body.get("images")
     if not isinstance(images, list) or len(images) != len(VIEWS):
         raise HTTPException(400, "Send the photos as [front, left, back, right].")
@@ -485,15 +525,17 @@ def model3d_start(body: dict):
     while len(AI_JOBS) >= MAX_AI_JOBS:
         del AI_JOBS[next(iter(AI_JOBS))]  # oldest first
     task_id = uuid.uuid4().hex
-    AI_JOBS[task_id] = job = {"status": "running", "message": "Sending the photos", "error": None, "model": None}
-    threading.Thread(target=run_ai_job, args=(job, photos), daemon=True).start()
+    AI_JOBS[task_id] = job = {"status": "running", "message": "Sending the photos", "error": None, "model": None,
+                              "colored": False, "note": None}
+    threading.Thread(target=run_ai_job, args=(job, photos, body.get("color") is True), daemon=True).start()
     return {"task": task_id}
 
 
 @app.get("/api/model3d/{task_id}")
 def model3d_status(task_id: str):
     job = get_ai_job(task_id)
-    return {"status": job["status"], "message": job["message"], "error": job["error"], "ready": job["model"] is not None}
+    return {"status": job["status"], "message": job["message"], "error": job["error"], "ready": job["model"] is not None,
+            "colored": job["colored"], "note": job["note"]}
 
 
 @app.get("/api/model3d/{task_id}/model.glb")

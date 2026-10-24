@@ -136,7 +136,8 @@ On **Quality Scan**, scroll to **3D Model**. Select an **order** at the top firs
 |---|---|---|
 | E1 | In the **Front** slot tap **Camera**, take a photo of the whole piece | Photo fills the slot, with an ✕ to remove it |
 | E2 | In another slot tap **Photos**, pick a saved photo | Photo fills the slot |
-| E3 | **Build 3D model** | Progress bar, then a grey 3D model you can drag to turn and pinch to zoom (about 20 s to 2 min online) |
+| E3 | **With colors** selected → **Build 3D model** | Progress bar, then a **colored** 3D model you can drag to turn and pinch to zoom (about 1 minute) |
+| E3b | **Shape only** → **Build 3D model** | A grey 3D model (about 20 s). If colors were unavailable, a yellow note says the model is the shape only |
 | E4 | Tap **⤢** (top right of the model) | Model fills the screen; ✕ or Esc goes back |
 | E5 | Look at the **Real size** box (top left) | Length / Width / Height in cm, marked *(measured)* or *(ordered)* |
 | E6 | **Download .glb** | File `mfqats-3d-model.glb` saves to the device |
