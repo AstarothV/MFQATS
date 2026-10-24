@@ -123,6 +123,7 @@ def test_model3d_falls_back_to_this_computer():
         raise RuntimeError("You have exceeded your ZeroGPU quota")
 
     online, local, url = yolo_server.build_online, yolo_server.build_local, yolo_server.LOCAL_3D_URL
+    color = yolo_server.build_online_color
     yolo_server.build_online = quota
     try:
         yolo_server.LOCAL_3D_URL = "http://127.0.0.1:9"  # nothing listens here: the local server is "not running"
@@ -134,8 +135,20 @@ def test_model3d_falls_back_to_this_computer():
         job = {"status": "running", "message": "", "error": None, "model": None}
         yolo_server.run_ai_job(job, [b"jpg", None, None, None])
         assert job["status"] == "done" and job["model"] == b"glTF...", job
+
+        # colors asked for but unavailable: still a model (shape only), with a note saying so
+        yolo_server.build_online_color = quota
+        job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None], color=True)
+        assert job["status"] == "done" and not job["colored"] and "shape only" in job["note"], job
+
+        yolo_server.build_online_color = lambda job, photos: b"glTF-colored"
+        job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None], color=True)
+        assert job["colored"] and job["model"] == b"glTF-colored" and job["note"] is None, job
     finally:
         yolo_server.build_online, yolo_server.build_local, yolo_server.LOCAL_3D_URL = online, local, url
+        yolo_server.build_online_color = color
 
 
 if __name__ == "__main__":

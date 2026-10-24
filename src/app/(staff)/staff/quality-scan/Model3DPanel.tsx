@@ -31,6 +31,8 @@ declare module 'react' {
         'camera-controls'?: boolean;
         'auto-rotate'?: boolean;
         'shadow-intensity'?: string;
+        'environment-image'?: string;
+        exposure?: string;
       };
     }
   }
@@ -41,6 +43,8 @@ interface TaskStatus {
   message: string;
   error: string | null;
   ready: boolean;
+  colored: boolean;
+  note: string | null; // e.g. colors were asked for but only the shape could be built
 }
 
 // The real size of the piece, since the 3D model itself is not to scale: the latest saved measurement of each
@@ -74,6 +78,40 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [dims, setDims] = useState<Dims>(NO_DIMS);
   const [full, setFull] = useState(false);
+  const [withColor, setWithColor] = useState(true);
+  const [note, setNote] = useState<string | null>(null);
+  const [colored, setColored] = useState(false); // the finished model has colors (so it can be shown with or without)
+  const [showColors, setShowColors] = useState(true);
+  const viewerRef = useRef<any>(null);
+  // each material's own color picture, kept so "Shape" can take it off and "Colors" put it back without rebuilding
+  const savedColors = useRef<{ texture: any; factor: number[] }[] | null>(null);
+
+  function paint(show: boolean) {
+    const materials = viewerRef.current?.model?.materials ?? [];
+    materials.forEach((m: any, i: number) => {
+      const saved = savedColors.current?.[i];
+      if (!saved) return;
+      m.pbrMetallicRoughness.baseColorTexture?.setTexture(show ? saved.texture : null);
+      m.pbrMetallicRoughness.setBaseColorFactor(show ? saved.factor : [0.85, 0.85, 0.85, 1]);
+    });
+  }
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || !modelUrl) return;
+    const onLoad = () => {
+      savedColors.current = (viewer.model?.materials ?? []).map((m: any) => ({
+        texture: m.pbrMetallicRoughness.baseColorTexture?.texture ?? null,
+        factor: [...m.pbrMetallicRoughness.baseColorFactor],
+      }));
+      paint(showColorsRef.current);
+    };
+    viewer.addEventListener('load', onLoad);
+    return () => viewer.removeEventListener('load', onLoad);
+  }, [modelUrl]);
+  const showColorsRef = useRef(showColors);
+  showColorsRef.current = showColors;
+  useEffect(() => { paint(showColors); }, [showColors]);
 
   // reload when a model appears too, so a measurement saved meanwhile shows up
   useEffect(() => {
@@ -127,10 +165,14 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
     setError(null);
     setModelUrl(null);
     setFull(false);
+    setNote(null);
+    setColored(false);
+    setShowColors(true);
+    savedColors.current = null;
     setProgress('Uploading photos');
     try {
       const images = await Promise.all(photos.map((p) => (p ? shrink(p) : null)));
-      const { task } = await api<{ task: string }>(`${apiUrl}/api/model3d`, postJson({ images }));
+      const { task } = await api<{ task: string }>(`${apiUrl}/api/model3d`, postJson({ images, color: withColor }));
       while (run === runRef.current) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         const s = await api<TaskStatus>(`${apiUrl}/api/model3d/${task}`);
@@ -142,6 +184,8 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
           if (!res.ok || res.headers.get('content-type')?.includes('text/html')) throw new Error('The finished model could not be loaded. Build it again.');
           const blob = await res.blob();
           if (run !== runRef.current) return;
+          setNote(s.note);
+          setColored(s.colored);
           setModelUrl(URL.createObjectURL(blob));
           break;
         }
@@ -165,7 +209,7 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
         </h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-xl">
           Take 1 to 4 photos of the whole piece on a plain background. One photo works; front plus more sides works better. The system turns them into a
-          3D model of its shape (no colours) you can turn and zoom. It is not to scale: use Measure Dimensions for sizes.
+          3D model you can turn and zoom. It is not to scale: use Measure Dimensions for sizes.
         </p>
       </div>
 
@@ -206,9 +250,32 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
         ))}
       </div>
 
-      <button onClick={build} disabled={busy || count === 0 || needsFront} className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-        {busy ? <Loader2 size={16} className="animate-spin" /> : <Box size={16} />} {busy ? 'Building…' : 'Build 3D model'}
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <button onClick={build} disabled={busy || count === 0 || needsFront} className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          {busy ? <Loader2 size={16} className="animate-spin" /> : <Box size={16} />} {busy ? 'Building…' : 'Build 3D model'}
+        </button>
+        <div role="group" aria-label="Model type" className="flex gap-1 rounded-xl bg-muted p-1">
+          {[
+            { on: true, label: 'With colors' },
+            { on: false, label: 'Shape only' },
+          ].map((o) => (
+            <button
+              key={o.label}
+              onClick={() => setWithColor(o.on)}
+              disabled={busy}
+              aria-pressed={withColor === o.on}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50 ${withColor === o.on ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {withColor
+          ? 'With colors: painted from your photos, about a minute. Uses more of the free daily time (about 4 to 6 a day).'
+          : 'Shape only: grey model with a slightly sharper shape, about 20 seconds (about 15 a day).'}
+      </p>
 
       {needsFront && <p className="text-sm text-warning">With more than one photo, add a front photo too.</p>}
 
@@ -229,6 +296,11 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
 
       {modelUrl && (
         <div className="space-y-2">
+          {note && (
+            <div role="status" className="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+              <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" /> {note}
+            </div>
+          )}
           <div
             role={full ? 'dialog' : undefined}
             aria-modal={full || undefined}
@@ -236,11 +308,14 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
             className={full ? 'fixed inset-0 z-[100] bg-[#0b0b0f]' : 'relative'}
           >
             <model-viewer
+              ref={viewerRef}
               src={modelUrl}
               alt="3D model of the furniture. Drag to turn it."
               camera-controls
               auto-rotate
               shadow-intensity="1"
+              environment-image="neutral"
+              exposure="1.3"
               style={{ width: '100%', height: full ? '100%' : 480, background: '#0b0b0f', borderRadius: full ? 0 : 12 }}
             />
             {DIMS.some(({ key }) => dims[key]) && (
@@ -251,6 +326,23 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
                     {label}: <span className="font-semibold">{dims[key]!.cm.toFixed(1)} cm</span>{' '}
                     <span className="text-white/60">({dims[key]!.measured ? 'measured' : 'ordered'})</span>
                   </p>
+                ))}
+              </div>
+            )}
+            {colored && (
+              <div role="group" aria-label="Show the model" className="absolute bottom-3 left-3 flex gap-1 rounded-xl bg-black/70 p-1">
+                {[
+                  { on: true, label: 'Colors' },
+                  { on: false, label: 'Shape' },
+                ].map((o) => (
+                  <button
+                    key={o.label}
+                    onClick={() => setShowColors(o.on)}
+                    aria-pressed={showColors === o.on}
+                    className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${showColors === o.on ? 'bg-primary text-primary-foreground' : 'text-white/70 hover:text-white'}`}
+                  >
+                    {o.label}
+                  </button>
                 ))}
               </div>
             )}
