@@ -90,8 +90,8 @@ export default function AdminDefectAnalyticsPage() {
     <AppLayout role="admin" currentPath="/admin/defect-analytics">
       <div className="space-y-6">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Quality Intelligence</p>
-          <h1 className="text-3xl font-bold text-foreground">Defect Analytics</h1>
+          <p className="page-eyebrow">Quality Intelligence</p>
+          <h1 className="page-title">Defect Analytics</h1>
           <p className="text-sm text-muted-foreground mt-2">Defect frequency analysis, confidence scores, and quality trends.</p>
         </div>
 

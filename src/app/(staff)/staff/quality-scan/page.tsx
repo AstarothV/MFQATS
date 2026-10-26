@@ -461,8 +461,8 @@ export default function QualityScanPage() {
         {/* Header */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Quality Inspection</p>
-            <h1 className="text-3xl font-bold text-foreground">YOLO Defect Detection</h1>
+            <p className="page-eyebrow">Quality Inspection</p>
+            <h1 className="page-title">YOLO Defect Detection</h1>
             <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
               Real-time furniture defect detection using computer vision. Point camera at workpiece to detect cracks, scratches, dents, and other defects.
             </p>
@@ -765,8 +765,8 @@ export default function QualityScanPage() {
             <SurfacePanel apiUrl={YOLO_API_URL} />
           </div>
 
-          {/* Detection Results Panel */}
-          <div className="space-y-4">
+          {/* Detection Results Panel: stays in view beside the long tool panels */}
+          <div className="space-y-4 xl:sticky xl:top-[88px] xl:self-start">
             {/* Summary */}
             <div className="card-dark rounded-3xl border border-border p-5">
               <h3 className="text-base font-semibold text-foreground mb-4 flex items-center gap-2">

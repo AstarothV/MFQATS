@@ -95,8 +95,8 @@ export default function AdminReworkPage() {
         )}
 
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Quality Management</p>
-          <h1 className="text-3xl font-bold text-foreground">Rework Queue</h1>
+          <p className="page-eyebrow">Quality Management</p>
+          <h1 className="page-title">Rework Queue</h1>
           <p className="text-sm text-muted-foreground mt-2">Manage rework requests, track resolution, and approve reinspections.</p>
         </div>
 

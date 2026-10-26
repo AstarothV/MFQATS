@@ -11,7 +11,7 @@ export default function StaffDashboardContent() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Workshop View</h1>
+          <h1 className="page-title">Workshop View</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Mon, May 11 2026 — Morning Shift · Station 7
           </p>

@@ -146,7 +146,7 @@ export default function OrderViewContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Order History</h1>
+          <h1 className="page-title">Order History</h1>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Track your furniture orders</p>
         </div>
         <div className="rounded-2xl border border-border bg-card py-16 text-center">
@@ -165,7 +165,7 @@ export default function OrderViewContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Order History</h1>
+          <h1 className="page-title">Order History</h1>
           {selectedOrder && (
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               Latest: #{selectedOrder.order_ref} · {selectedOrder.product_name}

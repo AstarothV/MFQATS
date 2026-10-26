@@ -354,6 +354,15 @@
     background: var(--card);
   }
 
+  /* Page headers: the same label, title and subtitle on every screen. */
+  .page-eyebrow {
+    @apply mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+  .page-title {
+    @apply text-[26px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[28px];
+    text-wrap: balance;
+  }
+
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
   }

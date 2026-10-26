@@ -240,8 +240,8 @@ export default function CatalogContent() {
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Product Catalog</p>
-          <h1 className="text-3xl font-bold text-foreground">Furniture Collections</h1>
+          <p className="page-eyebrow">Product Catalog</p>
+          <h1 className="page-title">Furniture Collections</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
             Manage product listings, pricing, dimensions, and 3D model assets.
           </p>

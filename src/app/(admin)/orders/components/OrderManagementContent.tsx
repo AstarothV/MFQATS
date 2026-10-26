@@ -13,7 +13,7 @@ const GATE_HINTS: Record<string, string> = {
   scan_passed: 'Needs the latest defect scan to pass',
 };
 
-export default function OrderManagementContent() {
+export default function OrderManagementContent({ eyebrow = 'Order Management' }: { eyebrow?: string }) {
   const supabase = createClient();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,8 +107,8 @@ export default function OrderManagementContent() {
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Order Management</p>
-          <h1 className="text-3xl font-bold text-foreground">Track orders through the inspection process</h1>
+          <p className="page-eyebrow">{eyebrow}</p>
+          <h1 className="page-title">Track orders through the inspection process</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered'].map(status => (
@@ -165,7 +165,7 @@ export default function OrderManagementContent() {
                         onClick={() => setSelectedOrderId(order.id)}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedOrderId === order.id ? 'bg-primary/10' : ''}`}
                       >
-                        <td className="px-4 py-4 font-semibold text-foreground">{order.order_ref}</td>
+                        <td className="px-4 py-4 font-semibold text-foreground whitespace-nowrap">{order.order_ref}</td>
                         <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
                         <td className="px-4 py-4">
                           <StatusBadge
@@ -173,7 +173,7 @@ export default function OrderManagementContent() {
                             label={statusLabel(order.extended_status || order.status)}
                           />
                         </td>
-                        <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>
+                        <td className="px-4 py-4 text-muted-foreground whitespace-nowrap">{order.due_date || '—'}</td>
                         <td className="px-4 py-4 font-semibold text-foreground">{peso(order.amount)}</td>
                       </tr>
                     ))}

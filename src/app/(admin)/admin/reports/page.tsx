@@ -156,8 +156,8 @@ export default function AdminReportsPage() {
         )}
 
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Administration</p>
-          <h1 className="text-3xl font-bold text-foreground">Reports</h1>
+          <p className="page-eyebrow">Administration</p>
+          <h1 className="page-title">Reports</h1>
           <p className="text-sm text-muted-foreground mt-2">Generate and export inspection progress, QA, defect, and inventory reports.</p>
         </div>
 

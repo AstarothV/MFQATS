@@ -124,8 +124,8 @@ export default function AdminDashboardContent() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground uppercase tracking-[0.3em] mb-2">Administrator Overview</p>
-          <h1 className="text-3xl font-bold text-foreground">Executive Dashboard</h1>
+          <p className="page-eyebrow">Administrator Overview</p>
+          <h1 className="page-title">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
             Monitor revenue, orders, inspection progress, and supplier readiness in one premium woodworks management view.
           </p>
