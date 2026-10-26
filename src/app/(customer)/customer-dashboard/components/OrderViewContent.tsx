@@ -64,7 +64,7 @@ const EVENT_ICONS: Record<string, React.ElementType> = {
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'queue', label: 'Order Queue', icon: Package },
   { key: 'gallery', label: 'Photo Gallery', icon: Image },
-  { key: '3d', label: '3D Preview & AR', icon: Box },
+  { key: '3d', label: '3D Preview', icon: Box },
   { key: 'inquiry', label: 'Inquiry', icon: MessageSquare },
 ];
 

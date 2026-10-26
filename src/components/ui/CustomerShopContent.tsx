@@ -27,7 +27,6 @@ interface Product {
   width_cm: number;
   length_cm: number;
   estimated_production_days: number;
-  ar_model_support: boolean;
   tags: string[];
 }
 
@@ -438,9 +437,6 @@ export default function CustomerShopContent() {
                   </button>
                   {product.original_price > product.price && (
                     <div className="absolute top-3 left-3 bg-danger text-white text-xs font-bold px-2 py-1 rounded">SALE</div>
-                  )}
-                  {product.ar_model_support && (
-                    <div className="absolute bottom-3 left-3 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">AR Preview</div>
                   )}
                 </div>
                 <div className="flex flex-1 flex-col p-5">
