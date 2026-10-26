@@ -1,8 +1,8 @@
 'use client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  RotateCcw, Maximize2, Minimize2, Smartphone, Info, ChevronRight,
-  Camera, ZoomIn, ZoomOut, RefreshCw, Package, Ruler,
+  Maximize2, Minimize2, Info, ChevronRight,
+  ZoomIn, ZoomOut, RefreshCw, Package, Ruler,
   Layers, Palette, Weight, Wrench, Heart, Clock, Hash, CheckCircle2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -11,7 +11,7 @@ import Icon from '@/components/ui/AppIcon';
 import { Skeleton, SkeletonRegion } from '@/components/ui/LoadingSkeleton';
 
 
-type ViewMode = 'photo' | '3d' | 'ar';
+type ViewMode = 'photo' | '3d';
 
 interface ProductDetail3DProps {
   order?: any;
@@ -29,7 +29,6 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('photo');
   const [rotation, setRotation] = useState({ x: -15, y: 30 });
   const [scale, setScale] = useState(1);
-  const [arStep, setArStep] = useState<'intro' | 'camera'>('intro');
   const [showSpecs, setShowSpecs] = useState(false);
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -130,7 +129,6 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
   const viewModes = [
     { key: 'photo' as ViewMode, label: 'Static Photo', desc: 'High-res product photo', emoji: '📷' },
     { key: '3d' as ViewMode, label: '3D Preview', desc: 'Interactive 3D model', emoji: '🎲' },
-    { key: 'ar' as ViewMode, label: 'View in My Room', desc: 'AR placement mode', emoji: '🏠' },
   ];
 
   const activeViewportClass = viewMode === 'photo' ?'bg-slate-100 dark:bg-slate-900' :'bg-gradient-to-br from-violet-200 via-purple-200 to-white dark:from-purple-950 dark:via-violet-900 dark:to-slate-950';
@@ -241,111 +239,6 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
         </div>
       )}
 
-      {/* AR Intro */}
-      {viewMode === 'ar' && arStep === 'intro' && (
-        <div className={`flex flex-col items-center justify-center px-6 py-10 text-center ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl border border-white/30 bg-white/25 dark:border-white/20 dark:bg-white/10">
-            <Smartphone size={36} className="text-slate-900 dark:text-white" />
-          </div>
-          <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">View in Your Room</h3>
-          <p className="mb-2 max-w-xs text-sm text-slate-700 dark:text-white/80">
-            Place your <strong>{productName}</strong> in your space.
-          </p>
-          <p className="mb-1 text-xs text-slate-600 dark:text-white/60">True-to-scale: {dimensions}</p>
-
-          {/* Order info */}
-          <div className="mb-5 w-full max-w-xs rounded-xl border border-white/20 bg-white/10 dark:bg-black/20 p-3 text-left space-y-1.5">
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-600 dark:text-white/60">Order</span>
-              <span className="font-semibold text-slate-800 dark:text-white">#{order?.order_ref || '—'}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-600 dark:text-white/60">Material</span>
-              <span className="font-semibold text-slate-800 dark:text-white">{product?.material_type || order?.material || 'Wood'}</span>
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-600 dark:text-white/60">Status</span>
-              <span className="font-semibold text-slate-800 dark:text-white">{statusLabel(order?.extended_status || order?.status || 'pending')}</span>
-            </div>
-          </div>
-
-          <div className="mb-5 w-full max-w-xs space-y-2 text-left">
-            {['Point camera at a flat floor surface', 'Tap to place the furniture', 'Pinch to resize · Drag to reposition'].map((step, i) => (
-              <div key={step} className="flex items-center gap-2.5">
-                <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700 dark:bg-white/20 dark:text-white">{i + 1}</div>
-                <p className="text-xs text-slate-700 dark:text-white/80">{step}</p>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setArStep('camera')}
-            className="flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-sm font-bold text-white transition active:scale-95 hover:bg-purple-700"
-          >
-            <Camera size={16} /> Launch AR Preview <ChevronRight size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* AR Camera Simulation */}
-      {viewMode === 'ar' && arStep === 'camera' && (
-        <div className={`relative flex items-center justify-center overflow-hidden ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
-          <div className="absolute inset-0 bg-slate-950" />
-          {/* Grid floor */}
-          <div className="absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(rgba(124,58,237,0.25)_1px,transparent_1px),linear-gradient(90deg,rgba(124,58,237,0.25)_1px,transparent_1px)] bg-[size:40px_40px] opacity-70" />
-          {/* Perspective lines */}
-          <div className="absolute inset-x-0 bottom-0 h-1/3 opacity-30"
-            style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(124,58,237,0.4) 0%, transparent 70%)' }}
-          />
-
-          {/* AR Furniture */}
-          <div
-            className="relative z-10 text-center transition-transform duration-100"
-            style={{ transform: `scale(${scale}) rotateX(${rotation.x * 0.3}deg) rotateY(${rotation.y * 0.2}deg)` }}
-          >
-            <div className="mx-auto flex h-28 w-40 items-center justify-center rounded-2xl border border-violet-300/60 bg-violet-400/25 backdrop-blur-sm dark:border-violet-200/40 dark:bg-violet-300/20 shadow-lg">
-              <div className="text-center">
-                <div className="text-4xl">🪑</div>
-                <p className="mt-1 text-xs text-white/90 font-semibold">{productName}</p>
-                <p className="text-[10px] text-white/60">{dimensions}</p>
-              </div>
-            </div>
-            <div className="mx-auto mt-1 h-3 w-32 rounded-full bg-violet-500/40 blur-sm" />
-          </div>
-
-          {/* AR Controls */}
-          <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
-            <button
-              onClick={handleZoomOut}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25 transition-colors"
-              aria-label="Zoom out"
-            >
-              <ZoomOut size={15} />
-            </button>
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-700 transition-colors"
-            >
-              <RotateCcw size={14} /> Reset
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/15 text-white backdrop-blur-sm hover:bg-white/25 transition-colors"
-              aria-label="Zoom in"
-            >
-              <ZoomIn size={15} />
-            </button>
-          </div>
-
-          <button
-            onClick={() => setArStep('intro')}
-            className="absolute left-3 top-3 rounded-lg bg-black/50 px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/70 transition-colors"
-          >
-            ← Back
-          </button>
-          <p className="absolute right-3 top-3 text-xs text-white/60">AR Mode · {dimensions}</p>
-        </div>
-      )}
     </div>
   );
 
@@ -363,7 +256,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
               {viewModes.map(mode => (
                 <button
                   key={mode.key}
-                  onClick={() => { setViewMode(mode.key); if (mode.key !== 'ar') setArStep('intro'); }}
+                  onClick={() => setViewMode(mode.key)}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === mode.key ? 'border-primary bg-primary/20 text-white' : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'}`}
                 >
                   <span>{mode.emoji}</span>
@@ -404,7 +297,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                   return (
                     <button
                       key={mode.key}
-                      onClick={() => { setViewMode(mode.key); if (mode.key !== 'ar') setArStep('intro'); }}
+                      onClick={() => setViewMode(mode.key)}
                       className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm transition duration-150 active:scale-95 ${isActive ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-muted text-foreground hover:bg-muted/80'}`}
                     >
                       <span className="text-xl">{mode.emoji}</span>
@@ -455,15 +348,6 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                 </div>
               )}
 
-              {/* View in AR Button */}
-              {viewMode !== 'ar' && (
-                <button
-                  onClick={() => { setViewMode('ar'); setArStep('intro'); }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-3 text-sm font-bold text-primary-foreground transition active:scale-95 hover:opacity-90"
-                >
-                  <Smartphone size={16} /> View in AR
-                </button>
-              )}
             </div>
           </div>
         </div>

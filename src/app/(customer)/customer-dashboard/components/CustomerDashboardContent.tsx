@@ -17,7 +17,7 @@ type Tab = 'timeline' | 'gallery' | 'product' | 'inquiry';
 const tabs: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'timeline', label: 'Order Queue', icon: Package },
   { key: 'gallery', label: 'Photo Gallery', icon: Image },
-  { key: 'product', label: '3D Preview & AR', icon: Box },
+  { key: 'product', label: '3D Preview', icon: Box },
   { key: 'inquiry', label: 'Inquiry', icon: MessageSquare },
 ];
 

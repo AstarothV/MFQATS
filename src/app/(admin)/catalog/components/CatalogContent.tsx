@@ -25,7 +25,6 @@ interface Product {
   availability: 'available' | 'limited' | 'out_of_stock' | 'discontinued';
   estimated_production_days: number;
   specifications: Record<string, string>;
-  ar_model_support: boolean;
   tags: string[];
   rating: number;
   review_count: number;
@@ -47,7 +46,6 @@ interface ProductForm {
   availability: 'available' | 'limited' | 'out_of_stock' | 'discontinued';
   estimated_production_days: string;
   specifications: string;
-  ar_model_support: boolean;
   tags: string;
 }
 
@@ -58,7 +56,7 @@ const emptyForm: ProductForm = {
   name: '', description: '', category: 'Tables', price: '', original_price: '',
   height_cm: '', width_cm: '', length_cm: '', material_type: '',
   images: '', model_3d_url: '', availability: 'available',
-  estimated_production_days: '14', specifications: '', ar_model_support: false, tags: ''
+  estimated_production_days: '14', specifications: '', tags: ''
 };
 
 export default function CatalogContent() {
@@ -118,7 +116,7 @@ export default function CatalogContent() {
       images: (p.images || []).join('\n'), model_3d_url: p.model_3d_url || '',
       availability: p.availability, estimated_production_days: String(p.estimated_production_days || 14),
       specifications: Object.entries(p.specifications || {}).map(([k, v]) => `${k}: ${v}`).join('\n'),
-      ar_model_support: p.ar_model_support, tags: (p.tags || []).join(', ')
+      tags: (p.tags || []).join(', ')
     });
     setModal('edit');
   }
@@ -161,7 +159,6 @@ export default function CatalogContent() {
       availability: form.availability,
       estimated_production_days: parseInt(form.estimated_production_days) || 14,
       specifications: specsObj,
-      ar_model_support: form.ar_model_support,
       tags: form.tags.split(',').map(s => s.trim()).filter(Boolean),
       is_active: true,
       created_by: user?.id,
@@ -283,7 +280,7 @@ export default function CatalogContent() {
           { label: 'Total Products', value: total, color: 'text-foreground' },
           { label: 'Available', value: products.filter(p => p.availability === 'available').length, color: 'text-success' },
           { label: 'Limited Stock', value: products.filter(p => p.availability === 'limited').length, color: 'text-warning' },
-          { label: 'AR Supported', value: products.filter(p => p.ar_model_support).length, color: 'text-primary' },
+          { label: 'Categories', value: new Set(products.map(p => p.category)).size, color: 'text-primary' },
         ].map((stat) => (
           <div key={stat.label} className="card-dark p-4 rounded-3xl border border-border">
             <p className="text-xs text-muted-foreground mb-1">{stat.label}</p>
@@ -311,9 +308,6 @@ export default function CatalogContent() {
                   <div className="flex items-center justify-center h-full">
                     <Package size={32} className="text-muted-foreground" />
                   </div>
-                )}
-                {product.ar_model_support && (
-                  <span className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs font-bold px-2 py-1 rounded-full">AR</span>
                 )}
                 <StatusBadge
                   variant={availabilityVariant(product.availability)}
@@ -453,10 +447,6 @@ export default function CatalogContent() {
                 Tags (comma separated)
                 <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} className="input-dark w-full mt-1" placeholder="Custom, Premium, Dining" />
               </label>
-              <label className="flex items-center gap-3 text-sm text-muted-foreground cursor-pointer">
-                <input type="checkbox" checked={form.ar_model_support} onChange={e => setForm(f => ({ ...f, ar_model_support: e.target.checked }))} className="w-4 h-4 rounded" />
-                AR Model Support
-              </label>
             </div>
             <div className="flex gap-3 mt-6 justify-end">
               <button type="button" onClick={() => setModal(null)} className="btn-secondary">Cancel</button>
@@ -487,7 +477,6 @@ export default function CatalogContent() {
                 <div><p className="text-muted-foreground">Price</p><p className="font-semibold text-foreground">{peso(selectedProduct.price)}</p></div>
                 <div><p className="text-muted-foreground">Lead Time</p><p className="font-semibold text-foreground">{selectedProduct.estimated_production_days} days</p></div>
                 <div><p className="text-muted-foreground">Dimensions</p><p className="font-semibold text-foreground">{selectedProduct.length_cm}L × {selectedProduct.width_cm}W × {selectedProduct.height_cm}H cm</p></div>
-                <div><p className="text-muted-foreground">AR Support</p><p className="font-semibold text-foreground">{selectedProduct.ar_model_support ? 'Yes' : 'No'}</p></div>
               </div>
               <div><p className="text-muted-foreground mb-1">Description</p><p className="text-foreground">{selectedProduct.description}</p></div>
               {Object.keys(selectedProduct.specifications || {}).length > 0 && (
