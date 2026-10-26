@@ -9,7 +9,7 @@ web
 ## Users
 
 - **Primary: the supervisor / admin at a desk.** The MVCA Furniture owner or production supervisor who monitors orders moving through production, reviews defect detections and rework, spots delays and bottlenecks, manages users, catalog and inventory, and pulls reports. When role needs conflict, design decisions favor this user.
-- **Workshop staff.** Floor workers who view assigned tasks, run AI quality scans with a phone or tablet camera, fill digital checklists, log work and rework. Per the capstone requirements they may have basic digital literacy and work in a sawdust-heavy, unevenly lit workshop.
+- **Workshop staff.** Floor workers who view assigned tasks, run quality scans with a phone or tablet camera, fill digital checklists, log work and rework. Per the capstone requirements they may have basic digital literacy and work in a sawdust-heavy, unevenly lit workshop.
 - **Customers.** Read-only order tracking: order status and timeline, estimated completion, approved final-inspection photos, product browsing and inquiries.
 
 ## Product Purpose
@@ -48,7 +48,7 @@ Its results feed a stage-gated order workflow, implemented as a finite state mac
 - **Roles:** admin (supervisor), staff (worker), customer. Role-based access is enforced by middleware and Supabase RLS.
 - **Stack (existing codebase):** Next.js 15 App Router, React 19, TypeScript, Tailwind CSS, Supabase (Postgres, Auth, Realtime), Recharts. There is also a Python service for YOLOv12n inference, PnP measurement, RANSAC surface analysis and SfM reconstruction.
 - **Admin surfaces:** overview dashboard, inspection progress monitor, user management, product catalog, order management, messages, inventory, team, reports, audit logs, defect analytics, rework queue.
-- **Staff surfaces:** workshop view, assigned tasks, order workflow, Quality Scan (AI), inventory, messages.
+- **Staff surfaces:** workshop view, assigned tasks, order workflow, Quality Scan, inventory, messages.
 - **Customer surfaces:** overview, order view, inquiry, shop.
 - **Known limits (from the manuscript):**
   - detects external defects only;
@@ -67,7 +67,7 @@ Its results feed a stage-gated order workflow, implemented as a finite state mac
 ## Evidence on Hand
 
 - **Capstone manuscript:** *MFQATS: MVCA Furniture Quality Assurance and Tracking System* (June 2026). Diaz, Dugenio, Mangaring, Rubia, Sy; adviser Jay Vee L. Capiral.
-- **YOLOv12n training notebooks:** `train_yolov12n_wood.ipynb`, `train_yolov12n_wood_w_results.ipynb`. Model registry: `src/api/weights/models.json`.
+- **YOLOv12n training notebook:** `train_yolov12n_wood.ipynb`. Model registry: `src/api/weights/models.json`.
 - **Surface-analysis samples:** `src/api/samples/*.ply` (flat, dent, warp boards).
 - **Measurement marker:** printable at `public/assets/mfqats-marker-150mm.pdf`.
 - **Logo:** `public/assets/images/app_logo.png`.

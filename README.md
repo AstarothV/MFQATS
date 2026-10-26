@@ -1,86 +1,84 @@
-# Next.js
+# MFQATS
 
-A modern Next.js 15 application built with TypeScript and Tailwind CSS.
+**MVCA Furniture Quality Assurance and Tracking System**: a capstone project (BSIT, National Teachers College) built
+for MVCA Furniture's workshop in Caloocan City.
 
-## 🚀 Features
+MFQATS follows each furniture order through a five-stage inspection before it is delivered:
 
-- **Next.js 15** - Latest version with improved performance and features
-- **React 19** - Latest React version with enhanced capabilities
-- **Tailwind CSS** - Utility-first CSS framework for rapid UI development
+**Upload → 3D Reconstruction → Detect Defects → Results → Recommendation**
 
-## 🛠️ Installation
+Along the way it finds surface defects in photos (YOLOv12), measures the piece with a printed marker, checks surfaces
+for dents and warping in 3D, and estimates delivery dates from past stage times (PERT and WMA).
 
-1. Install dependencies:
-  ```bash
-  npm install
-  # or
-  yarn install
-  ```
+## Who uses it
 
-2. Start the development server:
-  ```bash
-  npm run dev
-  # or
-  yarn dev
-  ```
-3. Open [http://localhost:4028](http://localhost:4028) with your browser to see the result.
+| Role | What they do |
+|---|---|
+| **Admin** (supervisor) | Approves orders, watches inspection progress and quality, handles rework, manages users, catalog and inventory, exports reports |
+| **Staff** (worker) | Moves orders through the stages and inspects each piece on the Quality Scan page |
+| **Customer** | Shops, places orders, follows their order's progress, asks questions |
 
-> **AI defect detection (Quality Scan page):** also needs the Python YOLOv12n server.
-> See **[docs/setup/YOLO_SERVER_SETUP.md](docs/setup/YOLO_SERVER_SETUP.md)** for setup and run steps.
+## Get started
 
-📚 **All project documentation** (setup, navigation, project status and plans) is in **[docs/](docs/README.md)**.
+You need **Node.js 18+**, **Python 3.12+** and **Git**, plus two private files from the group (`.env` and the trained
+model files). Full instructions: **[docs/setup/YOLO_SERVER_SETUP.md](docs/setup/YOLO_SERVER_SETUP.md)**.
 
-## 📁 Project Structure
+The short version, once set up:
+
+```powershell
+# Terminal 1: detection server (defect detection, measuring, 3D)
+.\.venv\Scripts\activate
+uvicorn src.api.yolo_server:app --reload --port 8000 --env-file .env
+
+# Terminal 2: website
+npm run dev
+```
+
+Then open **http://localhost:4028**.
+
+## Documentation
+
+| I want to… | Read |
+|---|---|
+| Install and run the system | [docs/setup/YOLO_SERVER_SETUP.md](docs/setup/YOLO_SERVER_SETUP.md) |
+| Test it on a laptop, phone or tablet | [docs/setup/DEVICE_TESTING.md](docs/setup/DEVICE_TESTING.md) |
+| Understand how an order goes from purchase to delivery | [docs/project/SYSTEM_FLOW.md](docs/project/SYSTEM_FLOW.md) |
+| Add a page or change the menu | [docs/navigation/NAVIGATION.md](docs/navigation/NAVIGATION.md) |
+| See every document | [docs/README.md](docs/README.md) |
+
+## Project layout
 
 ```
-nextjs/
-├── public/             # Static assets
+MFQATS/
 ├── src/
-│   ├── app/            # App router components
-│   │   ├── layout.tsx  # Root layout component
-│   │   └── page.tsx    # Main page component
-│   ├── components/     # Reusable UI components
-│   ├── styles/         # Global styles and Tailwind configuration
-├── next.config.mjs     # Next.js configuration
-├── package.json        # Project dependencies and scripts
-├── postcss.config.js   # PostCSS configuration
-└── tailwind.config.js  # Tailwind CSS configuration
-
+│   ├── app/            Pages, one folder per role: (admin), (staff), (customer)
+│   ├── components/     Shared parts: top bar, sidebar, charts, buttons, cards
+│   ├── lib/            Shared logic: order stages, defect rate, peso formatting, Supabase client
+│   ├── styles/         Theme and the shared glass styles (tailwind.css)
+│   └── api/            Python detection server: YOLO, marker measurement, 3D reconstruction, surface check
+├── supabase/
+│   ├── migrations/     Database setup, applied by hand in the Supabase SQL Editor (in order)
+│   └── checks/         Read-only queries for checking the live database
+├── public/assets/      Logo and the printable measuring marker
+├── docs/               All project documents
+└── train_yolov12n_wood.ipynb   Google Colab notebook for training the defect models
 ```
 
-## 🧩 Page Editing
+## Commands
 
-You can start editing the page by modifying `src/app/page.tsx`. The page auto-updates as you edit the file.
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the website at http://localhost:4028 (`npm start` does the same) |
+| `npm run build` | Build the website for production |
+| `npm run serve` | Run the production build |
+| `npm run lint` | Check the code for mistakes |
+| `npm run format` | Format the code with Prettier |
 
-## 🎨 Styling
+## Built with
 
-This project uses Tailwind CSS for styling with the following features:
-- Utility-first approach for rapid development
-- Custom theme configuration
-- Responsive design utilities
-- PostCSS and Autoprefixer integration
+Next.js 15, React 19, TypeScript, Tailwind CSS and Supabase (database and logins) for the website. Python with FastAPI,
+Ultralytics YOLOv12 and OpenCV for the detection server.
 
-## 📦 Available Scripts
+## Team
 
-- `npm run dev` - Start development server on port 4028
-- `npm run build` - Build the application for production
-- `npm run start` - Start the development server
-- `npm run serve` - Start the production server
-- `npm run lint` - Run ESLint to check code quality
-- `npm run lint:fix` - Fix ESLint issues automatically
-- `npm run format` - Format code with Prettier
-
-## 📱 Deployment
-
-Build the application for production:
-
-  ```bash
-  npm run build
-  ```
-
-## 📚 Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial
+Diaz, Dugenio, Mangaring, Rubia and Sy. Adviser: Jay Vee L. Capiral.
