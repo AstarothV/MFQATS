@@ -9,7 +9,8 @@ import { api, postJson, shrink } from './ReconstructPanel';
 // /api/model3d in src/api/yolo_server.py). It looks like the piece but has no real-world scale: measure with the
 // marker panels, view with this one.
 
-const VIEWS = ['Front', 'Left', 'Back', 'Right'] as const; // the server's slot order
+// the server's slot order; all six go to the model (the backup used when the free time runs out takes the four sides)
+const VIEWS = ['Front', 'Left', 'Back', 'Right', 'Top', 'Bottom'] as const;
 const POLL_MS = 4000;
 const DIMS = [
   { key: 'length', label: 'Length' },
@@ -78,7 +79,6 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
   const [modelUrl, setModelUrl] = useState<string | null>(null);
   const [dims, setDims] = useState<Dims>(NO_DIMS);
   const [full, setFull] = useState(false);
-  const [withColor, setWithColor] = useState(true);
   const [note, setNote] = useState<string | null>(null);
   const [colored, setColored] = useState(false); // the finished model has colors (so it can be shown with or without)
   const [showColors, setShowColors] = useState(true);
@@ -172,7 +172,7 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
     setProgress('Uploading photos');
     try {
       const images = await Promise.all(photos.map((p) => (p ? shrink(p) : null)));
-      const { task } = await api<{ task: string }>(`${apiUrl}/api/model3d`, postJson({ images, color: withColor }));
+      const { task } = await api<{ task: string }>(`${apiUrl}/api/model3d`, postJson({ images, color: true }));
       while (run === runRef.current) {
         await new Promise((r) => setTimeout(r, POLL_MS));
         const s = await api<TaskStatus>(`${apiUrl}/api/model3d/${task}`);
@@ -208,14 +208,15 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
           <Box size={16} className="text-accent" /> 3D Model
         </h3>
         <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          Take 1 to 4 photos of the whole piece on a plain background. One photo works; front plus more sides works better. The system turns them into a
-          3D model you can turn and zoom. It is not to scale: use Measure Dimensions for sizes.
+          Take photos of the whole piece on a plain background: one works, and more sides (top and bottom included) work
+          better. The system turns them into a colored 3D model you can turn, zoom, and view with or without its colors. It
+          is not to scale: use Measure Dimensions for sizes.
         </p>
       </div>
 
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPicked} />
       <input ref={libraryRef} type="file" accept="image/*" className="hidden" onChange={onPicked} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {VIEWS.map((view, i) => (
           <div key={view} className="relative aspect-square overflow-hidden rounded-xl border border-dashed border-border bg-muted">
             {previews[i] ? (
@@ -254,27 +255,10 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
         <button onClick={build} disabled={busy || count === 0 || needsFront} className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Box size={16} />} {busy ? 'Building…' : 'Build 3D model'}
         </button>
-        <div role="group" aria-label="Model type" className="flex gap-1 rounded-xl bg-muted p-1">
-          {[
-            { on: true, label: 'With colors' },
-            { on: false, label: 'Shape only' },
-          ].map((o) => (
-            <button
-              key={o.label}
-              onClick={() => setWithColor(o.on)}
-              disabled={busy}
-              aria-pressed={withColor === o.on}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors disabled:opacity-50 ${withColor === o.on ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        {withColor
-          ? 'With colors: painted from your photos, about a minute. Uses more of the free daily time (about 4 to 6 a day).'
-          : 'Shape only: grey model with a slightly sharper shape, about 20 seconds (about 15 a day).'}
+        About a minute. Each model uses part of the free daily time (about 4 to 6 a day); after that, a shape-only model is
+        built instead.
       </p>
 
       {needsFront && <p className="text-sm text-warning">With more than one photo, add a front photo too.</p>}
