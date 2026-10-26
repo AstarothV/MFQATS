@@ -232,7 +232,7 @@ export default function AdminUsersPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             {['all', 'admin', 'staff', 'customer'].map(r => (
-              <button key={r} onClick={() => { setRoleFilter(r); setPage(0); }} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${roleFilter === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              <button key={r} onClick={() => { setRoleFilter(r); setPage(0); }} className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${roleFilter === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
                 {r.charAt(0).toUpperCase() + r.slice(1)}
               </button>
             ))}

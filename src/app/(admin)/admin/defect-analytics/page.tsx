@@ -5,7 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend,  } from 'recharts';
+import { DonutChart, SimpleBarChart } from '@/components/charts/lazy';
 import Icon from '@/components/ui/AppIcon';
 import { SkeletonRegion, StatCardsSkeleton, ChartCardSkeleton } from '@/components/ui/LoadingSkeleton';
 
@@ -135,15 +135,7 @@ export default function AdminDefectAnalyticsPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No defect data available</p>
                 ) : (
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={defectStats} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
-                        <XAxis dataKey="defect_type" tick={{ fill: '#A3A3A3', fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: '#A3A3A3', fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} labelStyle={{ color: '#F5F5F5' }} />
-                        <Bar dataKey="count" fill="#7C3AED" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <SimpleBarChart data={defectStats} xKey="defect_type" yKey="count" />
                   </div>
                 )}
               </div>
@@ -155,17 +147,7 @@ export default function AdminDefectAnalyticsPage() {
                   <p className="text-sm text-muted-foreground text-center py-8">No severity data available</p>
                 ) : (
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={stageStats} dataKey="count" nameKey="stage_name" innerRadius={50} outerRadius={90} paddingAngle={4} stroke="transparent">
-                          {stageStats.map((_, i) => (
-                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} />
-                        <Legend formatter={(v) => <span className="text-xs text-muted-foreground">{v}</span>} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <DonutChart data={stageStats} valueKey="count" nameKey="stage_name" colors={COLORS} innerRadius={50} />
                   </div>
                 )}
               </div>

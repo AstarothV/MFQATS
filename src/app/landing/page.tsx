@@ -124,7 +124,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'bg-card/95 backdrop-blur-sm border-b border-border shadow-sm' : 'bg-transparent'}`}>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition duration-300 ${scrolled ? 'bg-card/95 backdrop-blur-sm border-b border-border shadow-sm' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
@@ -161,7 +161,7 @@ export default function LandingPage() {
         {mobileMenuOpen &&
         <div className="md:hidden bg-card border-b border-border px-4 py-4 space-y-2">
             {navLinks.map((link) =>
-          <button key={link.label} type="button" onClick={() => scrollTo(link.href)} className="block w-full text-left px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-all">
+          <button key={link.label} type="button" onClick={() => scrollTo(link.href)} className="block w-full text-left px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition">
                 {link.label}
               </button>
           )}
@@ -283,7 +283,7 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredProducts.map((product) =>
-            <div key={product.name} className="rounded-3xl border border-border bg-card overflow-hidden hover:shadow-lg transition-all duration-200 group">
+            <div key={product.name} className="rounded-3xl border border-border bg-card overflow-hidden hover:shadow-lg transition duration-200 group">
                 <div className="relative overflow-hidden h-48">
                   <img src={product.image} alt={product.alt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                   <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium text-foreground">

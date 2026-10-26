@@ -503,13 +503,13 @@ export default function QualityScanPage() {
             <div className="flex gap-2 p-1 rounded-xl bg-muted">
               <button
                 onClick={() => { setMode('live'); rescan(); }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'live' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${mode === 'live' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <Camera size={14} /> Live Camera
               </button>
               <button
                 onClick={() => { setMode('upload'); stopCamera(); }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition-all ${mode === 'upload' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold transition ${mode === 'upload' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 <Upload size={14} /> Upload Image
               </button>
@@ -694,7 +694,7 @@ export default function QualityScanPage() {
                                 <Target size={15} /> Start Scan
                               </button>
                             ) : (
-                              <button onClick={pauseScan} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-warning/20 text-warning border border-warning/30 text-sm font-semibold hover:bg-warning/30 transition-all">
+                              <button onClick={pauseScan} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-warning/20 text-warning border border-warning/30 text-sm font-semibold hover:bg-warning/30 transition">
                                 <Pause size={15} /> Pause Scan
                               </button>
                             )}
@@ -707,7 +707,7 @@ export default function QualityScanPage() {
                             <RotateCcw size={15} /> Clear &amp; Retry
                           </button>
                         )}
-                        <button onClick={stopCamera} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted text-muted-foreground border border-border text-sm font-semibold hover:text-foreground transition-all">
+                        <button onClick={stopCamera} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-muted text-muted-foreground border border-border text-sm font-semibold hover:text-foreground transition">
                           <X size={15} /> Stop Camera
                         </button>
                       </>

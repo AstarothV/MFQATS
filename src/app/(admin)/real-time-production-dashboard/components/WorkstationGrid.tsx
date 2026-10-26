@@ -169,7 +169,7 @@ export default function WorkstationGrid() {
             <button
               key={`filter-${f.key}`}
               onClick={() => setFilter(f.key)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                 filter === f.key
                   ? 'bg-muted text-foreground border border-border'
                   : 'text-muted-foreground hover:text-foreground'
@@ -189,7 +189,7 @@ export default function WorkstationGrid() {
             <div
               key={wp.id}
               onClick={() => setSelected(isSelected ? null : wp.id)}
-              className={`rounded-xl border p-4 cursor-pointer transition-all duration-150 card-hover ${statusBorderColor[wp.status]} ${statusBg[wp.status]} ${
+              className={`rounded-xl border p-4 cursor-pointer transition duration-150 card-hover ${statusBorderColor[wp.status]} ${statusBg[wp.status]} ${
                 isSelected ? 'ring-1 ring-primary/60' : ''
               }`}
             >
@@ -361,7 +361,7 @@ export default function WorkstationGrid() {
               {detailWp.defect && (
                 <button
                   onClick={() => setDetailModal(null)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-danger/20 text-danger text-sm font-semibold hover:bg-danger/30 transition-all active:scale-95"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-danger/20 text-danger text-sm font-semibold hover:bg-danger/30 transition active:scale-95"
                 >
                   Flag Rework
                 </button>

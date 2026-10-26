@@ -121,7 +121,7 @@ export default function AdminReworkPage() {
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
             >
               {s.replace('_', ' ').charAt(0).toUpperCase() + s.replace('_', ' ').slice(1)}
             </button>
@@ -173,7 +173,7 @@ export default function AdminReworkPage() {
                             <button
                               onClick={() => updateStatus(rework.id, 'in_progress')}
                               disabled={updating === rework.id}
-                              className="px-2 py-1 rounded-lg bg-info/20 text-info text-xs font-semibold hover:bg-info/30 transition-all"
+                              className="px-2 py-1 rounded-lg bg-info/20 text-info text-xs font-semibold hover:bg-info/30 transition"
                             >
                               {updating === rework.id ? <Loader2 size={10} className="animate-spin" /> : 'Start'}
                             </button>
@@ -182,14 +182,14 @@ export default function AdminReworkPage() {
                             <button
                               onClick={() => updateStatus(rework.id, 'resolved')}
                               disabled={updating === rework.id}
-                              className="px-2 py-1 rounded-lg bg-success/20 text-success text-xs font-semibold hover:bg-success/30 transition-all"
+                              className="px-2 py-1 rounded-lg bg-success/20 text-success text-xs font-semibold hover:bg-success/30 transition"
                             >
                               {updating === rework.id ? <Loader2 size={10} className="animate-spin" /> : 'Resolve'}
                             </button>
                           )}
                           <button
                             onClick={() => setSelectedRework(rework)}
-                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition"
                           >
                             <Eye size={13} />
                           </button>

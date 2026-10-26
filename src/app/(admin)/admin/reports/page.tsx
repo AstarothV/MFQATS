@@ -190,7 +190,7 @@ export default function AdminReportsPage() {
                       <button
                         onClick={() => exportCSV(report.id)}
                         disabled={isGenerating || report.count === 0}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border text-sm font-semibold text-foreground hover:bg-muted transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border text-sm font-semibold text-foreground hover:bg-muted transition disabled:opacity-50"
                       >
                         {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                         {isGenerating ? 'Generating...' : 'Export CSV'}

@@ -127,7 +127,7 @@ export default function AlertsFeed() {
             <button
               key={`alert-filter-${f}`}
               onClick={() => setFilter(f)}
-              className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+              className={`px-2 py-1 rounded text-xs font-medium transition ${
                 filter === f ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -153,7 +153,7 @@ export default function AlertsFeed() {
           return (
             <div
               key={alert.id}
-              className={`rounded-xl border p-3 transition-all ${cfg.bg} ${
+              className={`rounded-xl border p-3 transition ${cfg.bg} ${
                 alert.acknowledged ? 'opacity-60' : ''
               }`}
             >
@@ -176,19 +176,19 @@ export default function AlertsFeed() {
                     <div className="flex items-center gap-1.5 mt-2">
                       <button
                         onClick={() => acknowledge(alert.id)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-muted/50 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition active:scale-95"
                       >
                         <CheckCircle2 size={10} /> Ack
                       </button>
                       <button
                         onClick={() => { setAssignModal(alert.id); setSelectedStaff(''); }}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-primary/20 text-xs text-accent hover:bg-primary/30 transition-all active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-primary/20 text-xs text-accent hover:bg-primary/30 transition active:scale-95"
                       >
                         <UserPlus size={10} /> Assign
                       </button>
                       <button
                         onClick={() => setViewModal(alert.id)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-muted/30 text-xs text-muted-foreground hover:text-foreground transition-all active:scale-95"
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-muted/30 text-xs text-muted-foreground hover:text-foreground transition active:scale-95"
                       >
                         <Eye size={10} /> View
                       </button>
@@ -242,7 +242,7 @@ export default function AlertsFeed() {
                 <button
                   key={staff}
                   onClick={() => setSelectedStaff(staff)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-sm font-medium transition ${
                     selectedStaff === staff
                       ? 'border-primary/50 bg-primary/10 text-accent' :'border-border bg-muted/20 text-foreground hover:bg-muted/40'
                   }`}

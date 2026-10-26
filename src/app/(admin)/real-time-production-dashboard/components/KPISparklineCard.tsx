@@ -39,9 +39,11 @@ export default function KPISparklineCard({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider leading-snug max-w-[120px]">
           {label}
         </p>
-        <div className="w-20 h-10 shrink-0">
-          <SparklineChart data={sparkData} color={sparkColor} />
-        </div>
+        {sparkData.length > 0 && (
+          <div className="w-20 h-10 shrink-0">
+            <SparklineChart data={sparkData} color={sparkColor} />
+          </div>
+        )}
       </div>
       <div>
         <p className="text-3xl font-bold text-foreground tabular-nums leading-none mt-2">{value}</p>

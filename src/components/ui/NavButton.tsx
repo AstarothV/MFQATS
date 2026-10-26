@@ -40,7 +40,7 @@ export default function NavButton({
   const { isActive, navigate } = useNavigation();
   const active = isActive(href);
 
-  const baseStyles = 'flex items-center gap-2 rounded-lg font-medium transition-all duration-150';
+  const baseStyles = 'flex items-center gap-2 rounded-lg font-medium transition duration-150';
 
   const variantStyles = {
     default: `text-foreground border border-border ${

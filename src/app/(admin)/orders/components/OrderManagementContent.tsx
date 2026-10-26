@@ -116,7 +116,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
             >
               {status === 'All' ? 'All' : statusLabel(status)}
             </button>
@@ -227,7 +227,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                         <span>{activeOrder.completion_pct || 0}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-border overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${activeOrder.completion_pct || 0}%` }} />
+                        <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${activeOrder.completion_pct || 0}%` }} />
                       </div>
                     </div>
                   </div>
@@ -244,7 +244,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                         onClick={() => updateOrderStatus(activeOrder.id, status)}
                         disabled={updating || !canMoveTo(status)}
                         title={GATE_HINTS[nextMoves.find(t => t.to_status === status)?.gate || '']}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
                           (activeOrder.extended_status || 'pending') === status
                             ? 'bg-primary text-primary-foreground' :'bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50'
                         }`}
@@ -285,7 +285,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                       type="button"
                       onClick={() => updateOrderStatus(activeOrder.id, 'cancelled')}
                       disabled={updating || !canMoveTo('cancelled')}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <X size={16} /> Cancel Order
                     </button>

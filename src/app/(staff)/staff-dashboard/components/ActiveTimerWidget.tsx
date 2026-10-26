@@ -74,7 +74,7 @@ export default function ActiveTimerWidget() {
       <div className="relative z-10 flex items-center gap-2">
         <button
           onClick={() => setRunning(!running)}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150 active:scale-95 ${
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg font-semibold text-sm transition duration-150 active:scale-95 ${
             running
               ? 'bg-warning/20 text-warning border border-warning/30 hover:bg-warning/30' :'bg-success/20 text-success border border-success/30 hover:bg-success/30'
           }`}
@@ -84,7 +84,7 @@ export default function ActiveTimerWidget() {
         </button>
         <button
           onClick={() => setFlagged(!flagged)}
-          className={`p-2.5 rounded-lg border transition-all duration-150 active:scale-95 ${
+          className={`p-2.5 rounded-lg border transition duration-150 active:scale-95 ${
             flagged
               ? 'bg-danger/20 text-danger border-danger/30' :'text-muted-foreground border-border hover:text-foreground hover:bg-muted'
           }`}
@@ -93,7 +93,7 @@ export default function ActiveTimerWidget() {
           <Flag size={15} />
         </button>
         <button
-          className="p-2.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-all duration-150 active:scale-95"
+          className="p-2.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition duration-150 active:scale-95"
           aria-label="Timer history"
         >
           <ChevronDown size={15} />

@@ -37,7 +37,7 @@ export default function ProductionHeader() {
         <div className="relative">
           <button
             onClick={() => { setDateOpen(!dateOpen); setShiftOpen(false); }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/80 transition"
           >
             <Calendar size={14} />
             {dateFilters?.[dateFilter]}
@@ -64,7 +64,7 @@ export default function ProductionHeader() {
         <div className="relative">
           <button
             onClick={() => { setShiftOpen(!shiftOpen); setDateOpen(false); }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground hover:bg-muted/80 transition"
           >
             {shifts?.[shift]?.split(' ')?.[0]}
             <ChevronDown size={13} />
@@ -90,7 +90,7 @@ export default function ProductionHeader() {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground transition-all active:scale-95 disabled:opacity-70"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border text-sm text-muted-foreground hover:text-foreground transition active:scale-95 disabled:opacity-70"
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
           {refreshing ? 'Refreshing...' : 'Refresh'}
@@ -99,7 +99,7 @@ export default function ProductionHeader() {
         {/* Export */}
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/20 border border-primary/30 text-sm text-accent hover:bg-primary/30 transition-all active:scale-95"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/20 border border-primary/30 text-sm text-accent hover:bg-primary/30 transition active:scale-95"
         >
           {exportDone ? <CheckCircle2 size={14} /> : <Download size={14} />}
           {exportDone ? 'Exported!' : 'Export Report'}

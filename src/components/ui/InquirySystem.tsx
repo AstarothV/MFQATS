@@ -314,7 +314,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
               <button
                 type="button"
                 onClick={() => setShowNewForm(false)}
-                className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-all"
+                className="flex-1 rounded-xl border border-border bg-background py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition"
               >
                 Cancel
               </button>
@@ -350,7 +350,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
               key={s}
               type="button"
               onClick={() => setFilterStatus(s)}
-              className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all capitalize ${filterStatus === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              className={`rounded-xl px-3 py-2 text-xs font-semibold transition capitalize ${filterStatus === s ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
             >
               {s}
             </button>
@@ -381,7 +381,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
                   key={inq.id}
                   type="button"
                   onClick={() => setSelectedInquiry(inq)}
-                  className={`w-full text-left rounded-2xl border p-4 transition-all duration-150 ${
+                  className={`w-full text-left rounded-2xl border p-4 transition duration-150 ${
                     selectedInquiry?.id === inq.id
                       ? 'border-primary/40 bg-primary/5 ring-1 ring-primary/20' :'border-border bg-card hover:bg-muted/50'
                   }`}
@@ -447,7 +447,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
                             <button
                               type="button"
                               onClick={() => updateInquiryStatus(selectedInquiry.id, 'resolved')}
-                              className="rounded-lg border border-success/30 bg-success/5 px-2 py-1 text-xs font-semibold text-success hover:bg-success/10 transition-all"
+                              className="rounded-lg border border-success/30 bg-success/5 px-2 py-1 text-xs font-semibold text-success hover:bg-success/10 transition"
                             >
                               Resolve
                             </button>
@@ -456,7 +456,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
                             <button
                               type="button"
                               onClick={() => updateInquiryStatus(selectedInquiry.id, 'open')}
-                              className="rounded-lg border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/80 transition-all"
+                              className="rounded-lg border border-border bg-muted px-2 py-1 text-xs font-semibold text-muted-foreground hover:bg-muted/80 transition"
                             >
                               Reopen
                             </button>

@@ -99,7 +99,7 @@ export default function StaffInventoryContent() {
           <button
             key={category}
             onClick={() => setSelectedCategory(category)}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               selectedCategory === category
                 ? 'bg-primary text-primary-foreground'
                 : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -113,7 +113,7 @@ export default function StaffInventoryContent() {
         {filteredItems?.map((item) => (
           <div
             key={item?.id}
-            className={`rounded-3xl border p-5 transition-all ${
+            className={`rounded-3xl border p-5 transition ${
               item?.available
                 ? 'border-border bg-card hover:bg-muted/50' :'border-danger/30 bg-danger/5'
             }`}
@@ -154,7 +154,7 @@ export default function StaffInventoryContent() {
                 label={item?.available ? 'Available' : 'Out of Stock'}
               />
               <button
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                   item?.available
                     ? 'bg-primary/20 text-primary hover:bg-primary/30' :'bg-muted text-muted-foreground cursor-not-allowed'
                 }`}

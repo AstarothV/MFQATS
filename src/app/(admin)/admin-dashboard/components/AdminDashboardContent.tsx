@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  AreaChart, Area, ResponsiveContainer, CartesianGrid, Tooltip, XAxis, YAxis,
-  PieChart, Pie, Cell, Legend,
-} from 'recharts';
+import { DonutChart, RevenueAreaChart } from '@/components/charts/lazy';
 import { PhilippinePeso, Package, Users, Bell, FileText, TrendingUp, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { PageSkeleton } from '@/components/ui/LoadingSkeleton';
@@ -209,21 +206,14 @@ export default function AdminDashboardContent() {
             </div>
           </div>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={revenueTrend} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#7C3AED" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.08)" />
-                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#A3A3A3' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#A3A3A3' }} tickFormatter={(v) => money(pesoShort(Number(v)))} />
-                <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} labelStyle={{ color: '#F5F5F5' }} formatter={(v) => [money(peso(Number(v))), 'Revenue']} />
-                <Area type="monotone" dataKey="value" stroke="#7C3AED" strokeWidth={3} fill="url(#revenueGradient)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <RevenueAreaChart
+              data={revenueTrend}
+              xKey="month"
+              yKey="value"
+              label="Revenue"
+              tickFormatter={(v) => money(pesoShort(v))}
+              valueFormatter={(v) => money(peso(v))}
+            />
           </div>
         </section>
 
@@ -242,17 +232,7 @@ export default function AdminDashboardContent() {
                 <p className="text-sm text-muted-foreground">No order data</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={orderMixData} innerRadius={58} outerRadius={90} paddingAngle={4} dataKey="value" stroke="transparent">
-                    {orderMixData.map((_, index) => (
-                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: '#1F1F1F', borderColor: '#383838' }} labelStyle={{ color: '#F5F5F5' }} />
-                  <Legend verticalAlign="bottom" align="center" iconType="circle" formatter={(value) => <span className="text-sm text-muted-foreground">{value}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
+              <DonutChart data={orderMixData} valueKey="value" nameKey="name" colors={COLORS} />
             )}
           </div>
         </section>
