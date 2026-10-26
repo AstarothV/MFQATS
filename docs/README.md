@@ -1,52 +1,31 @@
-# MFQATS Documentation
+# MFQATS documents
 
-All project documents live in this folder, grouped by topic. **New to the project? Start with the Setup section.**
+**New to the project?** Read them in this order:
 
-```
-docs/
-├── setup/        How to install and run the system
-├── navigation/   How the app's role-based navigation works
-└── project/      Project status, decisions, and implementation plans
-```
+1. [setup/YOLO_SERVER_SETUP.md](setup/YOLO_SERVER_SETUP.md): install and run the system on your computer
+2. [project/SYSTEM_FLOW.md](project/SYSTEM_FLOW.md): how an order goes from purchase to delivery
+3. [setup/DEVICE_TESTING.md](setup/DEVICE_TESTING.md): how to test it on a laptop, phone or tablet
 
----
+## All documents
 
-## 🛠️ `setup/`: install and run
+| Folder | File | What it's for |
+|---|---|---|
+| `setup/` | [YOLO_SERVER_SETUP.md](setup/YOLO_SERVER_SETUP.md) | One-time setup and starting the system: tools, private files, the website and the detection server, adding a trained model, fixing common problems, retraining on Google Colab |
+| `setup/` | [DEVICE_TESTING.md](setup/DEVICE_TESTING.md) | Every test session: start-up order, checks, step-by-step tests per device, the optional local 3D server, and a test log |
+| `project/` | [SYSTEM_FLOW.md](project/SYSTEM_FLOW.md) | How the system works: each order stage, who does it, what each Quality Scan panel does, what happens automatically |
+| `navigation/` | [NAVIGATION.md](navigation/NAVIGATION.md) | Each role's menu and pages, who can open what, and how to add a page |
+| `project/archive/` | [README.md](project/archive/README.md) | Old September 2026 plans, kept for the record only |
 
-| File | What it's for |
+Outside this folder: [../README.md](../README.md) (project front page) and [../PRODUCT.md](../PRODUCT.md) (who the product
+is for and its design principles, used when designing screens).
+
+## Adding a document
+
+| It explains… | Put it in |
 |---|---|
-| [YOLO_SERVER_SETUP.md](setup/YOLO_SERVER_SETUP.md) | **Start here.** One-time setup (Node, Python, `.env`, model files), running the website + YOLOv12n AI server (multiple models), adding models, troubleshooting, and retraining on Google Colab |
-| [DEVICE_TESTING.md](setup/DEVICE_TESTING.md) | **Every test session.** Start-up order, health check, and step-by-step tests on laptop, Android, iPhone and tablet (https tunnel for phone cameras), fixes, and a test log |
+| How to install or run something | `setup/` |
+| How a feature works | `project/`, or a new folder named after the feature |
+| A plan or decision | `project/`, named `YYYY-MM-DD-topic.md` |
 
-## 🧭 `navigation/`: role-based navigation (Admin / Staff / Customer)
-
-| File | What it's for |
-|---|---|
-| [START_HERE.md](navigation/START_HERE.md) | Overview of the navigation system: read this first |
-| [MASTER_INDEX.md](navigation/MASTER_INDEX.md) | Index of all the navigation documents |
-| [NAVIGATION_QUICKREF.md](navigation/NAVIGATION_QUICKREF.md) | One-page cheat sheet of the navigation functions |
-| [NAVIGATION_GUIDE.md](navigation/NAVIGATION_GUIDE.md) | Full documentation of the navigation functions |
-| [ROLE_BASED_NAVIGATION.md](navigation/ROLE_BASED_NAVIGATION.md) | How routes differ per role |
-| [ROLE_NAVIGATION_REFERENCE.md](navigation/ROLE_NAVIGATION_REFERENCE.md) | Complete route reference per role |
-| [VISUAL_GUIDE.md](navigation/VISUAL_GUIDE.md) | Diagrams of the navigation flow |
-| [NAVIGATION_INDEX.md](navigation/NAVIGATION_INDEX.md) | Detailed index of the navigation code |
-| [README_NAVIGATION.md](navigation/README_NAVIGATION.md) | Completion summary |
-| [IMPLEMENTATION_SUMMARY.md](navigation/IMPLEMENTATION_SUMMARY.md) | What was implemented |
-| [DELIVERY_SUMMARY.md](navigation/DELIVERY_SUMMARY.md) | Delivery report |
-
-## 📋 `project/`: status and plans
-
-| File | What it's for |
-|---|---|
-| [SYSTEM_FLOW.md](project/SYSTEM_FLOW.md) | **How the system works now:** an order from purchase to delivery, who does each step, what each Quality Scan panel does, and what the system does by itself |
-| [mfqats-current-state.md](project/mfqats-current-state.md) | What exists vs what the capstone paper requires, known issues (security, missing modules), and the team's decisions |
-| [plans/2026-09-25-mfqats-roadmap.md](project/plans/2026-09-25-mfqats-roadmap.md) | Roadmap: the order the remaining modules will be built in |
-| [plans/2026-09-25-plan-01-security-truthfulness-foundation.md](project/plans/2026-09-25-plan-01-security-truthfulness-foundation.md) | Plan 01: security fixes and removing fake data |
-
----
-
-### Where to put new documents
-
-- How to install/run something → `setup/`
-- How a feature works → a new folder named after it (e.g. `yolo/`, `3d-reconstruction/`)
-- Status reports, decisions, plans → `project/` (plans in `project/plans/`, named `YYYY-MM-DD-topic.md`)
+Write for a classmate who hasn't seen the code: short sentences, numbered steps for anything they have to do, and a
+table when comparing things. Add the new file to the table above.
