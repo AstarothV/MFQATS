@@ -240,8 +240,8 @@ export default function CatalogContent() {
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Product Catalog</p>
-          <h1 className="text-3xl font-bold text-foreground">Furniture Collections</h1>
+          <p className="page-eyebrow">Product Catalog</p>
+          <h1 className="page-title">Furniture Collections</h1>
           <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
             Manage product listings, pricing, dimensions, and 3D model assets.
           </p>
@@ -266,7 +266,7 @@ export default function CatalogContent() {
             key={cat}
             type="button"
             onClick={() => { setActiveCategory(cat); setPage(0); }}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${activeCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+            className={`rounded-full px-4 py-2 text-sm font-medium transition ${activeCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
           >
             {cat}
           </button>
@@ -303,7 +303,7 @@ export default function CatalogContent() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           {products.map((product) => (
-            <div key={product.id} className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200">
+            <div key={product.id} className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition duration-200">
               <div className="relative h-44 bg-muted overflow-hidden">
                 {product.images?.[0] ? (
                   <img src={product.images[0]} alt={`${product.name} - ${product.material_type} furniture product`} className="w-full h-full object-cover" />
@@ -347,7 +347,7 @@ export default function CatalogContent() {
                   <button type="button" onClick={() => openEdit(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
                     <Edit2 size={13} /> Edit
                   </button>
-                  <button type="button" onClick={() => openDelete(product)} className="p-2 rounded-xl border border-border text-danger hover:bg-danger/10 transition-all">
+                  <button type="button" onClick={() => openDelete(product)} className="p-2 rounded-xl border border-border text-danger hover:bg-danger/10 transition">
                     <Trash2 size={14} />
                   </button>
                 </div>

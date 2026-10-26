@@ -14,20 +14,17 @@ import {
   Truck,
   MessageSquare,
   LogOut,
-  X,
   Camera,
-  Ruler,
   FileText,
   History,
   AlertTriangle,
   RotateCcw,
-  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   HelpCircle,
   Home,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-
-
 
 interface SidebarProps {
   role: 'staff' | 'admin' | 'customer';
@@ -38,34 +35,72 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-const navByRole = {
+type NavItem = { label: string; href: string; icon: React.ElementType };
+type NavGroup = { title?: string; items: NavItem[] };
+
+// Grouped so a long list scans quickly; the titles show only while the sidebar is open.
+const navByRole: Record<SidebarProps['role'], NavGroup[]> = {
   staff: [
-    { label: 'Workshop', href: '/staff-dashboard', icon: LayoutDashboard },
-    { label: 'Assigned Tasks', href: '/staff-dashboard/assigned-tasks', icon: ClipboardCheck },
-    { label: 'Order Workflow', href: '/staff-dashboard/orders', icon: Package },
-    { label: 'Quality Scan', href: '/staff/quality-scan', icon: Camera },
-    { label: 'Inventory', href: '/staff-dashboard/inventory', icon: ShoppingBag },
-    { label: 'Messages', href: '/staff/chat', icon: MessageSquare },
+    {
+      title: 'Workshop',
+      items: [
+        { label: 'Workshop', href: '/staff-dashboard', icon: LayoutDashboard },
+        { label: 'Assigned Tasks', href: '/staff-dashboard/assigned-tasks', icon: ClipboardCheck },
+        { label: 'Order Workflow', href: '/staff-dashboard/orders', icon: Package },
+        { label: 'Quality Scan', href: '/staff/quality-scan', icon: Camera },
+      ],
+    },
+    {
+      title: 'Resources',
+      items: [
+        { label: 'Inventory', href: '/staff-dashboard/inventory', icon: ShoppingBag },
+        { label: 'Messages', href: '/staff/chat', icon: MessageSquare },
+      ],
+    },
   ],
   admin: [
-    { label: 'Admin Overview', href: '/admin-dashboard', icon: LayoutDashboard },
-    { label: 'Inspection Progress', href: '/real-time-production-dashboard', icon: BarChart3 },
-    { label: 'User Management', href: '/admin/users', icon: Users },
-    { label: 'Product Catalog', href: '/catalog', icon: Box },
-    { label: 'Order Management', href: '/orders', icon: Package },
-    { label: 'Messages', href: '/admin/chat', icon: MessageSquare },
-    { label: 'Inventory', href: '/admin/inventory', icon: Truck },
-    { label: 'Team', href: '/admin/team', icon: Users },
-    { label: 'Reports', href: '/admin/reports', icon: FileText },
-    { label: 'Audit Logs', href: '/admin/audit-logs', icon: History },
-    { label: 'Defect Analytics', href: '/admin/defect-analytics', icon: AlertTriangle },
-    { label: 'Rework Queue', href: '/admin/rework', icon: RotateCcw },
+    {
+      title: 'Overview',
+      items: [
+        { label: 'Admin Overview', href: '/admin-dashboard', icon: LayoutDashboard },
+        { label: 'Inspection Progress', href: '/real-time-production-dashboard', icon: BarChart3 },
+      ],
+    },
+    {
+      title: 'Operations',
+      items: [
+        { label: 'Order Management', href: '/orders', icon: Package },
+        { label: 'Product Catalog', href: '/catalog', icon: Box },
+        { label: 'Inventory', href: '/admin/inventory', icon: Truck },
+        { label: 'Team', href: '/admin/team', icon: Users },
+      ],
+    },
+    {
+      title: 'Quality',
+      items: [
+        { label: 'Defect Analytics', href: '/admin/defect-analytics', icon: AlertTriangle },
+        { label: 'Rework Queue', href: '/admin/rework', icon: RotateCcw },
+        { label: 'Reports', href: '/admin/reports', icon: FileText },
+      ],
+    },
+    {
+      title: 'Admin',
+      items: [
+        { label: 'User Management', href: '/admin/users', icon: Users },
+        { label: 'Audit Logs', href: '/admin/audit-logs', icon: History },
+        { label: 'Messages', href: '/admin/chat', icon: MessageSquare },
+      ],
+    },
   ],
   customer: [
-    { label: 'Overview', href: '/customer-dashboard/overview', icon: Home },
-    { label: 'OrderView', href: '/customer-dashboard/order-view', icon: Package },
-    { label: 'Inquiry', href: '/customer-dashboard/inquiry', icon: HelpCircle },
-    { label: 'Shop Products', href: '/customer-dashboard/shop', icon: ShoppingBag },
+    {
+      items: [
+        { label: 'Overview', href: '/customer-dashboard/overview', icon: Home },
+        { label: 'OrderView', href: '/customer-dashboard/order-view', icon: Package },
+        { label: 'Inquiry', href: '/customer-dashboard/inquiry', icon: HelpCircle },
+        { label: 'Shop Products', href: '/customer-dashboard/shop', icon: ShoppingBag },
+      ],
+    },
   ],
 };
 
@@ -73,7 +108,8 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
   const pathname = usePathname();
   const router = useRouter();
   const { signOut } = useAuth();
-  const nav = navByRole[role];
+  const groups = navByRole[role];
+  const nav = groups.flatMap((g) => g.items);
   // Highlight the clicked item immediately, before the route commits.
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   useEffect(() => setPendingHref(null), [pathname]);
@@ -82,6 +118,8 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
   const activeHref = nav
     .filter((i) => activePath === i.href || activePath.startsWith(i.href + '/'))
     .reduce<string | null>((best, i) => (!best || i.href.length > best.length ? i.href : best), null);
+  // "Collapsed" is a desktop setting (lg: classes); the phone sheet always shows the labels.
+  const slim = collapsed;
 
   async function handleLogout() {
     try {
@@ -94,74 +132,82 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
 
   return (
     <>
+      {/* Floating glass panel, inset from the screen edge. Only its own width animates; the page beside it snaps to
+          the new width, so collapsing never relayouts the content (charts included) on every frame. */}
       <aside
-        className={`fixed top-16 bottom-0 left-0 z-50 ${collapsed ? 'w-20 p-4' : 'w-72 p-6'} overflow-y-auto overscroll-contain border-r border-border bg-card shadow-2xl transition-[width,padding,transform] duration-200 ease-out motion-reduce:transition-none lg:translate-x-0 ${
-          open ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        aria-label="Main navigation"
+        className={`glass-float fixed z-40 top-[76px] bottom-3 left-3 flex flex-col rounded-[22px] p-2.5 w-[min(280px,calc(100vw-24px))] transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+          slim ? 'lg:w-[68px]' : 'lg:w-[244px]'
+        } ${open ? 'translate-x-0' : '-translate-x-[calc(100%+24px)]'} lg:translate-x-0`}
       >
-        {/* Toggle: X closes/collapses the sidebar, the hamburger opens it */}
-        <div className={`mb-3 flex ${collapsed ? 'justify-center' : 'justify-end'}`}>
+        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-0.5 py-1">
+          {groups.map((group, gi) => (
+            <div key={group.title || gi}>
+              {group.title && (
+                <p
+                  className={`whitespace-nowrap px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground ${
+                    slim ? 'lg:hidden' : ''
+                  }`}
+                >
+                  {group.title}
+                </p>
+              )}
+              {slim && gi > 0 && <div className="mx-3 mb-2 hidden border-t border-[var(--glass-line)] lg:block" aria-hidden="true" />}
+              <div className="flex flex-col gap-0.5">
+                {group.items.map((item) => {
+                  const NavIcon = item.icon;
+                  const isActive = item.href === activeHref;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={(e) => {
+                        if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) setPendingHref(item.href);
+                        onClose();
+                      }}
+                      aria-current={isActive ? 'page' : undefined}
+                      title={slim ? item.label : undefined}
+                      className={`flex h-10 items-center gap-3 whitespace-nowrap rounded-xl px-3 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                        slim ? 'lg:justify-center lg:px-0' : ''
+                      } ${
+                        isActive
+                          ? 'bg-primary/15 font-semibold text-primary shadow-[inset_0_1px_0_var(--glass-edge)] dark:text-accent'
+                          : 'font-medium text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      <NavIcon size={18} className="shrink-0" aria-hidden="true" />
+                      <span className={`truncate ${slim ? 'lg:sr-only' : ''}`}>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className={`mt-2 flex gap-1.5 border-t border-[var(--glass-line)] pt-2.5 ${slim ? 'lg:flex-col' : ''}`}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            title={slim ? 'Sign Out' : undefined}
+            className={`flex h-10 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-danger transition-colors duration-200 hover:bg-danger/10 ${
+              slim ? 'lg:justify-center lg:px-0' : ''
+            }`}
+          >
+            <LogOut size={18} className="shrink-0" aria-hidden="true" />
+            <span className={slim ? 'lg:sr-only' : ''}>Sign Out</span>
+          </button>
           {onToggleCollapse && (
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="hidden lg:inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground shadow-sm"
-              aria-label={collapsed ? 'Open sidebar' : 'Close sidebar'}
-              title={collapsed ? 'Open sidebar' : 'Close sidebar'}
+              className="hidden h-10 w-10 shrink-0 items-center justify-center self-center rounded-xl text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground lg:inline-flex"
+              aria-label={slim ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={slim ? 'Expand sidebar' : 'Collapse sidebar'}
             >
-              {collapsed ? <Menu size={16} /> : <X size={16} />}
+              {slim ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="lg:hidden inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background text-muted-foreground hover:text-foreground shadow-sm"
-            aria-label="Close navigation"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        <nav className="space-y-1" aria-label="Main navigation">
-          {nav.map((item) => {
-            const NavIcon = item.icon;
-            const isActive = item.href === activeHref;
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={(e) => {
-                  if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) setPendingHref(item.href);
-                  onClose();
-                }}
-                aria-current={isActive ? 'page' : undefined}
-                aria-label={collapsed ? item.label : undefined}
-                title={collapsed ? item.label : undefined}
-                className={`flex items-center ${collapsed ? 'justify-center px-0 py-2.5 my-1' : 'gap-3 px-4 py-2.5 my-1'} rounded-2xl text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                  isActive
-                    ? 'bg-muted text-foreground ring-1 ring-border shadow-sm'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <NavIcon size={18} className="shrink-0" aria-hidden="true" />
-                {!collapsed && <span className="truncate">{item.label}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="mt-8 pt-6 border-t border-border flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={handleLogout}
-            aria-label="Sign Out"
-            title={collapsed ? 'Sign Out' : undefined}
-            className={`flex items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-danger hover:bg-danger/10 transition-colors ${collapsed ? 'w-full justify-center' : 'w-full justify-between'}`}
-          >
-            {!collapsed && <span>Sign Out</span>}
-            <LogOut size={18} />
-          </button>
         </div>
       </aside>
 
@@ -169,8 +215,8 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
         <button
           type="button"
           onClick={onClose}
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[1px] lg:hidden"
-          aria-label="Close overlay"
+          className="fixed inset-0 z-30 animate-fade-in bg-black/35 backdrop-blur-sm lg:hidden"
+          aria-label="Close navigation"
         />
       )}
     </>

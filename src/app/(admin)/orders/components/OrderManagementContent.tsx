@@ -13,7 +13,7 @@ const GATE_HINTS: Record<string, string> = {
   scan_passed: 'Needs the latest defect scan to pass',
 };
 
-export default function OrderManagementContent() {
+export default function OrderManagementContent({ eyebrow = 'Order Management' }: { eyebrow?: string }) {
   const supabase = createClient();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,8 +107,8 @@ export default function OrderManagementContent() {
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Order Management</p>
-          <h1 className="text-3xl font-bold text-foreground">Track orders through the inspection process</h1>
+          <p className="page-eyebrow">{eyebrow}</p>
+          <h1 className="page-title">Track orders through the inspection process</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered'].map(status => (
@@ -116,7 +116,7 @@ export default function OrderManagementContent() {
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition-all ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
             >
               {status === 'All' ? 'All' : statusLabel(status)}
             </button>
@@ -165,7 +165,7 @@ export default function OrderManagementContent() {
                         onClick={() => setSelectedOrderId(order.id)}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedOrderId === order.id ? 'bg-primary/10' : ''}`}
                       >
-                        <td className="px-4 py-4 font-semibold text-foreground">{order.order_ref}</td>
+                        <td className="px-4 py-4 font-semibold text-foreground whitespace-nowrap">{order.order_ref}</td>
                         <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
                         <td className="px-4 py-4">
                           <StatusBadge
@@ -173,7 +173,7 @@ export default function OrderManagementContent() {
                             label={statusLabel(order.extended_status || order.status)}
                           />
                         </td>
-                        <td className="px-4 py-4 text-muted-foreground">{order.due_date || '—'}</td>
+                        <td className="px-4 py-4 text-muted-foreground whitespace-nowrap">{order.due_date || '—'}</td>
                         <td className="px-4 py-4 font-semibold text-foreground">{peso(order.amount)}</td>
                       </tr>
                     ))}
@@ -227,7 +227,7 @@ export default function OrderManagementContent() {
                         <span>{activeOrder.completion_pct || 0}%</span>
                       </div>
                       <div className="h-2 rounded-full bg-border overflow-hidden">
-                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${activeOrder.completion_pct || 0}%` }} />
+                        <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${activeOrder.completion_pct || 0}%` }} />
                       </div>
                     </div>
                   </div>
@@ -244,7 +244,7 @@ export default function OrderManagementContent() {
                         onClick={() => updateOrderStatus(activeOrder.id, status)}
                         disabled={updating || !canMoveTo(status)}
                         title={GATE_HINTS[nextMoves.find(t => t.to_status === status)?.gate || '']}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
                           (activeOrder.extended_status || 'pending') === status
                             ? 'bg-primary text-primary-foreground' :'bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50'
                         }`}
@@ -285,7 +285,7 @@ export default function OrderManagementContent() {
                       type="button"
                       onClick={() => updateOrderStatus(activeOrder.id, 'cancelled')}
                       disabled={updating || !canMoveTo('cancelled')}
-                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-sm text-danger hover:bg-danger/10 transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <X size={16} /> Cancel Order
                     </button>

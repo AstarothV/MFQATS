@@ -3,22 +3,22 @@
 @tailwind utilities;
 
 :root {
-  --background: #F7F5F1;
-  --foreground: #1F1F1F;
+  --background: #F3F0F8;
+  --foreground: #1C1726;
   --primary: #7C3AED;
   --primary-foreground: #FFFFFF;
-  --secondary: #EEE8DF;
+  --secondary: #ECE7F4;
   --secondary-foreground: #4B5563;
   --accent: #A78BFA;
   --accent-foreground: #1F1F1F;
-  --muted: #F3EFE8;
-  --muted-foreground: #6B7280;
+  --muted: #EEE9F5;
+  --muted-foreground: #6B6478;
   --card: #FFFFFF;
-  --card-foreground: #1F1F1F;
-  --border: #E4DDD4;
+  --card-foreground: #1C1726;
+  --border: #E2DBEC;
   --input: #FFFFFF;
   --ring: #7C3AED;
-  --radius: 8px;
+  --radius: 10px; /* lg 14px, xl 18px, 2xl 22px */
   --font-sans: var(--font-dm-sans), sans-serif;
 
   /* Semantic colors */
@@ -31,6 +31,19 @@
   --info: #3B82F6;
   --info-bg: #1E3A5F;
 
+  /* Liquid glass. Page cards (.card-dark) are simulated glass: a translucent gradient with a bright top edge, no
+     blur, so scrolling stays cheap. Real blur is only on floating layers (.glass-float: top bar, sidebar, menus). */
+  --glass-top: rgba(255, 255, 255, 0.80);
+  --glass-bottom: rgba(255, 255, 255, 0.56);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --glass-line: rgba(28, 23, 38, 0.08);
+  --glass-shadow: 0 1px 2px rgba(28, 23, 38, 0.05), 0 12px 32px -14px rgba(76, 29, 149, 0.22);
+  --float-bg: rgba(255, 255, 255, 0.62);
+  --blob-a: rgba(167, 139, 250, 0.50);
+  --blob-b: rgba(244, 114, 182, 0.24);
+  --blob-c: rgba(56, 189, 248, 0.22);
+  --ease-glass: cubic-bezier(0.32, 0.72, 0, 1);
+
   /* Customer theme */
   --customer-bg: #F8F5FF;
   --customer-card: #FFFFFF;
@@ -39,16 +52,26 @@
 }
 
 .dark {
-  --background: #1F1F1F;
-  --foreground: #F5F5F5;
-  --secondary: #2D2D2D;
-  --secondary-foreground: #D4D4D4;
-  --muted: #3F3F3F;
-  --muted-foreground: #A3A3A3;
-  --card: #2A2A2A;
-  --card-foreground: #F5F5F5;
-  --border: #383838;
-  --input: #333333;
+  --background: #110E17;
+  --foreground: #F2EEF8;
+  --secondary: #221D2C;
+  --secondary-foreground: #D6D0E0;
+  --muted: #262031;
+  --muted-foreground: #A49CB3;
+  --card: #1B1724;
+  --card-foreground: #F2EEF8;
+  --border: #2E2839;
+  --input: #1F1A29;
+
+  --glass-top: rgba(255, 255, 255, 0.075);
+  --glass-bottom: rgba(255, 255, 255, 0.03);
+  --glass-edge: rgba(255, 255, 255, 0.13);
+  --glass-line: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -18px rgba(0, 0, 0, 0.75);
+  --float-bg: rgba(27, 23, 36, 0.62);
+  --blob-a: rgba(124, 58, 237, 0.40);
+  --blob-b: rgba(190, 24, 93, 0.20);
+  --blob-c: rgba(14, 116, 144, 0.22);
 }
 
 @layer base {
@@ -62,6 +85,19 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* The glass needs something soft behind it. Fixed, no filter and no animation, so it costs one paint. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(42vw 42vw at 10% 6%, var(--blob-a), transparent 70%),
+      radial-gradient(36vw 36vw at 94% 16%, var(--blob-b), transparent 70%),
+      radial-gradient(46vw 46vw at 72% 104%, var(--blob-c), transparent 70%);
   }
 
   html {
@@ -119,12 +155,32 @@
   }
 
   .card-hover {
-    transition: all 200ms ease;
+    transition: transform 250ms var(--ease-glass), box-shadow 250ms var(--ease-glass);
   }
 
   .card-hover:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
+  }
+
+  /* Dropdowns and popovers: frosted, but mostly opaque so their text stays readable over busy pages. */
+  .glass-menu {
+    background: color-mix(in srgb, var(--card) 86%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-line);
+    border-radius: 18px;
+    box-shadow: inset 0 1px 0 var(--glass-edge), 0 24px 48px -16px rgba(0, 0, 0, 0.45);
+    transform-origin: top right;
+    animation: menuIn 220ms var(--ease-glass) backwards;
+  }
+
+  /* Real frosted glass, for the few layers that float over content (top bar, sidebar, menus, viewer controls). */
+  .glass-float {
+    background: var(--float-bg);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-line);
+    box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
   }
 
   .status-ok {
@@ -200,7 +256,17 @@
 /* Route content fades in on navigation. Fill is "backwards" only, so no stacking context is left
    behind once the fade ends (page modals must still layer above the fixed topbar/sidebar). */
 .page-enter {
-  animation: fadeIn 160ms ease-out backwards;
+  animation: pageRise 360ms var(--ease-glass) backwards;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pageRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -209,7 +275,8 @@
     background-image: none;
   }
   .skeleton-reveal,
-  .page-enter {
+  .page-enter,
+  .glass-menu {
     animation-duration: 1ms;
   }
 }
@@ -235,33 +302,65 @@
 }
 
 @layer components {
+  /* Buttons animate only transform, shadow and color (never `all`), so a press or hover never relayouts the page. */
   .btn-primary {
-    @apply bg-primary text-primary-foreground font-semibold px-4 py-2.5 rounded-lg
-           transition-all duration-150 hover:opacity-90 active:scale-95
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    @apply text-primary-foreground font-semibold px-4 py-2.5 rounded-lg
+           active:scale-[0.96] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+    background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 84%, white), var(--primary));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 8px 20px -10px var(--primary);
+    transition: transform 150ms var(--ease-glass), box-shadow 200ms var(--ease-glass), filter 200ms var(--ease-glass);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.07);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 10px 26px -10px var(--primary);
   }
 
   .btn-secondary {
-    @apply bg-muted text-foreground font-semibold px-4 py-2.5 rounded-lg
-           transition-all duration-150 hover:bg-border active:scale-95
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply text-foreground font-semibold px-4 py-2.5 rounded-lg border
+           active:scale-[0.96] disabled:opacity-50 disabled:cursor-not-allowed;
+    background: color-mix(in srgb, var(--muted) 70%, transparent);
+    border-color: var(--glass-line);
+    box-shadow: inset 0 1px 0 var(--glass-edge);
+    transition: transform 150ms var(--ease-glass), background-color 200ms var(--ease-glass);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--muted);
   }
 
   .btn-ghost {
-    @apply text-muted-foreground font-medium px-3 py-2 rounded-lg
-           transition-all duration-150 hover:bg-muted hover:text-foreground
-           active:scale-95;
+    @apply text-muted-foreground font-medium px-3 py-2 rounded-lg hover:bg-muted hover:text-foreground active:scale-[0.96];
+    transition: transform 150ms var(--ease-glass), background-color 200ms var(--ease-glass), color 200ms var(--ease-glass);
   }
 
   .input-dark {
     @apply bg-input border border-border text-foreground rounded-lg px-3 py-2.5
-           text-sm placeholder-muted-foreground
-           focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent
-           transition-all duration-150;
+           text-sm placeholder-muted-foreground focus:outline-none;
+    transition: border-color 200ms var(--ease-glass), box-shadow 200ms var(--ease-glass);
+  }
+  .input-dark:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 18%, transparent);
   }
 
+  /* Page cards: simulated glass (translucent gradient + bright top edge + soft depth), no blur. */
   .card-dark {
-    @apply bg-card border border-border rounded-xl;
+    @apply rounded-2xl;
+    background: linear-gradient(180deg, var(--glass-top), var(--glass-bottom));
+    border: 1px solid var(--glass-line);
+    box-shadow: inset 0 1px 0 var(--glass-edge), var(--glass-shadow);
+  }
+  /* A card that is itself a dialog (directly inside a full-screen overlay) stays solid, so nothing shows through. */
+  .fixed > .card-dark {
+    background: var(--card);
+  }
+
+  /* Page headers: the same label, title and subtitle on every screen. */
+  .page-eyebrow {
+    @apply mb-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+  .page-title {
+    @apply text-[26px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[28px];
+    text-wrap: balance;
   }
 
   .badge {

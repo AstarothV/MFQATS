@@ -73,7 +73,7 @@ export default function CustomerDashboardContent() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Order Queue</h1>
+          <h1 className="page-title">Order Queue</h1>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {order ? `Latest: #${order.order_ref} · ${order.product_name}` : 'No active orders found'}
           </p>
@@ -111,7 +111,7 @@ export default function CustomerDashboardContent() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition duration-150 ${
                     isActive ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                   }`}
                 >

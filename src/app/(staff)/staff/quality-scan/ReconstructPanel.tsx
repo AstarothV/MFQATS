@@ -261,7 +261,7 @@ export default function ReconstructPanel({ apiUrl }: { apiUrl: string }) {
             aria-valuenow={Math.round(progress.fraction * 100)}
             className="h-2 w-full overflow-hidden rounded-full bg-muted"
           >
-            <div className="h-full bg-primary transition-all" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
+            <div className="h-full bg-primary transition-[width]" style={{ width: `${Math.round(progress.fraction * 100)}%` }} />
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{progress.message}. This can take several minutes; keep this page open.</p>
         </div>

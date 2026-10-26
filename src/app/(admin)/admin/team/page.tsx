@@ -178,8 +178,8 @@ export default function AdminTeamPage() {
   return (
     <AppLayout role="admin" currentPath="/admin/team">
       <div className="space-y-6">
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <h1 className="text-2xl font-semibold text-foreground">Team Management</h1>
+        <div>
+          <h1 className="page-title">Team Management</h1>
           <p className="text-sm text-muted-foreground mt-2">
             Monitor worker performance, track time, and manage team assignments.
           </p>

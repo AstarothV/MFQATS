@@ -140,7 +140,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
             <button
               key={tab.key}
               onClick={() => setActiveFilter(tab.key)}
-              className={`rounded-full px-3 py-1 text-xs font-semibold transition-all duration-150 ${
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition duration-150 ${
                 activeFilter === tab.key
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'border border-border bg-muted text-foreground hover:bg-muted/80'
@@ -188,7 +188,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
           {filtered.map((photo, idx) => (
             <div
               key={photo.id}
-              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
+              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-xl border border-border bg-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20"
               onClick={() => setLightboxIdx(idx)}
             >
               {imgErrors[photo.id] ? (
@@ -209,7 +209,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
               )}
 
               {/* Hover Overlay */}
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all duration-200 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition duration-200 flex items-center justify-center">
                 <ZoomIn size={24} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 drop-shadow-lg" />
               </div>
 

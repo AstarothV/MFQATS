@@ -63,7 +63,7 @@ export default function StageProgressPanel() {
             <React.Fragment key={stage.id}>
               <div className="flex flex-col items-center min-w-[64px]">
                 <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 transition-all ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 transition ${
                     stage.status === 'complete'
                       ? 'bg-success/20 text-success border border-success/40'
                       : stage.status === 'active' ?'bg-primary text-primary-foreground'
@@ -108,7 +108,7 @@ export default function StageProgressPanel() {
         <div className="flex items-center gap-2">
           <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
             <div
-              className="h-full bg-accent rounded-full transition-all duration-300"
+              className="h-full bg-accent rounded-full transition-[width] duration-300"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -121,7 +121,7 @@ export default function StageProgressPanel() {
           <button
             key={check.id}
             onClick={() => toggleCheck(check.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all duration-150 text-left ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition duration-150 text-left ${
               check.done
                 ? 'bg-success/10 border-success/20 text-success' :'bg-muted/30 border-border text-foreground hover:bg-muted/60'
             }`}

@@ -35,7 +35,7 @@ export default function MessagesHub({ userRole, initialTab = 'chat' }: { userRol
               type="button"
               onClick={() => setTab(key)}
               aria-pressed={tab === key}
-              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 ${
+              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition duration-150 ${
                 tab === key
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'

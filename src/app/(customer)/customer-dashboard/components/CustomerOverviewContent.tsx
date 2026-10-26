@@ -124,7 +124,7 @@ export default function CustomerOverviewContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Overview</h1>
+          <h1 className="page-title">Overview</h1>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
             {orders.length > 0 ? `${orders.length} order${orders.length !== 1 ? 's' : ''} found` : 'No orders yet'}
           </p>
@@ -156,7 +156,7 @@ export default function CustomerOverviewContent() {
                   key={order.id}
                   type="button"
                   onClick={() => setSelectedOrder(order)}
-                  className={`w-full text-left rounded-2xl border p-4 transition-all duration-150 ${
+                  className={`w-full text-left rounded-2xl border p-4 transition duration-150 ${
                     isSelected
                       ? 'border-primary/40 bg-primary/5 shadow-sm ring-1 ring-primary/20'
                       : 'border-border bg-card hover:bg-muted/50'
@@ -186,7 +186,7 @@ export default function CustomerOverviewContent() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-all duration-500"
+                        className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-500"
                         style={{ width: `${order.completion_pct || 0}%` }}
                       />
                     </div>
@@ -227,7 +227,7 @@ export default function CustomerOverviewContent() {
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-all duration-700"
+                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-700"
                       style={{ width: `${completionPct}%` }}
                     />
                   </div>
@@ -335,13 +335,13 @@ export default function CustomerOverviewContent() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link
                   href="/customer-dashboard/order-view"
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-border bg-card py-3 text-sm font-semibold text-foreground hover:bg-muted transition"
                 >
                   <Package size={15} /> View Full Order
                 </Link>
                 <Link
                   href="/customer-dashboard/inquiry"
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 py-3 text-sm font-semibold text-primary hover:bg-primary/10 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 py-3 text-sm font-semibold text-primary hover:bg-primary/10 transition"
                 >
                   <MessageSquare size={15} /> Send Inquiry
                 </Link>

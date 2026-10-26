@@ -184,7 +184,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
             <button
               type="button"
               onClick={() => setShowOrderPicker(!showOrderPicker)}
-              className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition-all"
+              className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-xs font-medium text-foreground hover:bg-muted transition"
             >
               <Package size={13} />
               {selectedOrder?.order_ref || 'Select Order'}
@@ -197,7 +197,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
                     key={order.id}
                     type="button"
                     onClick={() => { setSelectedOrderId(order.id); setShowOrderPicker(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all ${selectedOrderId === order.id ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted'}`}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition ${selectedOrderId === order.id ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted'}`}
                   >
                     <p className="font-semibold">{order.order_ref}</p>
                     <p className="text-xs text-muted-foreground truncate">{order.product_name}</p>

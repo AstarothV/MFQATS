@@ -146,7 +146,7 @@ export default function OrderViewContent() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Order History</h1>
+          <h1 className="page-title">Order History</h1>
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Track your furniture orders</p>
         </div>
         <div className="rounded-2xl border border-border bg-card py-16 text-center">
@@ -165,7 +165,7 @@ export default function OrderViewContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Order History</h1>
+          <h1 className="page-title">Order History</h1>
           {selectedOrder && (
             <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
               Latest: #{selectedOrder.order_ref} · {selectedOrder.product_name}
@@ -181,7 +181,7 @@ export default function OrderViewContent() {
           )}
           <Link
             href="/customer-dashboard/shop"
-            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition-all"
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition"
           >
             🛍 Shop
           </Link>
@@ -258,7 +258,7 @@ export default function OrderViewContent() {
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-150 ${
+                className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold transition duration-150 ${
                   isActive
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -325,13 +325,13 @@ export default function OrderViewContent() {
             <div className="mt-4 flex gap-3">
               <Link
                 href="/customer-dashboard/inquiry"
-                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition-all active:scale-95"
+                className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition active:scale-95"
               >
                 <MessageSquare size={15} /> Open Inquiry Center
               </Link>
               <Link
                 href="/customer-dashboard/inquiry"
-                className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/10 transition-all"
+                className="flex items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/10 transition"
               >
                 <AlertCircle size={15} /> New Inquiry
               </Link>

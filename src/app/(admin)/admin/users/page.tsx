@@ -202,8 +202,8 @@ export default function AdminUsersPage() {
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Administration</p>
-            <h1 className="text-3xl font-bold text-foreground">User Management</h1>
+            <p className="page-eyebrow">Administration</p>
+            <h1 className="page-title">User Management</h1>
             <p className="text-sm text-muted-foreground mt-2">Manage system users, roles, and access permissions.</p>
           </div>
           <button onClick={openAdd} className="btn-primary flex items-center gap-2">
@@ -232,7 +232,7 @@ export default function AdminUsersPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             {['all', 'admin', 'staff', 'customer'].map(r => (
-              <button key={r} onClick={() => { setRoleFilter(r); setPage(0); }} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${roleFilter === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+              <button key={r} onClick={() => { setRoleFilter(r); setPage(0); }} className={`px-4 py-2 rounded-xl text-sm font-semibold transition ${roleFilter === r ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
                 {r.charAt(0).toUpperCase() + r.slice(1)}
               </button>
             ))}

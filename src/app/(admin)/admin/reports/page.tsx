@@ -156,8 +156,8 @@ export default function AdminReportsPage() {
         )}
 
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Administration</p>
-          <h1 className="text-3xl font-bold text-foreground">Reports</h1>
+          <p className="page-eyebrow">Administration</p>
+          <h1 className="page-title">Reports</h1>
           <p className="text-sm text-muted-foreground mt-2">Generate and export inspection progress, QA, defect, and inventory reports.</p>
         </div>
 
@@ -190,7 +190,7 @@ export default function AdminReportsPage() {
                       <button
                         onClick={() => exportCSV(report.id)}
                         disabled={isGenerating || report.count === 0}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border text-sm font-semibold text-foreground hover:bg-muted transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border text-sm font-semibold text-foreground hover:bg-muted transition disabled:opacity-50"
                       >
                         {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                         {isGenerating ? 'Generating...' : 'Export CSV'}

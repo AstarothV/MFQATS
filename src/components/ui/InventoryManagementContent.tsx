@@ -251,7 +251,7 @@ export default function InventoryManagementContent() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex gap-2 flex-wrap">
         {CATEGORIES.map((cat) => (
-          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
             {cat}
           </button>
         ))}
@@ -273,7 +273,7 @@ export default function InventoryManagementContent() {
           ) : (
             items.map((item) => (
               <div key={item.id} onClick={() => setSelectedItem(item.id === selectedItem ? null : item.id)}
-                className={`rounded-3xl border p-5 cursor-pointer transition-all ${selectedItem === item.id ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'}`}>
+                className={`rounded-3xl border p-5 cursor-pointer transition ${selectedItem === item.id ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'}`}>
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -302,13 +302,13 @@ export default function InventoryManagementContent() {
                       <div><p className="text-muted-foreground">Last Updated</p><p className="font-semibold text-foreground">{new Date(item.last_updated).toLocaleDateString()}</p></div>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={(e) => { e.stopPropagation(); openStock(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); openStock(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition">
                         <Truck size={12} /> Update Stock
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); openEdit(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold hover:text-foreground transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); openEdit(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold hover:text-foreground transition">
                         <Edit2 size={12} /> Edit
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); setSelectedItemData(item); setModal('delete'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition-all">
+                      <button onClick={(e) => { e.stopPropagation(); setSelectedItemData(item); setModal('delete'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition">
                         <Trash2 size={12} /> Remove
                       </button>
                     </div>
@@ -333,14 +333,14 @@ export default function InventoryManagementContent() {
           <div className="rounded-3xl border border-border bg-card p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
             <div className="space-y-3">
-              <button onClick={() => { setForm({ item_ref: '', name: '', category: 'Wood', supplier: '', stock_level: 0, min_stock: 0, unit: 'units', location: '', cost_per_unit: 0 }); setModal('add'); }} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground hover:bg-muted transition-all">
+              <button onClick={() => { setForm({ item_ref: '', name: '', category: 'Wood', supplier: '', stock_level: 0, min_stock: 0, unit: 'units', location: '', cost_per_unit: 0 }); setModal('add'); }} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground hover:bg-muted transition">
                 <Plus size={16} /> Add New Item
               </button>
-              <button onClick={() => setSelectedCategory('All')} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground hover:bg-muted transition-all">
+              <button onClick={() => setSelectedCategory('All')} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-foreground hover:bg-muted transition">
                 <Package size={16} /> View All Items
               </button>
               {lowStockCount > 0 && (
-                <button onClick={() => {}} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning hover:bg-warning/20 transition-all">
+                <button onClick={() => {}} className="w-full flex items-center justify-center gap-2 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning hover:bg-warning/20 transition">
                   <AlertTriangle size={16} /> {lowStockCount} Reorder Alerts
                 </button>
               )}
@@ -421,7 +421,7 @@ export default function InventoryManagementContent() {
             <h3 className="text-lg font-bold text-foreground mb-3">Remove Item</h3>
             <p className="text-sm text-muted-foreground mb-5">Remove <strong className="text-foreground">{selectedItemData.name}</strong> from inventory? This will mark it as inactive.</p>
             <div className="flex gap-3">
-              <button onClick={handleDelete} disabled={formLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30 transition-all">
+              <button onClick={handleDelete} disabled={formLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30 transition">
                 {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                 Remove
               </button>

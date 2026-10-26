@@ -397,7 +397,7 @@ export default function CustomerShopContent() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="flex gap-2 flex-wrap">
         {categories.map(cat => (
-          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
+          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedCategory === cat ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}>
             {cat}
           </button>
         ))}
@@ -424,7 +424,7 @@ export default function CustomerShopContent() {
             const inCart = cart.some(i => i.product.id === product.id);
             const cartItem = cart.find(i => i.product.id === product.id);
             return (
-              <div key={product.id} className="flex h-full flex-col rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition-all duration-200">
+              <div key={product.id} className="flex h-full flex-col rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition duration-200">
                 <div className="relative">
                   {product.images?.[0] ? (
                     <img src={product.images[0]} alt={`${product.name} - handcrafted ${product.material_type} furniture`} className="w-full h-48 object-cover" />

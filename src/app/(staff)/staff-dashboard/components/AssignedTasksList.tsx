@@ -135,7 +135,7 @@ export default function AssignedTasksList() {
             <div
               key={task.id}
               onClick={() => setActiveId(task.id)}
-              className={`rounded-xl border p-4 cursor-pointer transition-all duration-150 card-hover ${
+              className={`rounded-xl border p-4 cursor-pointer transition duration-150 card-hover ${
                 isActive
                   ? 'border-primary/50 bg-primary/10' :'border-border bg-muted/20 hover:bg-muted/40'
               }`}
@@ -186,7 +186,7 @@ export default function AssignedTasksList() {
                     </span>
                   ) : (
                     <button
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition-all active:scale-95"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition active:scale-95"
                       onClick={(e) => startTask(task.id, e)}
                     >
                       <Play size={11} /> Start
@@ -204,7 +204,7 @@ export default function AssignedTasksList() {
                   </div>
                   <div className="h-1 bg-muted rounded-full overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${overTime ? 'bg-warning' : 'bg-accent'}`}
+                      className={`h-full rounded-full transition-[width] ${overTime ? 'bg-warning' : 'bg-accent'}`}
                       style={{ width: `${Math.min(100, (task.elapsedMin / task.estimatedMin) * 100)}%` }}
                     />
                   </div>
@@ -215,20 +215,20 @@ export default function AssignedTasksList() {
               {isActive && (
                 <div className="mt-3 pt-3 border-t border-border/50 flex items-center gap-2">
                   <button
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition active:scale-95"
                     onClick={(e) => { e.stopPropagation(); showToast(`Checklist opened for ${task.workpieceId}`); }}
                   >
                     <ChevronRight size={11} /> Open QA
                   </button>
                   <button
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold hover:text-foreground hover:bg-muted/80 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-semibold hover:text-foreground hover:bg-muted/80 transition active:scale-95"
                     onClick={(e) => { e.stopPropagation(); showToast(`Note logged for ${task.workpieceId}`); }}
                   >
                     Log Note
                   </button>
                   {task.defectFlag && (
                     <button
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-danger/20 text-danger text-xs font-semibold hover:bg-danger/30 transition-all active:scale-95"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-danger/20 text-danger text-xs font-semibold hover:bg-danger/30 transition active:scale-95"
                       onClick={(e) => { e.stopPropagation(); showToast(`Help requested for ${task.workpieceId}`); }}
                     >
                       Request Help

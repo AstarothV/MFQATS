@@ -64,8 +64,8 @@ export default function AdminAuditLogsPage() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-[0.3em] mb-2">Administration</p>
-            <h1 className="text-3xl font-bold text-foreground">Audit Logs</h1>
+            <p className="page-eyebrow">Administration</p>
+            <h1 className="page-title">Audit Logs</h1>
             <p className="text-sm text-muted-foreground mt-2">Track all system actions, logins, and data changes.</p>
           </div>
           <div className="text-sm text-muted-foreground">{total} total entries</div>
@@ -168,10 +168,10 @@ export default function AdminAuditLogsPage() {
                 Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, total)} of {total}
               </p>
               <div className="flex gap-2">
-                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition-all">
+                <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition">
                   <ChevronLeft size={14} />
                 </button>
-                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition-all">
+                <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground disabled:opacity-40 transition">
                   <ChevronRight size={14} />
                 </button>
               </div>

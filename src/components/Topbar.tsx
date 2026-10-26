@@ -122,13 +122,13 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur-sm">
-      <div className="max-w-screen-2xl mx-auto flex h-16 items-center justify-between gap-4 px-4 lg:px-8 xl:px-10 2xl:px-16">
+    <header className="glass-float fixed top-2.5 left-3 right-3 z-50 h-14 rounded-[18px]">
+      <div className="flex h-full items-center justify-between gap-3 pl-3 pr-2">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => { onMenuToggle(); setMobileMenuOpen(v => !v); }}
-            className="lg:hidden btn-ghost p-2 rounded-xl border border-border hover:bg-muted transition-all"
+            className="lg:hidden btn-ghost p-2"
             aria-label="Toggle navigation menu"
           >
             <Menu size={18} />
@@ -139,7 +139,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
           </Link>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           <span className={`badge ${roleColor[role]} hidden md:inline-flex`}>{roleLabel[role]}</span>
 
           {/* Notifications */}
@@ -159,7 +159,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-12 z-50 w-80 rounded-3xl border border-border bg-card p-4 shadow-2xl">
+              <div className="glass-menu absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] p-4">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
                   <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="hidden sm:flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+            className="hidden sm:flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
@@ -211,7 +211,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             <button
               type="button"
               onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
-              className="flex items-center gap-2 rounded-xl border border-border px-2 py-1.5 hover:bg-muted transition-all"
+              className="flex items-center gap-2 rounded-full bg-muted/60 py-1 pl-1 pr-2.5 hover:bg-muted transition-colors duration-200"
             >
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                 {initials}
@@ -221,14 +221,14 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-12 z-50 w-52 rounded-2xl border border-border bg-card p-2 shadow-2xl">
+              <div className="glass-menu absolute right-0 top-12 z-50 w-52 p-2">
                 <div className="px-3 py-2 mb-1 border-b border-border">
                   <p className="text-sm font-semibold text-foreground truncate">{displayName}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
                 <button
                   type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200"
                   onClick={() => { setUserMenuOpen(false); setProfileOpen(true); }}
                 >
                   <User size={14} /> Profile
@@ -237,7 +237,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                   type="button"
                   onClick={handleLogout}
                   disabled={loggingOut}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-all mt-1"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-danger hover:bg-danger/10 transition-colors duration-200 mt-1"
                 >
                   <LogOut size={14} />
                   {loggingOut ? 'Signing out...' : 'Sign out'}
@@ -261,7 +261,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
       {profileOpen && (
         <div className="fixed inset-0 z-50" onClick={() => setProfileOpen(false)}>
           <div
-            className="absolute right-4 top-16 w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl animate-fade-in"
+            className="glass-menu absolute right-3 top-[76px] w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="bg-gradient-to-r from-primary/15 via-background to-background p-5 border-b border-border/60">

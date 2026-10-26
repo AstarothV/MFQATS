@@ -216,21 +216,21 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleZoomOut}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition-all active:scale-95"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition active:scale-95"
               aria-label="Zoom out"
             >
               <ZoomOut size={15} />
             </button>
             <button
               onClick={handleZoomIn}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition-all active:scale-95"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition active:scale-95"
               aria-label="Zoom in"
             >
               <ZoomIn size={15} />
             </button>
             <button
               onClick={handleReset}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/80 transition-all active:scale-95"
+              className="flex items-center gap-1.5 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/80 transition active:scale-95"
             >
               <RefreshCw size={13} /> Reset
             </button>
@@ -280,7 +280,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
 
           <button
             onClick={() => setArStep('camera')}
-            className="flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-sm font-bold text-white transition-all active:scale-95 hover:bg-purple-700"
+            className="flex items-center gap-2 rounded-xl bg-purple-600 px-6 py-3 text-sm font-bold text-white transition active:scale-95 hover:bg-purple-700"
           >
             <Camera size={16} /> Launch AR Preview <ChevronRight size={14} />
           </button>
@@ -364,7 +364,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                 <button
                   key={mode.key}
                   onClick={() => { setViewMode(mode.key); if (mode.key !== 'ar') setArStep('intro'); }}
-                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition-all ${viewMode === mode.key ? 'border-primary bg-primary/20 text-white' : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'}`}
+                  className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === mode.key ? 'border-primary bg-primary/20 text-white' : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'}`}
                 >
                   <span>{mode.emoji}</span>
                   <span className="font-medium">{mode.label}</span>
@@ -405,7 +405,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                     <button
                       key={mode.key}
                       onClick={() => { setViewMode(mode.key); if (mode.key !== 'ar') setArStep('intro'); }}
-                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm transition-all duration-150 active:scale-95 ${isActive ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-muted text-foreground hover:bg-muted/80'}`}
+                      className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm transition duration-150 active:scale-95 ${isActive ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-muted text-foreground hover:bg-muted/80'}`}
                     >
                       <span className="text-xl">{mode.emoji}</span>
                       <div className="flex-1 min-w-0">
@@ -421,7 +421,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
               {/* Product Specifications Toggle */}
               <button
                 onClick={() => setShowSpecs(!showSpecs)}
-                className="flex w-full items-center justify-between rounded-xl border border-border bg-muted px-3 py-2.5 text-sm font-semibold text-foreground transition-all hover:bg-muted/80"
+                className="flex w-full items-center justify-between rounded-xl border border-border bg-muted px-3 py-2.5 text-sm font-semibold text-foreground transition hover:bg-muted/80"
               >
                 <div className="flex items-center gap-2">
                   <Info size={14} /> Product Specifications
@@ -459,7 +459,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
               {viewMode !== 'ar' && (
                 <button
                   onClick={() => { setViewMode('ar'); setArStep('intro'); }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-3 text-sm font-bold text-primary-foreground transition-all active:scale-95 hover:opacity-90"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-3 text-sm font-bold text-primary-foreground transition active:scale-95 hover:opacity-90"
                 >
                   <Smartphone size={16} /> View in AR
                 </button>
