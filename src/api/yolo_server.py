@@ -393,7 +393,8 @@ def reconstruct_status(job_id: str):
 # ponytail: Hunyuan's own texture step ("/generation_all") is broken on its Space as of 2026-10; TRELLIS covers colors.
 HF_SPACE = "tencent/Hunyuan3D-2mv"
 COLOR_SPACE = "trellis-community/TRELLIS"
-VIEWS = ("front", "left", "back", "right")
+VIEWS = ("front", "left", "back", "right")  # Hunyuan3D-2mv was trained on these four side views only
+ALL_VIEWS = VIEWS + ("top", "bottom")       # TRELLIS takes any number of views, so top and bottom help the colored model
 LOCAL_3D_URL = os.environ.get("LOCAL_3D_URL", "http://localhost:8001")
 AI_JOBS = {}
 MAX_AI_JOBS = 8
@@ -427,7 +428,7 @@ def build_online_color(job, photos):
 
     with tempfile.TemporaryDirectory() as tmp:
         files = []
-        for view, data in zip(VIEWS, photos):
+        for view, data in zip(ALL_VIEWS, photos):
             if data is not None:
                 path = Path(tmp) / f"{view}.jpg"
                 path.write_bytes(data)
@@ -451,7 +452,7 @@ def build_online_color(job, photos):
 
 def build_local(photos):
     """-> .glb bytes from hunyuan_local.py. Raises urllib errors if it is not running or fails."""
-    images = [None if p is None else "data:image/jpeg;base64," + base64.b64encode(p).decode() for p in photos]
+    images = [None if p is None else "data:image/jpeg;base64," + base64.b64encode(p).decode() for p in photos[:len(VIEWS)]]
     request = urllib.request.Request(f"{LOCAL_3D_URL}/generate", data=json.dumps({"images": images}).encode(),
                                      headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(request, timeout=900) as r:  # the first build also loads the model
@@ -459,6 +460,8 @@ def build_local(photos):
 
 
 def run_ai_job(job, photos, color=False):
+    if not color and any(p is not None for p in photos[len(VIEWS):]):
+        job["note"] = "Top and bottom photos are used for colored models only; this shape was built from the side photos."
     if color:
         try:
             job["model"] = build_online_color(job, photos)
@@ -466,8 +469,10 @@ def run_ai_job(job, photos, color=False):
             return
         except Exception as e:
             print(f"[model3d] colors failed, building the shape only: {str(e)[:200]}")
+            sides_only = (" It was built from the four side photos: the backup model has no top or bottom input."
+                          if any(p is not None for p in photos[len(VIEWS):]) else "")
             job["note"] = ("Colors were not available this time (the free online time may be running low), "
-                           "so this model is the shape only.")
+                           "so this model is the shape only." + sides_only)
     try:
         job["model"] = build_online(job, photos)
         job["status"], job["message"] = "done", "Done"
@@ -504,11 +509,13 @@ def get_ai_job(task_id):
 
 @app.post("/api/model3d")
 def model3d_start(body: dict):
-    """JSON {"images": [front, left, back, right], "color": true}: JPEG data URLs or null. One photo, or a front photo
-    plus at least one more -> {"task": id}. The model is built in the background; poll GET /api/model3d/{task}."""
+    """JSON {"images": [front, left, back, right, top, bottom], "color": true}: JPEG data URLs or null (top and bottom
+    may be left out). One photo, or a front photo plus at least one more -> {"task": id}. The model is built in the
+    background; poll GET /api/model3d/{task}."""
     images = body.get("images")
-    if not isinstance(images, list) or len(images) != len(VIEWS):
-        raise HTTPException(400, "Send the photos as [front, left, back, right].")
+    if not isinstance(images, list) or len(images) not in (len(VIEWS), len(ALL_VIEWS)):
+        raise HTTPException(400, "Send the photos as [front, left, back, right, top, bottom].")
+    images = images + [None] * (len(ALL_VIEWS) - len(images))
     if not all(i is None or (isinstance(i, str) and i.startswith("data:image/")) for i in images):
         raise HTTPException(400, "Each photo must be an image data URL.")
     count = sum(i is not None for i in images)
@@ -521,7 +528,7 @@ def model3d_start(body: dict):
     except (IndexError, binascii.Error):
         raise HTTPException(400, "A photo could not be read.")
     if count == 1:
-        photos = [next(p for p in photos if p is not None), None, None, None]  # a single photo is used as the front
+        photos = [next(p for p in photos if p is not None)] + [None] * (len(ALL_VIEWS) - 1)  # a single photo is used as the front
     while len(AI_JOBS) >= MAX_AI_JOBS:
         del AI_JOBS[next(iter(AI_JOBS))]  # oldest first
     task_id = uuid.uuid4().hex

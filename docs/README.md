@@ -38,6 +38,7 @@ docs/
 
 | File | What it's for |
 |---|---|
+| [SYSTEM_FLOW.md](project/SYSTEM_FLOW.md) | **How the system works now:** an order from purchase to delivery, who does each step, what each Quality Scan panel does, and what the system does by itself |
 | [mfqats-current-state.md](project/mfqats-current-state.md) | What exists vs what the capstone paper requires, known issues (security, missing modules), and the team's decisions |
 | [plans/2026-09-25-mfqats-roadmap.md](project/plans/2026-09-25-mfqats-roadmap.md) | Roadmap: the order the remaining modules will be built in |
 | [plans/2026-09-25-plan-01-security-truthfulness-foundation.md](project/plans/2026-09-25-plan-01-security-truthfulness-foundation.md) | Plan 01: security fixes and removing fake data |

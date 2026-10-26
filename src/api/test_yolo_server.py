@@ -110,7 +110,7 @@ def test_model3d_rejects_bad_requests():
         raise AssertionError("expected an HTTPException")
 
     photo = "data:image/jpeg;base64,AAAA"
-    assert status(lambda: model3d_start({"images": [photo]})) == 400  # not the 4 slots
+    assert status(lambda: model3d_start({"images": [photo]})) == 400  # not the 4 or 6 slots
     assert status(lambda: model3d_start({"images": [None] * 4})) == 422
     assert status(lambda: model3d_start({"images": [None, photo, photo, None]})) == 422  # several photos but no front
     assert status(lambda: model3d_start({"images": ["https://example.com/a.jpg", None, None, None]})) == 400
@@ -146,6 +146,17 @@ def test_model3d_falls_back_to_this_computer():
         job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
         yolo_server.run_ai_job(job, [b"jpg", None, None, None], color=True)
         assert job["colored"] and job["model"] == b"glTF-colored" and job["note"] is None, job
+
+        # colors unavailable with top/bottom photos: the backup uses the sides only, and the panel is told so
+        yolo_server.build_online_color = quota
+        job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None, b"top", None], color=True)
+        assert job["status"] == "done" and "four side photos" in job["note"], job
+
+        # shape only with top/bottom photos: they cannot be used, and the panel is told so
+        job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None, b"top", None], color=False)
+        assert job["status"] == "done" and "colored models only" in job["note"], job
     finally:
         yolo_server.build_online, yolo_server.build_local, yolo_server.LOCAL_3D_URL = online, local, url
         yolo_server.build_online_color = color
