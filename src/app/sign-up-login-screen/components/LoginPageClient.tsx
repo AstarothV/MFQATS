@@ -36,7 +36,7 @@ export default function LoginPageClient() {
   const searchParams = useSearchParams();
   const { signIn, signUp } = useAuth();
   const supabase = createClient();
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [showPass, setShowPass] = useState(false);
   const [showConfirmPass, setShowConfirmPass] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -52,8 +52,8 @@ export default function LoginPageClient() {
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem('theme') as 'dark' | 'light' | null;
-    const initialTheme = storedTheme === 'light' ? 'light' : 'dark';
+    const storedTheme = window.localStorage.getItem('mfqats-theme') as 'dark' | 'light' | null;
+    const initialTheme = storedTheme === 'dark' ? 'dark' : 'light';
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
@@ -76,7 +76,7 @@ export default function LoginPageClient() {
   function toggleTheme() {
     setTheme(curr => {
       const next = curr === 'dark' ? 'light' : 'dark';
-      window.localStorage.setItem('theme', next);
+      window.localStorage.setItem('mfqats-theme', next);
       document.documentElement.classList.toggle('dark', next === 'dark');
       return next;
     });

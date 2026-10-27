@@ -34,7 +34,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState('');
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -50,8 +50,8 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const profileImage = profile?.avatar_url || user?.user_metadata?.avatar_url || '';
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem('theme') as 'dark' | 'light' | null;
-    const initialTheme = storedTheme === 'light' ? 'light' : 'dark';
+    const storedTheme = window.localStorage.getItem('mfqats-theme') as 'dark' | 'light' | null;
+    const initialTheme = storedTheme === 'dark' ? 'dark' : 'light';
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
@@ -84,7 +84,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   function toggleTheme() {
     setTheme((currentTheme) => {
       const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      window.localStorage.setItem('theme', nextTheme);
+      window.localStorage.setItem('mfqats-theme', nextTheme);
       document.documentElement.classList.toggle('dark', nextTheme === 'dark');
       return nextTheme;
     });

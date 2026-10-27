@@ -35,13 +35,14 @@ export default function RootLayout({
         <Script id="theme-bootstrap" strategy="beforeInteractive">
           {`(() => {
             try {
-              const storedTheme = localStorage.getItem('theme');
-              const theme = storedTheme === 'light' ? 'light' : 'dark';
+              // light by default; dark only if the person picked it ('mfqats-theme', so older saved choices don't apply)
+              const storedTheme = localStorage.getItem('mfqats-theme');
+              const theme = storedTheme === 'dark' ? 'dark' : 'light';
               document.documentElement.classList.toggle('dark', theme === 'dark');
               document.documentElement.style.colorScheme = theme;
             } catch (error) {
-              document.documentElement.classList.add('dark');
-              document.documentElement.style.colorScheme = 'dark';
+              document.documentElement.classList.remove('dark');
+              document.documentElement.style.colorScheme = 'light';
             }
           })();`}
         </Script>
