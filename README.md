@@ -81,4 +81,9 @@ Ultralytics YOLOv12 and OpenCV for the detection server.
 
 ## Team
 
-Diaz, Dugenio, Mangaring, Rubia and Sy. Adviser: Jay Vee L. Capiral.
+Diaz, Roland Federic D.,
+Dugenio, Brian James A.,
+Mangaring, Joyce Lyn E.,
+Rubia, Sean Michael R.,
+Sy, Keith Wednesday M.,
+Adviser: Jay Vee L. Capiral.
