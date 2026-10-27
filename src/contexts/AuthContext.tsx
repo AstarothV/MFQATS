@@ -100,7 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           role: metadata?.role || 'customer',
           avatar_url: metadata?.avatarUrl || '',
         },
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     if (error) throw error;
