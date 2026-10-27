@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 
 type Role = 'staff' | 'admin' | 'customer';
-type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'verify-2fa';
+type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'verify-2fa';
 
 type LoginForm = { email: string; password: string; remember: boolean };
 type RegisterForm = { fullName: string; email: string; phone: string; password: string; confirmPassword: string };
@@ -57,9 +57,10 @@ export default function LoginPageClient() {
     setTheme(initialTheme);
     document.documentElement.classList.toggle('dark', initialTheme === 'dark');
 
-    // Check if register tab requested
+    // Check if register tab requested; 'new-password' is where the reset email's link lands
     const tabParam = searchParams?.get('tab');
     if (tabParam === 'register') setTab('register');
+    if (tabParam === 'new-password') setTab('new-password');
   }, [searchParams]);
 
   useEffect(() => {
@@ -109,6 +110,29 @@ export default function LoginPageClient() {
     }
   }
 
+  // The reset link signed the person in for this one purpose; save the new password, then open their home page.
+  async function onNewPassword(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const password = String(form.get('newPassword') || '');
+    if (password.length < 8) { showMessage('error', 'Use at least 8 characters.'); return; }
+    if (password !== String(form.get('confirmNewPassword') || '')) { showMessage('error', 'Passwords do not match'); return; }
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('This reset link has expired or was opened in another browser. Request a new one.');
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      const { data: profileData } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle();
+      showMessage('success', 'Password changed.');
+      router.push(roleRedirect[profileData?.role || 'staff'] || '/staff-dashboard');
+    } catch (error: any) {
+      showMessage('error', error?.message || 'Could not change the password.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onRegister(data: RegisterForm) {
     if (data.password !== data.confirmPassword) {
       showMessage('error', 'Passwords do not match');
@@ -134,8 +158,11 @@ export default function LoginPageClient() {
   async function onForgot(data: ForgotForm) {
     setLoading(true);
     try {
+      // The link comes back to the address in use (localhost or the tunnel), which must be in Supabase's
+      // Redirect URLs. It has to be opened in this same browser: the one-time code is kept in its cookies.
+      const next = encodeURIComponent('/sign-up-login-screen?tab=new-password');
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback?next=/sign-up-login-screen`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
       });
       if (error) throw error;
       setPendingEmail(data.email);
@@ -345,6 +372,39 @@ export default function LoginPageClient() {
                   <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
                     Send Reset Link
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* New password: where the reset email's link lands */}
+            {tab === 'new-password' && (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">Set a New Password</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Choose a new password for your account.</p>
+                </div>
+                <form onSubmit={onNewPassword} className="space-y-4">
+                  <label className="block space-y-1 text-sm text-muted-foreground">
+                    New password
+                    <div className="relative mt-1">
+                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input name="newPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-9 pr-10" placeholder="Min 8 characters" />
+                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={showPass ? 'Hide password' : 'Show password'}>
+                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </label>
+                  <label className="block space-y-1 text-sm text-muted-foreground">
+                    Confirm new password
+                    <div className="relative mt-1">
+                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <input name="confirmNewPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-9" placeholder="Repeat password" />
+                    </div>
+                  </label>
+                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                    Save New Password
                   </button>
                 </form>
               </div>
