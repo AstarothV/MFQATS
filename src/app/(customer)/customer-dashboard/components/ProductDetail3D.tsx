@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel } from '@/lib/orders';
-import Icon from '@/components/ui/AppIcon';
 import { Skeleton, SkeletonRegion } from '@/components/ui/LoadingSkeleton';
 
 

@@ -6,7 +6,6 @@ import { Download, Loader2, CheckCircle2, AlertTriangle, BarChart3, Package, Rot
 import { createClient } from '@/lib/supabase/client';
 import { isProcessStage, statusLabel } from '@/lib/orders';
 import { defectRate, fetchInspectionCounts, type InspectionCounts } from '@/lib/inspections';
-import Icon from '@/components/ui/AppIcon';
 import { SkeletonRegion, ReportCardsSkeleton } from '@/components/ui/LoadingSkeleton';
 
 

@@ -2,7 +2,8 @@ import { imageHosts } from './image-hosts.config.mjs';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  productionBrowserSourceMaps: true,
+  // off: browser source maps slowed every build and published the app's source code
+  productionBrowserSourceMaps: false,
   distDir: process.env.DIST_DIR || '.next',
   typescript: {
     ignoreBuildErrors: true,
@@ -28,13 +29,8 @@ const nextConfig = {
       dev: dev
     }
   ) {
-    config.module.rules.push({
-      test: /\.(jsx|tsx)$/,
-      exclude: [/node_modules/],
-      use: [{
-        loader: '@dhiwise/component-tagger/nextLoader',
-      }],
-    });
+    // (The website builder's @dhiwise/component-tagger loader ran here on every .jsx/.tsx file, adding 7 data-component-*
+    // attributes to every element of every page. Removed: nothing reads them, and they slowed compiles.)
     if (dev) {
       const ignoredPaths = (process.env.WATCH_IGNORED_PATHS || '')
         .split(',')

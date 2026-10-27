@@ -1,7 +1,6 @@
 'use client';
 import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Info, X, UserPlus, Eye } from 'lucide-react';
-import Icon from '@/components/ui/AppIcon';
 
 
 const initialAlerts = [
