@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requestOrigin } from '@/lib/requestOrigin';
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = requestOrigin(request);
   const code = searchParams.get('code');
   const wanted = searchParams.get('next') ?? '/';
   const next = wanted.startsWith('/') && !wanted.startsWith('//') ? wanted : '/';
