@@ -123,7 +123,8 @@ export function SurfaceResultView({ result, caption, showMap = true }: { result:
   );
 }
 
-export default function SurfacePanel({ apiUrl }: { apiUrl: string }) {
+// onResult: tells the page the verdict, for the Results step
+export default function SurfacePanel({ apiUrl, onResult }: { apiUrl: string; onResult?: (r: SurfaceResponse) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [unit, setUnit] = useState('mm');
   const [toleranceMm, setToleranceMm] = useState('2');
@@ -159,6 +160,7 @@ export default function SurfacePanel({ apiUrl }: { apiUrl: string }) {
         throw new Error(typeof body?.detail === 'string' ? body.detail : `Surface check failed (HTTP ${res.status})`);
       }
       setResult(body);
+      onResult?.(body);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Surface check failed.');
     } finally {

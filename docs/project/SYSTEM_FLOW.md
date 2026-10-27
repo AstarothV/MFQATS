@@ -44,10 +44,12 @@ Detect Defects → Results → Recommendation. **Delivered** and **Cancelled** a
 
 ### 3. Upload (stage 1)
 - Staff open **Order Workflow** and move the order to **Upload**.
-- They take the inspection photos of the finished piece. The photos are used by the panels in the next stages.
+- On **Quality Scan**, they choose the order and take the inspection photos in step **① Upload** (front, left,
+  back, right, top, bottom). The page has one step per stage, and the same photos are used by the 3D model and the
+  defect scan.
 
 ### 4. 3D Reconstruction (stage 2)
-In **Quality Scan**, staff choose the order at the top of the page and use the 3D panels:
+In Quality Scan step **② 3D Reconstruction** (and the size check in step ③), staff use these tools:
 
 | Panel | What it does | Needs the printed marker? |
 |---|---|---|

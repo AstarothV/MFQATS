@@ -128,12 +128,23 @@ Open the **same `https://` link**.
 
 Same steps as **B**, using the same `https://` link.
 
-### E. 3D Model panel (any device)
+### E. Quality Scan steps (any device)
 
-On **Quality Scan**, scroll to **3D Model**. Select an **order** at the top first so the real measurements show.
+On **Quality Scan**, choose an **order** at the top. The page opens on the step the order is at; the step bar at the top
+switches steps, and **Back / Next** move one step at a time.
 
 | # | Test | Expected result |
 |---|---|---|
+| E1 | **① Upload:** in **Front** tap **Camera** (or **Photos**), then add more sides, Top and Bottom included | Each photo fills its slot, with an ✕ to remove it; the bar shows "N of 6 photos" |
+| E2 | **② 3D Reconstruction → 3D Model → Build 3D model** | It uses the Upload photos (no new photos asked); about a minute later a colored model appears |
+| E3 | On the model, tap **Colors / Shape**, **⤢**, and look at **Real size** | Switches instantly; full screen; length / width / height marked *(measured)* or *(ordered)* |
+| E4 | **③ Detect Defects → Upload photos**, tap a photo | Boxes and a PASS/FAIL badge; "Found on this picture" lists the defects |
+| E5 | **③ → Size check** | Measure Dimensions with the printed marker, as before |
+| E6 | **④ Results → Save results** | "Saved"; then **Move … to Results** appears while the order is at Detect Defects |
+| E7 | **⑤ Recommendation** with the order at Recommendation | Repair advice per defect; **Release for delivery** opens only after a passed scan; **Send back for rework** returns it to Upload |
+| E8 | **Download .glb** on a finished 3D model | File `mfqats-3d-model.glb` saves to the device |
+
+---|---|---|
 | E1 | In the **Front** slot tap **Camera**, take a photo of the whole piece | Photo fills the slot, with an ✕ to remove it |
 | E2 | In another slot tap **Photos**, pick a saved photo | Photo fills the slot |
 | E2b | Add **Top** and **Bottom** photos too | All six photos are used for the model |

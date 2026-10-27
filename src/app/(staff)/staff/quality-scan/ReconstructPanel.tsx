@@ -167,7 +167,8 @@ function ModelViewer({ model, toleranceMm, colorBy }: { model: Model; toleranceM
   );
 }
 
-export default function ReconstructPanel({ apiUrl }: { apiUrl: string }) {
+// onResult: tells the page the dent/warp verdict, for the Results step
+export default function ReconstructPanel({ apiUrl, onResult }: { apiUrl: string; onResult?: (r: SurfaceResponse) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const runRef = useRef(0); // bumps when a run is started or the panel goes away, so an old run stops polling
   const [files, setFiles] = useState<File[]>([]);
@@ -200,7 +201,7 @@ export default function ReconstructPanel({ apiUrl }: { apiUrl: string }) {
         const status = await api<JobStatus>(`${apiUrl}/api/reconstruct/${job}`);
         if (run !== runRef.current) return;
         if (status.status === 'failed') throw new Error(status.error || 'Reconstruction failed.');
-        if (status.status === 'done' && status.result) { setResult(status.result); break; }
+        if (status.status === 'done' && status.result) { setResult(status.result); onResult?.(status.result.surface); break; }
         setProgress({ fraction: 0.1 + 0.9 * status.progress, message: status.message }); // uploads were the first 10%
       }
     } catch (e) {
