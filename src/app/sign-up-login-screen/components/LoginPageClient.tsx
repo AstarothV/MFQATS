@@ -61,6 +61,7 @@ export default function LoginPageClient() {
     const tabParam = searchParams?.get('tab');
     if (tabParam === 'register') setTab('register');
     if (tabParam === 'new-password') setTab('new-password');
+    if (tabParam === 'forgot') setTab('forgot');
   }, [searchParams]);
 
   useEffect(() => {
@@ -158,11 +159,10 @@ export default function LoginPageClient() {
   async function onForgot(data: ForgotForm) {
     setLoading(true);
     try {
-      // The link comes back to the address in use (localhost or the tunnel), which must be in Supabase's
-      // Redirect URLs. It has to be opened in this same browser: the one-time code is kept in its cookies.
-      const next = encodeURIComponent('/sign-up-login-screen?tab=new-password');
+      // The link comes back to /auth/reset on the address in use (localhost or the tunnel), which must be in
+      // Supabase's Redirect URLs. It has to be opened in this same browser: the one-time code is kept in its cookies.
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
-        redirectTo: `${window.location.origin}/auth/callback?next=${next}`,
+        redirectTo: `${window.location.origin}/auth/reset`,
       });
       if (error) throw error;
       setPendingEmail(data.email);
@@ -362,6 +362,11 @@ export default function LoginPageClient() {
                   </button>
                   <h2 className="text-2xl font-bold text-foreground">Reset Password</h2>
                   <p className="text-sm text-muted-foreground mt-1">Enter your email to receive a reset link</p>
+                  {searchParams?.get('expired') && (
+                    <p role="alert" className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
+                      That reset link has expired or was opened in a different browser. Send a new one, then open it in this browser.
+                    </p>
+                  )}
                 </div>
                 <form onSubmit={handleForgot(onForgot)} className="space-y-4">
                   <label className="block space-y-1 text-sm text-muted-foreground">
