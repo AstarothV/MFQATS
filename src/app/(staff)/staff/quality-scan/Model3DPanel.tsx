@@ -1,16 +1,15 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Camera, Images, Loader2, AlertTriangle, Download, X, Maximize2 } from 'lucide-react';
+import { Box, Loader2, AlertTriangle, Download, X, Maximize2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { api, postJson, shrink } from './ReconstructPanel';
+import { PhotoThumbs, type PhotoSet } from './PhotoSet';
 
 // Turns 1–4 photos of a whole piece of furniture into a 3D model (image-to-3D with Hunyuan3D-2mv, see
 // /api/model3d in src/api/yolo_server.py). It looks like the piece but has no real-world scale: measure with the
 // marker panels, view with this one.
 
-// the server's slot order; all six go to the model (the backup used when the free time runs out takes the four sides)
-const VIEWS = ['Front', 'Left', 'Back', 'Right', 'Top', 'Bottom'] as const;
 const POLL_MS = 4000;
 const DIMS = [
   { key: 'length', label: 'Length' },
@@ -66,13 +65,12 @@ async function loadDims(orderId: string): Promise<Dims> {
   return dims;
 }
 
-export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orderId: string }) {
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const libraryRef = useRef<HTMLInputElement>(null);
-  const slotRef = useRef(0);
+// Builds from the order's photos taken in the Upload step (see PhotoSet.tsx).
+export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
+  apiUrl: string; orderId: string; set: PhotoSet; onChangePhotos: () => void;
+}) {
+  const photos = set.photos;
   const runRef = useRef(0); // bumps when a run starts or the panel goes away, so an old run stops polling
-  const [photos, setPhotos] = useState<(File | null)[]>(VIEWS.map(() => null));
-  const [previews, setPreviews] = useState<(string | null)[]>(VIEWS.map(() => null));
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -135,29 +133,8 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
     import('@google/model-viewer'); // registers <model-viewer>; browser-only
     return () => { runRef.current++; };
   }, []);
-  const previewsRef = useRef(previews);
-  previewsRef.current = previews;
-  useEffect(() => () => previewsRef.current.forEach((p) => p && URL.revokeObjectURL(p)), []);
   // the model is held in the browser (a blob URL), so viewing and downloading need no second trip to the server
   useEffect(() => () => { if (modelUrl) URL.revokeObjectURL(modelUrl); }, [modelUrl]);
-
-  function pick(slot: number, from: 'camera' | 'library') {
-    slotRef.current = slot;
-    (from === 'camera' ? cameraRef : libraryRef).current?.click();
-  }
-
-  function onPicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    e.target.value = ''; // so the same photo can be chosen again
-    if (f) setSlot(slotRef.current, f);
-  }
-
-  function setSlot(slot: number, file: File | null) {
-    const old = previews[slot];
-    if (old) URL.revokeObjectURL(old);
-    setPhotos((ps) => ps.map((p, i) => (i === slot ? file : p)));
-    setPreviews((ps) => ps.map((p, i) => (i === slot ? (file ? URL.createObjectURL(file) : null) : p)));
-  }
 
   async function build() {
     const run = ++runRef.current;
@@ -202,53 +179,18 @@ export default function Model3DPanel({ apiUrl, orderId }: { apiUrl: string; orde
   const needsFront = count > 1 && !photos[0]; // several views are built around the front one
 
   return (
-    <div className="card-dark rounded-3xl border border-border p-5 space-y-4">
-      <div>
-        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Box size={16} className="text-accent" /> 3D Model
-        </h3>
-        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
-          Take photos of the whole piece on a plain background: one works, and more sides (top and bottom included) work
-          better. The system turns them into a colored 3D model you can turn, zoom, and view with or without its colors. It
-          is not to scale: use Measure Dimensions for sizes.
-        </p>
-      </div>
-
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPicked} />
-      <input ref={libraryRef} type="file" accept="image/*" className="hidden" onChange={onPicked} />
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {VIEWS.map((view, i) => (
-          <div key={view} className="relative aspect-square overflow-hidden rounded-xl border border-dashed border-border bg-muted">
-            {previews[i] ? (
-              <img src={previews[i]!} alt={`${view} photo`} className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-2">
-                <span className="text-sm font-semibold text-muted-foreground">{view}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => pick(i, 'camera')} disabled={busy} aria-label={`Take ${view.toLowerCase()} photo with the camera`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-                    <Camera size={18} /> Camera
-                  </button>
-                  <button onClick={() => pick(i, 'library')} disabled={busy} aria-label={`Choose ${view.toLowerCase()} photo from photos`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-                    <Images size={18} /> Photos
-                  </button>
-                </div>
-              </div>
-            )}
-            {previews[i] && (
-              <>
-                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-xs text-white">{view}</span>
-                <button
-                  onClick={() => setSlot(i, null)}
-                  disabled={busy}
-                  aria-label={`Remove ${view.toLowerCase()} photo`}
-                  className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white"
-                >
-                  <X size={14} />
-                </button>
-              </>
-            )}
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-border bg-muted/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Uses the Upload photos</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {count === 0 ? 'No photos yet: add them in step 1.' : `${count} of 6 photos. The model is in color and can be shown without its colors. It is not to scale.`}
+            </p>
           </div>
-        ))}
+          <button onClick={onChangePhotos} disabled={busy} className="btn-secondary text-sm">{count === 0 ? 'Add photos' : 'Change photos'}</button>
+        </div>
+        {count > 0 && <div className="mt-3"><PhotoThumbs set={set} /></div>}
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
