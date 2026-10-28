@@ -1,7 +1,6 @@
 import React from 'react';
 import { CheckCircle2, XCircle, AlertTriangle, Clock, Camera } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
-import Icon from '@/components/ui/AppIcon';
 
 
 const feedItems = [

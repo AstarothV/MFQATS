@@ -11,7 +11,6 @@ import Link from 'next/link';
 import PhotoGallery from './PhotoGallery';
 import ProductDetail3D from './ProductDetail3D';
 import OrderStatusTimeline from './OrderStatusTimeline';
-import Icon from '@/components/ui/AppIcon';
 
 
 interface Order {

@@ -1,7 +1,6 @@
 'use client';
 import React, { useState } from 'react';
 import { Play, Camera, Image, HelpCircle, ClipboardCheck, ChevronRight, CheckCircle2, X } from 'lucide-react';
-import Icon from '@/components/ui/AppIcon';
 
 
 interface ModalContent {

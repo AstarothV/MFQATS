@@ -6,7 +6,6 @@ import { AlertTriangle, BarChart3, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { DonutChart, SimpleBarChart } from '@/components/charts/lazy';
-import Icon from '@/components/ui/AppIcon';
 import { SkeletonRegion, StatCardsSkeleton, ChartCardSkeleton } from '@/components/ui/LoadingSkeleton';
 
 

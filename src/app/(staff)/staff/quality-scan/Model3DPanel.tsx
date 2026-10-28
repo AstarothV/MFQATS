@@ -129,10 +129,9 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
     return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
   }, [full]);
 
-  useEffect(() => {
-    import('@google/model-viewer'); // registers <model-viewer>; browser-only
-    return () => { runRef.current++; };
-  }, []);
+  useEffect(() => () => { runRef.current++; }, []);
+  // <model-viewer> (with three.js, the app's largest library) is loaded only once there is a model to show
+  useEffect(() => { if (modelUrl) import('@google/model-viewer'); }, [modelUrl]);
   // the model is held in the browser (a blob URL), so viewing and downloading need no second trip to the server
   useEffect(() => () => { if (modelUrl) URL.revokeObjectURL(modelUrl); }, [modelUrl]);
 
