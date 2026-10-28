@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Heart, ShoppingCart, Star, CheckCircle2, X, Loader2, Package, Minus, Plus, ArrowRight, MapPin, Phone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
+import PhotoSlider from '@/components/ui/PhotoSlider';
 interface Product {
   id: string;
   product_ref: string;
@@ -374,12 +376,12 @@ export default function CustomerShopContent() {
 
   return (
     <div className="space-y-6">
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
+      {toast && createPortal(
+        <div className={`fixed top-4 right-4 z-[70] flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={15} /> : <X size={15} />}
           {toast.message}
         </div>
-      )}
+      , document.body)}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -425,13 +427,7 @@ export default function CustomerShopContent() {
             return (
               <div key={product.id} className="flex h-full flex-col rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition duration-200">
                 <div className="relative">
-                  {product.images?.[0] ? (
-                    <img src={product.images[0]} alt={`${product.name} - handcrafted ${product.material_type} furniture`} className="w-full h-48 object-cover" />
-                  ) : (
-                    <div className="w-full h-48 bg-muted flex items-center justify-center">
-                      <Package size={32} className="text-muted-foreground" />
-                    </div>
-                  )}
+                  <PhotoSlider images={product.images} alt={product.name} className="h-56" onOpen={() => setSelectedProduct(product)} />
                   <button onClick={() => toggleFavorite(product.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-white transition-colors">
                     <Heart size={16} className={favorites.includes(product.id) ? 'text-danger fill-danger' : 'text-muted-foreground'} />
                   </button>
@@ -442,7 +438,9 @@ export default function CustomerShopContent() {
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-foreground text-lg">{product.name}</h3>
+                      <h3 className="font-semibold text-foreground text-lg">
+                        <button type="button" onClick={() => setSelectedProduct(product)} className="text-left hover:text-primary transition-colors">{product.name}</button>
+                      </h3>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.category}</p>
                     </div>
                     <span className="shrink-0 whitespace-nowrap">
@@ -500,6 +498,69 @@ export default function CustomerShopContent() {
           })}
         </div>
       )}
+
+      {/* Product details: all photos, size and price */}
+      {selectedProduct && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setSelectedProduct(null)}>
+          <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl border border-border bg-card p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-foreground">{selectedProduct.name}</h2>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">{selectedProduct.category} · {selectedProduct.material_type}</p>
+              </div>
+              <button type="button" aria-label="Close" onClick={() => setSelectedProduct(null)} className="btn-ghost p-2"><X size={18} /></button>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="overflow-hidden rounded-2xl">
+                <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-72 md:h-80" thumbs />
+              </div>
+              <div className="space-y-4 text-sm">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold text-foreground">{peso(selectedProduct.price)}</span>
+                  {selectedProduct.original_price > selectedProduct.price && (
+                    <span className="text-muted-foreground line-through">{peso(selectedProduct.original_price)}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <StatusBadge variant={getAvailabilityVariant(selectedProduct.availability)} label={getAvailabilityLabel(selectedProduct.availability)} />
+                  <span className="flex items-center gap-1">
+                    <Star size={14} className="text-warning fill-warning" />
+                    <span className="font-semibold text-foreground">{selectedProduct.rating}</span>
+                    <span className="text-xs text-muted-foreground">({selectedProduct.review_count} reviews)</span>
+                  </span>
+                </div>
+                <p className="text-muted-foreground">{selectedProduct.description}</p>
+                <div className="rounded-xl border border-border bg-muted p-3 space-y-1">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Size</span>
+                    <span className="font-semibold text-foreground">{selectedProduct.length_cm}L × {selectedProduct.width_cm}W × {selectedProduct.height_cm}H cm</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Lead time</span>
+                    <span className="font-semibold text-foreground">{selectedProduct.estimated_production_days} days</span>
+                  </div>
+                  {Object.entries(selectedProduct.specifications).map(([k, v]) => (
+                    <div key={k} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
+                      <span className="font-semibold text-foreground text-right">{v}</span>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  disabled={selectedProduct.availability === 'out_of_stock'}
+                  onClick={() => addToCart(selectedProduct)}
+                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <ShoppingCart size={16} />
+                  {selectedProduct.availability === 'out_of_stock' ? 'Out of Stock'
+                    : cart.some(i => i.product.id === selectedProduct.id) ? 'Add another' : 'Add to Cart'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      , document.body)}
     </div>
   );
 }

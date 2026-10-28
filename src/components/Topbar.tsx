@@ -264,7 +264,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             className="glass-menu absolute right-3 top-[76px] w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-gradient-to-r from-primary/15 via-background to-background p-5 border-b border-border/60">
+            <div className="bg-gradient-to-r from-primary/15 to-transparent p-5 border-b border-border/60">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Profile</p>
@@ -278,7 +278,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             </div>
 
             <div className="p-5 space-y-4">
-              <div className="rounded-2xl border border-border bg-background p-4">
+              <div className="rounded-2xl border border-border bg-foreground/5 p-4">
                 <div className="flex items-center gap-3">
                   <div className="w-14 h-14 rounded-full overflow-hidden bg-primary flex items-center justify-center shrink-0">
                     {profileImage ? (

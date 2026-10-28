@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
+import PhotoSlider from '@/components/ui/PhotoSlider';
 interface Product {
   id: string;
   product_ref: string;
@@ -301,18 +302,12 @@ export default function CatalogContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
           {products.map((product) => (
             <div key={product.id} className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition duration-200">
-              <div className="relative h-44 bg-muted overflow-hidden">
-                {product.images?.[0] ? (
-                  <img src={product.images[0]} alt={`${product.name} - ${product.material_type} furniture product`} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex items-center justify-center h-full">
-                    <Package size={32} className="text-muted-foreground" />
-                  </div>
-                )}
-                <StatusBadge
+              <div className="relative overflow-hidden">
+                <PhotoSlider images={product.images || []} alt={product.name} className="h-44" />
+                <span className="absolute top-3 left-3"><StatusBadge
                   variant={availabilityVariant(product.availability)}
                   label={product.availability.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                />
+                /></span>
               </div>
               <div className="p-4">
                 <div className="mb-2">
@@ -467,8 +462,10 @@ export default function CatalogContent() {
               <h2 className="text-xl font-bold text-foreground">{selectedProduct.name}</h2>
               <button type="button" onClick={() => setModal(null)} className="btn-ghost p-2"><X size={18} /></button>
             </div>
-            {selectedProduct.images?.[0] && (
-              <img src={selectedProduct.images[0]} alt={`${selectedProduct.name} product image`} className="w-full h-48 object-cover rounded-2xl mb-4" />
+            {selectedProduct.images?.length > 0 && (
+              <div className="mb-4 overflow-hidden rounded-2xl">
+                <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-64" thumbs />
+              </div>
             )}
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-3">
