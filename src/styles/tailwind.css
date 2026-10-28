@@ -367,3 +367,8 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
   }
 }
+/* Full-screen overlays (modals, menu backdrops) often sit inside a space-y-* page wrapper, whose child margin pushed
+   them down and left an undimmed strip at the top of the screen. */
+.fixed.inset-0 {
+  margin: 0 !important;
+}
