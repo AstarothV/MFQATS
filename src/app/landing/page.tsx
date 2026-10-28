@@ -19,17 +19,17 @@ const featuredProducts = [
 {
   name: 'Oak Dining Table',
   category: 'Tables',
-  price: 78100,
-  image: 'https://img.rocket.new/generatedImages/rocket_gen_img_13d329e25-1772441226671.png',
-  alt: 'Solid oak dining table with curved legs and natural wood grain finish',
+  price: 24500,
+  image: 'https://www.ikea.com/us/en/images/products/moerbylanga-table-oak-veneer-brown-stained__0737108_pe740890_s5.jpg',
+  alt: 'Solid oak dining table with sturdy frame legs and natural wood grain finish',
   rating: 4.8,
   reviews: 24
 },
 {
   name: 'Walnut Bookshelf',
   category: 'Storage',
-  price: 56100,
-  image: 'https://img.rocket.new/generatedImages/rocket_gen_img_17c6d1e91-1772199203166.png',
+  price: 11900,
+  image: 'https://www.ikea.com/us/en/images/products/hemnes-bookcase-black-brown-light-brown__1590299_pe1038938_s5.jpg',
   alt: 'Modern walnut bookshelf with five adjustable shelves and minimalist design',
   rating: 4.6,
   reviews: 18
@@ -37,17 +37,17 @@ const featuredProducts = [
 {
   name: 'Cherry Coffee Table',
   category: 'Tables',
-  price: 41000,
-  image: 'https://img.rocket.new/generatedImages/rocket_gen_img_164fe4caf-1764651052330.png',
-  alt: 'Cherry wood coffee table with hidden storage compartment and tapered legs',
+  price: 8500,
+  image: 'https://www.ikea.com/us/en/images/products/jakobsfors-coffee-table-dark-brown-stained-oak-veneer__1108164_pe869323_s5.jpg',
+  alt: 'Round cherry wood coffee table with a lower shelf and angled legs',
   rating: 4.7,
   reviews: 31
 },
 {
   name: 'Cherry Bed Frame',
   category: 'Beds',
-  price: 99500,
-  image: "https://img.rocket.new/generatedImages/rocket_gen_img_10dfcefad-1772601618690.png",
+  price: 21500,
+  image: 'https://www.ikea.com/us/en/images/products/malm-bed-frame-dark-brown-veneer__1364772_pe956028_s5.jpg',
   alt: 'Luxury cherrywood bed frame with low-profile rails and reinforced joinery',
   rating: 4.9,
   reviews: 8
@@ -284,8 +284,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredProducts.map((product) =>
             <div key={product.name} className="rounded-3xl border border-border bg-card overflow-hidden hover:shadow-lg transition duration-200 group">
-                <div className="relative overflow-hidden h-48">
-                  <img src={product.image} alt={product.alt} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="relative overflow-hidden h-48 bg-white">
+                  <img src={product.image} alt={product.alt} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
                   <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium text-foreground">
                     {product.category}
                   </div>
