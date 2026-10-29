@@ -51,7 +51,7 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   if (res.redirected || (res.ok && !isJson)) throw new Error('Your session has expired. Please log in again.');
   const body = isJson ? await res.json().catch(() => null) : null;
   if (!res.ok) {
-    if (!body && res.status >= 500) throw new Error(SERVER_DOWN);
+    if (!body && (res.status === 404 || res.status >= 500)) throw new Error(SERVER_DOWN);
     throw new Error(typeof body?.detail === 'string' ? body.detail : `Reconstruction failed (HTTP ${res.status})`);
   }
   return body;

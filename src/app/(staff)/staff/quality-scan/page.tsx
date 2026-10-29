@@ -85,7 +85,7 @@ async function detectDefects(imageData: string, tiled = true): Promise<DetectRes
   }
   if (!res.ok) {
     const body = isJson ? await res.json().catch(() => null) : null;
-    if (!body && res.status >= 500) throw new BackendOfflineError(); // proxy couldn't reach the Python server
+    if (!body && (res.status === 404 || res.status >= 500)) throw new BackendOfflineError(); // proxy couldn't reach the Python server
     throw new Error(body?.detail || `Detection failed (HTTP ${res.status})`);
   }
   return res.json();

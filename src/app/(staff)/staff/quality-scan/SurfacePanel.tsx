@@ -156,7 +156,7 @@ export default function SurfacePanel({ apiUrl, onResult }: { apiUrl: string; onR
       if (res.redirected || (res.ok && !isJson)) throw new Error('Your session has expired. Please log in again.');
       const body = isJson ? await res.json().catch(() => null) : null;
       if (!res.ok) {
-        if (!body && res.status >= 500) throw new Error('Could not reach the analysis server. Make sure the Python server is running.');
+        if (!body && (res.status === 404 || res.status >= 500)) throw new Error('Could not reach the analysis server. Make sure the Python server is running.');
         throw new Error(typeof body?.detail === 'string' ? body.detail : `Surface check failed (HTTP ${res.status})`);
       }
       setResult(body);
