@@ -142,28 +142,45 @@ steps are in **[DEVICE_TESTING.md](DEVICE_TESTING.md)**.
 
 ### The published website
 
-The published website (on the hosting service) does not run the Python detection server. Every Quality Scan tool sends
-its request to `/staff/yolo/…` on the website, and the website forwards it to the address in the **`YOLO_SERVER_URL`**
-setting. If that setting is empty, the tools say they cannot reach the detection server (before, they showed
-"HTTP 404").
+The website is published on **Vercel**. Vercel does not run the Python detection server: that stays on the group's
+laptop.
+- Every Quality Scan tool sends its request to `/staff/yolo/…` on the website.
+- The website forwards it to the address in the **`YOLO_SERVER_URL`** setting.
+- The laptop is reached through **Tailscale Funnel**, which gives it a fixed https address.
+- If the setting is empty or the laptop is off, the tools say they cannot reach the detection server.
 
-To connect the published website to the detection server on the group's laptop:
+**One-time setup** (done by the laptop owner and the Vercel project owner):
+1. Make a free account at tailscale.com and install Tailscale on the laptop. Sign in.
+2. Start the detection server (Terminal 1 above). In another terminal, run:
+   ```
+   tailscale funnel 8000
+   ```
+   The first time, it gives a link for turning on **HTTPS** and **Funnel** for your account; open it and allow both.
+   Then it prints the laptop's address, e.g. `https://mvca-laptop.tail1234.ts.net`. **This address never changes.**
+3. On vercel.com, open the MFQATS project → **Settings → Environment Variables**. Add `YOLO_SERVER_URL` with that
+   address as the value (no `/` at the end), for **Production**. Save.
+4. **Redeploy**: **Deployments** → **⋯** on the latest one → **Redeploy**. The address is read when the site is built,
+   so saving the setting alone does nothing.
+5. In Supabase → **Authentication → URL Configuration**, add the Vercel address as `https://<the-site>.vercel.app/**`
+   under **Redirect URLs**, so password reset links work on the published site.
 
-1. Start the detection server (Terminal 1 above).
-2. In another terminal, open a tunnel to it:
-   ```
-   cloudflared tunnel --url http://localhost:8000
-   ```
-   It prints an address like `https://something-random.trycloudflare.com`.
-3. In the hosting service's project settings, open **Environment Variables**. Set `YOLO_SERVER_URL` to that address,
-   with no `/` at the end.
-4. **Redeploy** the website. The address is read when the site is built, so changing the setting alone does nothing.
+**Every time the tools should work on the published site**, run on the laptop:
+
+| Terminal | Command |
+|---|---|
+| 1. Detection server | `.\.venv\Scripts\activate` then `uvicorn src.api.yolo_server:app --port 8000 --env-file .env` |
+| 2. Local 3D server (only for the unlimited 3D model) | `.venv-hunyuan\Scripts\python.exe -m uvicorn src.api.hunyuan_local:app --port 8001` |
+| 3. Funnel | `tailscale funnel 8000` (or `tailscale funnel --bg 8000` to keep it on in the background) |
+
+`npm run dev` is **not** needed for the published site: Vercel runs the website.
 
 Keep in mind:
-- The tools only work while the laptop, the detection server and the tunnel are running.
-- A quick tunnel gets a **new address every time** it starts, so steps 3 and 4 must be repeated. For an address that
-  never changes, use a named Cloudflare tunnel (needs a domain) or host the detection server online.
-- Anyone who finds the tunnel address can call the detection server directly, so don't post it publicly.
+- **The laptop must stay on.** The tools only work while the laptop, the detection server and the funnel are
+  running, so turn off sleep. The rest of the site (logins, shop, orders, dashboards) works without it.
+- **Publishing:** every merge into `main` on GitHub publishes the website automatically. Only the Vercel project owner
+  can change settings.
+- **Keep the funnel address private.** Anyone who has it can use the detection server, including the free daily 3D
+  model time.
 
 ---
 
