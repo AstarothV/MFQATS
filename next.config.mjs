@@ -1,12 +1,5 @@
 import { imageHosts } from './image-hosts.config.mjs';
 
-// YOLO_SERVER_URL is pasted by hand into the hosting site's settings: tolerate spaces/line breaks, a missing https://
-// and a trailing /. new URL() stops the build with a clear error if it still isn't an address.
-const rawYoloServer = (process.env.YOLO_SERVER_URL || '').trim().replace(/\/+$/, '');
-const yoloServer = !rawYoloServer ? 'http://localhost:8000'
-  : /^https?:\/\//i.test(rawYoloServer) ? rawYoloServer : `https://${rawYoloServer}`;
-console.log(`Quality Scan tools (/staff/yolo) -> detection server at ${new URL(yoloServer).host}`);
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // off: browser source maps slowed every build and published the app's source code
@@ -22,14 +15,7 @@ const nextConfig = {
     remotePatterns: imageHosts,
     minimumCacheTTL: 60,
   },
-  async rewrites() {
-    // Browser -> this site (/staff/yolo/...) -> Python YOLO server. Same origin, so it also works from phones
-    // over an https tunnel. Under /staff so the middleware only lets logged-in staff reach the AI server.
-    return [{
-      source: '/staff/yolo/:path*',
-      destination: `${yoloServer}/:path*`,
-    }];
-  },
+  // The Quality Scan tools reach the Python detection server through src/app/(staff)/staff/yolo/[...path]/route.ts.
   webpack(
     config,
     {

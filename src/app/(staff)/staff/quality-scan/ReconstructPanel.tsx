@@ -60,13 +60,13 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
 export const postJson = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // Photo file -> JPEG data URL, scaled down so uploads stay small.
-export function shrink(file: File): Promise<string> {
+export function shrink(file: File, maxPx = MAX_PHOTO_PX): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-      const scale = Math.min(1, MAX_PHOTO_PX / Math.max(img.naturalWidth, img.naturalHeight));
+      const scale = Math.min(1, maxPx / Math.max(img.naturalWidth, img.naturalHeight));
       const canvas = document.createElement('canvas');
       canvas.width = Math.round(img.naturalWidth * scale);
       canvas.height = Math.round(img.naturalHeight * scale);
