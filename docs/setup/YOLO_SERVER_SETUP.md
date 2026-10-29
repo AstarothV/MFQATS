@@ -140,6 +140,31 @@ Press **Ctrl + C** in each terminal.
 Phones only allow the camera on `https://` pages, so they need a free Cloudflare tunnel (a third terminal). The full
 steps are in **[DEVICE_TESTING.md](DEVICE_TESTING.md)**.
 
+### The published website
+
+The published website (on the hosting service) does not run the Python detection server. Every Quality Scan tool sends
+its request to `/staff/yolo/…` on the website, and the website forwards it to the address in the **`YOLO_SERVER_URL`**
+setting. If that setting is empty, the tools say they cannot reach the detection server (before, they showed
+"HTTP 404").
+
+To connect the published website to the detection server on the group's laptop:
+
+1. Start the detection server (Terminal 1 above).
+2. In another terminal, open a tunnel to it:
+   ```
+   cloudflared tunnel --url http://localhost:8000
+   ```
+   It prints an address like `https://something-random.trycloudflare.com`.
+3. In the hosting service's project settings, open **Environment Variables**. Set `YOLO_SERVER_URL` to that address,
+   with no `/` at the end.
+4. **Redeploy** the website. The address is read when the site is built, so changing the setting alone does nothing.
+
+Keep in mind:
+- The tools only work while the laptop, the detection server and the tunnel are running.
+- A quick tunnel gets a **new address every time** it starts, so steps 3 and 4 must be repeated. For an address that
+  never changes, use a named Cloudflare tunnel (needs a domain) or host the detection server online.
+- Anyone who finds the tunnel address can call the detection server directly, so don't post it publicly.
+
 ---
 
 ## Checking the detection server

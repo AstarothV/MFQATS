@@ -115,7 +115,7 @@ export default function MeasurePanel({ apiUrl, orderId, showToast }: Props) {
     if (res.redirected || (res.ok && !isJson)) throw new Error('Your session has expired. Please log in again.');
     const body = isJson ? await res.json().catch(() => null) : null;
     if (!res.ok) {
-      if (!body && res.status >= 500) throw new Error('Could not reach the measurement server. Make sure the Python server is running.');
+      if (!body && (res.status === 404 || res.status >= 500)) throw new Error('Could not reach the measurement server. Make sure the Python server is running.');
       throw new Error(typeof body?.detail === 'string' ? body.detail : `Measurement failed (HTTP ${res.status})`);
     }
     return body;
