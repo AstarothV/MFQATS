@@ -21,7 +21,7 @@ Browser  ──▶  Website (Next.js, port 4028)  ──▶  Detection server (P
 | Program | What it does | Folder |
 |---|---|---|
 | **Website** | Every screen for admin, staff and customers | `src/app/` |
-| **Detection server** | Finds defects in photos (YOLOv12), measures with the marker, builds 3D models, checks for dents and warping | `src/api/` |
+| **Detection server** | Finds defects in photos (YOLOv12) and builds 3D models | `src/api/` |
 
 If the detection server isn't running, the Quality Scan page shows a yellow **"Detection server is offline"** alert.
 Everything else still works.
@@ -129,7 +129,7 @@ Wait for `Ready`, then open **http://localhost:4028** and log in.
 3. **Live Camera → Start Camera → Start Scan** checks the camera about once a second. **Capture & Analyze** freezes a
    frame.
 4. Choose an order at the top, add notes, and click **Save Detection** to store the result.
-5. Scroll down for **Measure Dimensions**, **3D Model**, **3D Reconstruction** and **3D Surface Check**.
+5. Step **② 3D Reconstruction** builds the **3D Model** from the Upload photos.
 
 ### Stopping
 
@@ -206,9 +206,6 @@ only answers these addresses:
 |---|---|
 | `/health` | You, to check the server |
 | `/api/detect` | Defect detection (camera and uploads) |
-| `/api/measure` | Measure Dimensions (the printed marker) |
-| `/api/reconstruct/…` | 3D Reconstruction (photos around a surface) |
-| `/api/surface` | 3D Surface Check (a 3D scan file) |
 | `/api/model3d/…` | 3D Model (photos of the whole piece) |
 
 ---
@@ -308,9 +305,6 @@ Models are trained on **Google Colab** (free GPU) with `train_yolov12n_wood.ipyn
 | Path | What it is |
 |---|---|
 | `src/api/yolo_server.py` | The detection server: every address above, merging the models, severity and recommendation per defect type |
-| `src/api/measure.py` | Marker measurement (PnP) |
-| `src/api/sfm.py` | 3D Reconstruction from photos (SfM) |
-| `src/api/surface.py` | Dent and warp check (RANSAC plane fit) |
 | `src/api/hunyuan_local.py` | The optional local 3D server |
 | `src/api/requirements.txt` | Python packages for the detection server |
 | `src/api/test_*.py` | Self-tests: `python src/api/test_yolo_server.py` should print `ok` |

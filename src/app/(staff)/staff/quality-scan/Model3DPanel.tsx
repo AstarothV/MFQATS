@@ -3,21 +3,25 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Loader2, AlertTriangle, Download, X, Maximize2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { api, postJson, shrink } from './ReconstructPanel';
+import { api, postJson, shrink } from './serverApi';
 import { PhotoThumbs, type PhotoSet } from './PhotoSet';
 
-// Turns 1–4 photos of a whole piece of furniture into a 3D model (image-to-3D with Hunyuan3D-2mv, see
-// /api/model3d in src/api/yolo_server.py). It looks like the piece but has no real-world scale: measure with the
-// marker panels, view with this one.
+// Turns the Upload photos of a whole piece of furniture into a 3D model (TRELLIS, or Hunyuan3D as the fallback; see
+// /api/model3d in src/api/yolo_server.py). It looks like the piece but has no real-world scale, so its sizes come from
+// the order.
 
 const POLL_MS = 4000;
+// the dimension lines, each from the front-bottom corner hotspot to the end of one edge (see dimPoints below)
+const LINES = [['dim-l', 'dim-o'], ['dim-o', 'dim-h'], ['dim-o', 'dim-w']] as const;
 const DIMS = [
   { key: 'length', label: 'Length' },
   { key: 'width', label: 'Width' },
   { key: 'height', label: 'Height' },
 ] as const;
-type Dims = Record<(typeof DIMS)[number]['key'], { cm: number; measured: boolean } | null>;
+type Dims = Record<(typeof DIMS)[number]['key'], { cm: number } | null>;
 const NO_DIMS: Dims = { length: null, width: null, height: null };
+
+type V3 = { x: number; y: number; z: number };
 
 // <model-viewer> is a web component, so React's JSX types have to be told about it (this needs a namespace)
 declare module 'react' {
@@ -30,6 +34,8 @@ declare module 'react' {
         alt?: string;
         'camera-controls'?: boolean;
         'auto-rotate'?: boolean;
+        'camera-orbit'?: string;
+        'max-camera-orbit'?: string;
         'shadow-intensity'?: string;
         'environment-image'?: string;
         exposure?: string;
@@ -47,27 +53,24 @@ interface TaskStatus {
   note: string | null; // e.g. colors were asked for but only the shape could be built
 }
 
-// The real size of the piece, since the 3D model itself is not to scale: the latest saved measurement of each
-// dimension for the order (Measure Dimensions), else the size the product was ordered in.
+// The real size of the piece, since the 3D model itself is not to scale: the size of the product the customer
+// ordered, the same length × width × height the shop shows.
 async function loadDims(orderId: string): Promise<Dims> {
   const supabase = createClient();
-  const [{ data: rows }, { data: order }] = await Promise.all([
-    supabase.from('measurements').select('length_cm, width_cm, height_cm').eq('order_id', orderId).order('created_at', { ascending: false }).limit(20),
-    supabase.from('orders').select('products(length_cm, width_cm, height_cm)').eq('id', orderId).maybeSingle(),
-  ]);
+  const { data: order } = await supabase.from('orders').select('products(length_cm, width_cm, height_cm)').eq('id', orderId).maybeSingle();
   const product: any = Array.isArray(order?.products) ? order?.products[0] : order?.products;
   const dims = { ...NO_DIMS };
   for (const { key } of DIMS) {
-    const measured = rows?.map((r: any) => Number(r[`${key}_cm`])).find((v) => v > 0);
-    const ordered = Number(product?.[`${key}_cm`]);
-    dims[key] = measured ? { cm: measured, measured: true } : ordered > 0 ? { cm: ordered, measured: false } : null;
+    const cm = Number(product?.[`${key}_cm`]);
+    dims[key] = cm > 0 ? { cm } : null;
   }
   return dims;
 }
 
 // Builds from the order's photos taken in the Upload step (see PhotoSet.tsx).
-export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
+export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos, onModel }: {
   apiUrl: string; orderId: string; set: PhotoSet; onChangePhotos: () => void;
+  onModel?: (url: string | null) => void; // the finished model, for Detect Defects to show the defects on
 }) {
   const photos = set.photos;
   const runRef = useRef(0); // bumps when a run starts or the panel goes away, so an old run stops polling
@@ -81,6 +84,9 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
   const [colored, setColored] = useState(false); // the finished model has colors (so it can be shown with or without)
   const [showColors, setShowColors] = useState(true);
   const viewerRef = useRef<any>(null);
+  const [showDims, setShowDims] = useState(true);
+  const [bounds, setBounds] = useState<{ c: V3; s: V3 } | null>(null); // the loaded model's bounding box
+  const lineRefs = useRef<(SVGLineElement | null)[]>([]);
   // each material's own color picture, kept so "Shape" can take it off and "Colors" put it back without rebuilding
   const savedColors = useRef<{ texture: any; factor: number[] }[] | null>(null);
 
@@ -103,10 +109,31 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
         factor: [...m.pbrMetallicRoughness.baseColorFactor],
       }));
       paint(showColorsRef.current);
+      setBounds({ c: viewer.getBoundingBoxCenter(), s: viewer.getDimensions() });
     };
     viewer.addEventListener('load', onLoad);
-    return () => viewer.removeEventListener('load', onLoad);
+    viewer.addEventListener('camera-change', drawLines);
+    return () => { viewer.removeEventListener('load', onLoad); viewer.removeEventListener('camera-change', drawLines); };
   }, [modelUrl]);
+
+  // The three dimension lines follow the model: their ends are hotspots, and each line is redrawn between where
+  // those hotspots are on screen whenever the camera moves.
+  function drawLines() {
+    const viewer = viewerRef.current;
+    LINES.forEach(([a, b], i) => {
+      const line = lineRefs.current[i];
+      const p = viewer?.queryHotspot?.(`hotspot-${a}`)?.canvasPosition, q = viewer?.queryHotspot?.(`hotspot-${b}`)?.canvasPosition;
+      if (!line || !p || !q) return;
+      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y); line.setAttribute('x2', q.x); line.setAttribute('y2', q.y);
+    });
+  }
+  // the hotspots exist only after a render, and full screen changes the size: redraw on the next frames too
+  useEffect(() => {
+    let frames = 0, id = 0;
+    const tick = () => { drawLines(); if (++frames < 10) id = requestAnimationFrame(tick); };
+    id = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(id);
+  }, [bounds, showDims, full]);
   const showColorsRef = useRef(showColors);
   showColorsRef.current = showColors;
   useEffect(() => { paint(showColors); }, [showColors]);
@@ -134,6 +161,7 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
   useEffect(() => { if (modelUrl) import('@google/model-viewer'); }, [modelUrl]);
   // the model is held in the browser (a blob URL), so viewing and downloading need no second trip to the server
   useEffect(() => () => { if (modelUrl) URL.revokeObjectURL(modelUrl); }, [modelUrl]);
+  useEffect(() => { onModel?.(modelUrl); }, [modelUrl]);
 
   async function build() {
     const run = ++runRef.current;
@@ -144,6 +172,7 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
     setNote(null);
     setColored(false);
     setShowColors(true);
+    setBounds(null);
     savedColors.current = null;
     setProgress('Uploading photos');
     try {
@@ -176,6 +205,20 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
   }
 
   const count = photos.filter(Boolean).length;
+  let dimPoints: Record<string, string> = {};
+  if (bounds) {
+    const { c, s } = bounds, g = Math.max(s.x, s.y, s.z) * 0.04;
+    const x0 = c.x - s.x / 2, x1 = c.x + s.x / 2, y0 = c.y - s.y / 2 - g, y1 = c.y + s.y / 2, z0 = c.z - s.z / 2, z1 = c.z + s.z / 2 + g;
+    const pt = (x: number, y: number, z: number) => `${x}m ${y}m ${z}m`;
+    dimPoints = {
+      'dim-o': pt(x1 + g, y0, z1), 'dim-l': pt(x0, y0, z1), 'dim-h': pt(x1 + g, y1, z1), 'dim-w': pt(x1 + g, y0, z0),
+      'lab-length': pt(c.x, y0, z1), 'lab-height': pt(x1 + g, c.y, z1), 'lab-width': pt(x1 + g, y0, c.z),
+    };
+  }
+  const dimText = (key: (typeof DIMS)[number]['key'], label: string) => {
+    const d = dims[key];
+    return d ? `${label[0]} ${d.cm.toFixed(1)} cm` : label;
+  };
   const needsFront = count > 1 && !photos[0]; // several views are built around the front one
 
   return (
@@ -236,19 +279,37 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
               alt="3D model of the furniture. Drag to turn it."
               camera-controls
               auto-rotate
+              camera-orbit="0deg 75deg 130%"
+              max-camera-orbit="auto auto 300%"
               shadow-intensity="1"
               environment-image="neutral"
               exposure="1.3"
               style={{ width: '100%', height: full ? '100%' : 480, background: '#0b0b0f', borderRadius: full ? 0 : 12 }}
-            />
-            {DIMS.some(({ key }) => dims[key]) && (
-              <div className="pointer-events-none absolute left-3 top-3 rounded-xl bg-black/70 px-3 py-2 text-xs text-white">
-                <p className="mb-1 font-semibold uppercase tracking-wider text-white/70">Real size</p>
+            >
+              {bounds && showDims && (
+                <>
+                  <svg className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden="true">
+                    {LINES.map((_, i) => (
+                      <line key={i} ref={(el) => { lineRefs.current[i] = el; }} stroke="#fff" strokeWidth={2} strokeDasharray="1 0" strokeLinecap="round" />
+                    ))}
+                  </svg>
+                  {Object.entries(dimPoints).filter(([name]) => name.startsWith('dim-')).map(([name, pos]) => (
+                    <div key={`${name}${pos}`} slot={`hotspot-${name}`} data-position={pos} className="pointer-events-none h-0 w-0" />
+                  ))}
+                  {DIMS.map(({ key, label }) => (
+                    <div key={`${key}${dimPoints[`lab-${key}`]}`} slot={`hotspot-lab-${key}`} data-position={dimPoints[`lab-${key}`]}
+                      className="pointer-events-none whitespace-nowrap rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-[#1F1A2B] shadow">
+                      {dimText(key, label)}
+                    </div>
+                  ))}
+                </>
+              )}
+            </model-viewer>
+            {!showDims && DIMS.some(({ key }) => dims[key]) && (
+              <div className="pointer-events-none absolute left-3 top-16 rounded-xl bg-black/70 px-3 py-2 text-xs text-white">
+                <p className="mb-1 font-semibold uppercase tracking-wider text-white/70">Ordered size</p>
                 {DIMS.map(({ key, label }) => dims[key] && (
-                  <p key={key}>
-                    {label}: <span className="font-semibold">{dims[key]!.cm.toFixed(1)} cm</span>{' '}
-                    <span className="text-white/60">({dims[key]!.measured ? 'measured' : 'ordered'})</span>
-                  </p>
+                  <p key={key}>{label}: <span className="font-semibold">{dims[key]!.cm.toFixed(1)} cm</span></p>
                 ))}
               </div>
             )}
@@ -269,6 +330,15 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
                 ))}
               </div>
             )}
+            <div role="group" aria-label="Show on the model" className="absolute left-3 top-3 flex flex-wrap gap-1 rounded-xl bg-black/70 p-1">
+              <button
+                onClick={() => setShowDims(!showDims)}
+                aria-pressed={showDims}
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${showDims ? 'bg-primary text-primary-foreground' : 'text-white/70 hover:text-white'}`}
+              >
+                Dimensions
+              </button>
+            </div>
             <button
               onClick={() => setFull(!full)}
               aria-label={full ? 'Exit full screen' : 'Show the 3D model in full screen'}
@@ -277,7 +347,12 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
               {full ? <X size={18} /> : <Maximize2 size={16} />}
             </button>
           </div>
-          {!orderId && <p className="text-xs text-muted-foreground">Select an order at the top to show the piece&apos;s real measurements on the model.</p>}
+          {!orderId && <p className="text-xs text-muted-foreground">Select an order at the top to show the size the customer ordered on the model.</p>}
+          {showDims && orderId && (
+            <p className="text-xs text-muted-foreground">
+              The sizes are the ones in the customer&apos;s order (the same as in the shop). The model itself is not to scale; the lines show where each size runs.
+            </p>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">Drag to turn, scroll or pinch to zoom.</p>
             <a href={modelUrl} download="mfqats-3d-model.glb" className="btn-secondary flex items-center gap-2 text-sm">

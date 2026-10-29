@@ -63,8 +63,8 @@ const orderSteps = [
 
 const inspectionStages = [
 { title: 'Upload', desc: 'Photos of the finished piece' },
-{ title: '3D Reconstruction', desc: 'A 3D model of the surface' },
-{ title: 'Detect Defects', desc: 'Cracks, dents, and warping found' },
+{ title: '3D Reconstruction', desc: 'A 3D model of the piece' },
+{ title: 'Detect Defects', desc: 'Cracks, knots and holes found' },
 { title: 'Results', desc: 'Pass or fail against tolerance' },
 { title: 'Recommendation', desc: 'Rework steps if anything fails' }];
 
@@ -361,11 +361,11 @@ export default function LandingPage() {
                   Inspected Before It Reaches You
                 </h2>
                 <p className="text-muted-foreground mb-6">
-                  Every piece goes through our inspection process before delivery. We scan it for surface defects,
-                  build a 3D model to check for dents and warping, and measure it against the size you ordered.
+                  Every piece goes through our inspection process before delivery. We scan every side for surface
+                  defects and build a 3D model of the piece, with its size and anything found marked on it.
                 </p>
                 <ul className="space-y-3 mb-8">
-                  {['Defect detection for cracks, knots, and finish flaws', '3D surface check for dents and warping', 'Measured against your ordered dimensions', 'Follow each inspection stage from your dashboard'].map((feat) =>
+                  {['Defect detection for cracks, knots, and finish flaws', 'A 3D model of your piece, with the size you ordered', 'Every side checked before delivery', 'Follow each inspection stage from your dashboard'].map((feat) =>
                   <li key={feat} className="flex items-center gap-3 text-sm text-foreground">
                       <CheckCircle2 size={16} className="text-success shrink-0" />
                       {feat}

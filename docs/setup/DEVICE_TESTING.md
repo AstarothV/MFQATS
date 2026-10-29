@@ -136,11 +136,11 @@ switches steps, and **Back / Next** move one step at a time.
 | # | Test | Expected result |
 |---|---|---|
 | E1 | **① Upload:** in **Front** tap **Camera** (or **Photos**), then add more sides, Top and Bottom included | Each photo fills its slot, with an ✕ to remove it; the bar shows "N of 6 photos" |
-| E2 | **② 3D Reconstruction → 3D Model → Build 3D model** | It uses the Upload photos (no new photos asked); about a minute later a colored model appears |
-| E3 | On the model, tap **Colors / Shape**, **⤢**, and look at **Real size** | Switches instantly; full screen; length / width / height marked *(measured)* or *(ordered)* |
-| E4 | **③ Detect Defects → Upload photos**, tap a photo | Boxes and a PASS/FAIL badge; "Found on this picture" lists the defects |
-| E5 | **③ → Size check** | Measure Dimensions with the printed marker, as before |
-| E6 | **④ Results → Save results** | "Saved"; then **Move … to Results** appears while the order is at Detect Defects |
+| E2 | **② 3D Reconstruction → Build 3D model** | It uses the Upload photos (no new photos asked); about a minute later a colored model appears |
+| E3 | On the model, tap **Dimensions**, **Colors / Shape** and **⤢** | Length / width / height lines with the order's sizes; colors switch instantly; full screen |
+| E4 | **③ Detect Defects → Scan all sides** (or tap one photo) | Each Upload photo is scanned; "Found on this picture" lists the defects |
+| E5 | **② → Defect pins** and **Edit mode** after scanning | Pins on the sides where defects were found; edit mode shows the surface grid with the defect faces painted |
+| E6 | **④ Results** | The verdict for every side, and the **Defects by side** grid; tap a side to see it larger. **Save results** saves all sides as one scan |
 | E7 | **⑤ Recommendation** with the order at Recommendation | Repair advice per defect; **Release for delivery** opens only after a passed scan; **Send back for rework** returns it to Upload |
 | E8 | **Download .glb** on a finished 3D model | File `mfqats-3d-model.glb` saves to the device |
 
@@ -151,7 +151,7 @@ switches steps, and **Back / Next** move one step at a time.
 | E3 | **Build 3D model** | Progress bar, then a **colored** 3D model you can drag to turn and pinch to zoom (about 1 minute) |
 | E3b | Tap **Colors** / **Shape** (bottom left of the model) | Switches between the colored and grey model instantly, without building again. If the free time ran out, a yellow note says the model is the shape only |
 | E4 | Tap **⤢** (top right of the model) | Model fills the screen; ✕ or Esc goes back |
-| E5 | Look at the **Real size** box (top left) | Length / Width / Height in cm, marked *(measured)* or *(ordered)* |
+| E5 | Tap **Dimensions** (top left) with an order chosen | Length / Width / Height lines in cm, the same sizes as the order |
 | E6 | **Download .glb** | File `mfqats-3d-model.glb` saves to the device |
 | E7 | Only with Terminal 4: build again after the free online time is used up | Message "this computer is building it (1 to 5 minutes)", then the model appears |
 

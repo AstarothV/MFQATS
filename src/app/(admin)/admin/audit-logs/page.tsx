@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
 import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -15,6 +15,7 @@ interface AuditLog {
   old_values: any;
   new_values: any;
   ip_address: string;
+  user_agent?: string;
   created_at: string;
   user_profiles?: { full_name: string; email: string; role: string } | null;
 }
@@ -30,8 +31,10 @@ export default function AdminAuditLogsPage() {
   const [total, setTotal] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const shown = useRef(''); // the search/page whose rows are on screen: refreshes of it keep the table in place
   const fetchLogs = useCallback(async () => {
-    setLoading(true);
+    const view = `${search}|${page}`;
+    if (shown.current !== view) setLoading(true);
     let query = supabase
       .from('audit_logs')
       .select('*, user_profiles(full_name, email, role)', { count: 'exact' });
@@ -42,10 +45,17 @@ export default function AdminAuditLogsPage() {
       setLogs(data as AuditLog[]);
       setTotal(count || 0);
     }
+    shown.current = view;
     setLoading(false);
   }, [supabase, search, page]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
+  // new activity appears by itself on the first page; older pages stay still while being read
+  useEffect(() => {
+    if (page !== 0) return;
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') fetchLogs(); }, 10000);
+    return () => clearInterval(timer);
+  }, [fetchLogs, page]);
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -57,6 +67,14 @@ export default function AdminAuditLogsPage() {
     qa_submitted: 'text-success',
     rework_created: 'text-danger',
     order_updated: 'text-info',
+    system_access: 'text-muted-foreground',
+    password_changed: 'text-warning',
+    order_placed: 'text-success',
+    staff_assigned: 'text-accent',
+  };
+  const actionName: Record<string, string> = {
+    user_login: 'Signed in', user_logout: 'Signed out', system_access: 'Opened the system', password_changed: 'Changed password',
+    order_placed: 'Placed an order', stage_update: 'Moved an order', staff_assigned: 'Assigned staff', qa_submitted: 'Saved a defect scan',
   };
 
   return (
@@ -66,7 +84,7 @@ export default function AdminAuditLogsPage() {
           <div>
             <p className="page-eyebrow">Administration</p>
             <h1 className="page-title">Audit Logs</h1>
-            <p className="text-sm text-muted-foreground mt-2">Track all system actions, logins, and data changes.</p>
+            <p className="text-sm text-muted-foreground mt-2">Every sign-in, visit and data change, as it happens. Updates every 10 seconds.</p>
           </div>
           <div className="text-sm text-muted-foreground">{total} total entries</div>
         </div>
@@ -121,7 +139,7 @@ export default function AdminAuditLogsPage() {
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-xs font-semibold ${actionColor[log.action] || 'text-foreground'}`}>
-                            {log.action.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                            {actionName[log.action] || log.action.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize">
@@ -134,6 +152,11 @@ export default function AdminAuditLogsPage() {
                       {expandedId === log.id && (
                         <tr className="bg-muted/20">
                           <td colSpan={5} className="px-4 py-3">
+                            {(log.ip_address || log.user_agent) && (
+                              <p className="mb-3 text-xs text-muted-foreground">
+                                {log.ip_address ? `IP address ${log.ip_address}` : ''}{log.ip_address && log.user_agent ? ' · ' : ''}{log.user_agent || ''}
+                              </p>
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                               {log.old_values && Object.keys(log.old_values).length > 0 && (
                                 <div>

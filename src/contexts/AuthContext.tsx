@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { clearPageCache } from '@/lib/pageCache';
+import { accessAlreadyLogged, logActivity, markAccessLogged } from '@/lib/activity';
 
 
 interface UserProfile {
@@ -69,6 +70,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        // audit log: someone opened the system while already signed in (once per browser tab session)
+        if (!accessAlreadyLogged(session.user.id)) {
+          markAccessLogged(session.user.id);
+          logActivity(supabase, 'system_access', { page: window.location.pathname });
+        }
       }
       setLoading(false);
     });
@@ -117,6 +123,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // Immediately set user and session state
       if (data?.user) {
+        markAccessLogged(data.user.id); // the sign-in below already counts as opening the system
+        logActivity(supabase, 'user_login', { email });
         setUser(data.user);
         setSession(data.session);
         setLoading(false);
@@ -133,6 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signOut = async () => {
+    await logActivity(supabase, 'user_logout'); // before signing out, while the person is still known
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     setProfile(null);

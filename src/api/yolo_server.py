@@ -7,8 +7,7 @@ Small defects: the models look at 640 px, so a whole phone photo is shrunk about
 photo is therefore checked twice: whole (for big defects) and in overlapping 640 px tiles at full detail (for small
 ones), and the two sets of boxes are merged. Live camera frames skip the tiles to stay fast.
 
-Also serves /api/measure (marker-based measurement, see measure.py), /api/surface (dents and warping, see surface.py)
-and /api/reconstruct (3D model from photos, see sfm.py) and /api/model3d (3D model of a whole piece, via Hunyuan3D).
+Also serves /api/model3d (3D model of a whole piece, via TRELLIS / Hunyuan3D).
 
 Run from the project root (--env-file passes the optional HF_TOKEN from .env, used by /api/model3d):
     uvicorn src.api.yolo_server:app --reload --port 8000 --env-file .env
@@ -22,7 +21,6 @@ import os
 import re
 import tempfile
 import threading
-import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -30,7 +28,6 @@ from contextlib import asynccontextmanager
 from functools import cache
 from pathlib import Path
 
-import numpy as np
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, UnidentifiedImageError
@@ -253,138 +250,8 @@ async def detect(request: Request):
     return detect_image(image, tiled)
 
 
-@app.post("/api/measure")
-async def measure_distance(request: Request):
-    """JSON {"image": ..., "marker_mm": 150, "points": [[x, y], [x, y]]} -> real distance between the two points.
-    Without "points" it only reports whether the marker was found."""
-    from .measure import DEFAULT_MARKER_MM, MeasureError, measure  # lazy, like ultralytics above: keeps cv2 out of the unit tests
-
-    image = await read_image(request)
-    body = await request.json()
-    try:
-        marker_mm = float(body.get("marker_mm") or DEFAULT_MARKER_MM)
-        return measure(np.asarray(image)[:, :, ::-1].copy(), marker_mm, body.get("points"))  # RGB -> BGR for OpenCV
-    except MeasureError as e:
-        raise HTTPException(422, str(e))
-    except (TypeError, ValueError) as e:
-        raise HTTPException(400, f"Invalid measure request: {e}")
-
-
-MAX_CLOUD_BYTES = 50 * 1024 * 1024
-
-
-@app.post("/api/surface")
-async def surface_check(request: Request):
-    """Multipart form: `file` (point cloud, .ply or x y z text), `unit` (mm | cm | m), `tolerance_mm`.
-    -> flat / dent / warp verdict with a deviation map (RANSAC plane + point-to-plane distance)."""
-    from .surface import DEFAULT_TOLERANCE_MM, UNITS_TO_MM, SurfaceError, analyze, read_points  # lazy, as above
-
-    try:
-        form = await request.form()
-        data = await form["file"].read()
-        scale = UNITS_TO_MM[str(form.get("unit") or "mm")]
-        tolerance_mm = float(form.get("tolerance_mm") or DEFAULT_TOLERANCE_MM)
-    except (KeyError, AttributeError, TypeError, ValueError) as e:
-        raise HTTPException(400, f"Invalid surface request: {e}")
-    if len(data) > MAX_CLOUD_BYTES:
-        raise HTTPException(413, "That point cloud file is larger than 50 MB.")
-    try:
-        return analyze(read_points(data) * scale, tolerance_mm)
-    except SurfaceError as e:
-        raise HTTPException(422, str(e))
-
-
-# ---- 3D reconstruction (SfM) jobs: photos are uploaded one at a time, then the job runs in the background ----
-# ponytail: jobs live in this process's memory (lost on restart, one at a time); use a job table if that stops being enough.
-JOBS = {}
-MAX_JOBS = 4
-RUNNING = threading.Lock()
-
-
-def get_job(job_id):
-    job = JOBS.get(job_id)
-    if job is None:
-        raise HTTPException(404, "That reconstruction was not found. Start it again.")
-    return job
-
-
-def run_job(job, marker_mm, tolerance_mm):
-    from .sfm import ReconstructionError, reconstruct_and_check
-    from .surface import SurfaceError
-
-    def progress(message, fraction):
-        job["message"], job["progress"] = message, round(float(fraction), 3)
-
-    try:
-        job["result"] = reconstruct_and_check(job.pop("photos"), marker_mm, tolerance_mm, progress)
-        job["status"], job["progress"], job["message"] = "done", 1.0, "Done"
-    except (ReconstructionError, SurfaceError) as e:
-        job["status"], job["error"] = "failed", str(e)
-    except Exception:
-        traceback.print_exc()
-        job["status"], job["error"] = "failed", "The reconstruction stopped unexpectedly. Check the Python server's window."
-    finally:
-        RUNNING.release()
-
-
-@app.post("/api/reconstruct")
-def reconstruct_start():
-    while len(JOBS) >= MAX_JOBS:
-        del JOBS[next(iter(JOBS))]  # oldest first
-    job_id = uuid.uuid4().hex
-    JOBS[job_id] = {"status": "collecting", "photos": [], "progress": 0.0, "message": "Waiting for photos"}
-    return {"job": job_id}
-
-
-@app.post("/api/reconstruct/{job_id}/photo")
-async def reconstruct_photo(job_id: str, request: Request):
-    from .sfm import MAX_PHOTOS
-
-    job = get_job(job_id)
-    if job["status"] != "collecting":
-        raise HTTPException(409, "This reconstruction has already started.")
-    if len(job["photos"]) >= MAX_PHOTOS:
-        raise HTTPException(422, f"Use at most {MAX_PHOTOS} photos.")
-    image = await read_image(request)
-    job["photos"].append(np.asarray(image)[:, :, ::-1].copy())  # RGB -> BGR for OpenCV
-    return {"photos": len(job["photos"])}
-
-
-@app.post("/api/reconstruct/{job_id}/run")
-async def reconstruct_run(job_id: str, request: Request):
-    from .measure import DEFAULT_MARKER_MM
-    from .sfm import MIN_PHOTOS
-    from .surface import DEFAULT_TOLERANCE_MM
-
-    job = get_job(job_id)
-    try:
-        body = await request.json()
-        marker_mm = float(body.get("marker_mm") or DEFAULT_MARKER_MM)
-        tolerance_mm = float(body.get("tolerance_mm") or DEFAULT_TOLERANCE_MM)
-    except (AttributeError, TypeError, ValueError) as e:
-        raise HTTPException(400, f"Invalid reconstruction request: {e}")
-    if not 10 <= marker_mm <= 2000 or not 0.1 <= tolerance_mm <= 100:
-        raise HTTPException(422, "Marker size must be 10 to 2000 mm and tolerance 0.1 to 100 mm.")
-    if job["status"] != "collecting":
-        raise HTTPException(409, "This reconstruction has already started.")
-    if len(job["photos"]) < MIN_PHOTOS:
-        raise HTTPException(422, f"Add at least {MIN_PHOTOS} photos first.")
-    if not RUNNING.acquire(blocking=False):
-        raise HTTPException(409, "Another reconstruction is running. Wait for it to finish, then try again.")
-    job["status"], job["message"] = "running", "Starting"
-    threading.Thread(target=run_job, args=(job, marker_mm, tolerance_mm), daemon=True).start()
-    return {"status": "running"}
-
-
-@app.get("/api/reconstruct/{job_id}")
-def reconstruct_status(job_id: str):
-    job = get_job(job_id)
-    return {k: job.get(k) for k in ("status", "progress", "message", "error", "result")}
-
-
 # ---- 3D model of the whole piece from photos (free Hugging Face Spaces) ----
-# Unlike /api/reconstruct this is a generative model: it looks right but has no real-world scale, so it is for viewing,
-# not for measuring. Free GPU time is limited per day; HF_TOKEN (a free Hugging Face account token) raises the limit.
+# A generative model: it looks right but has no real-world scale, so it is for viewing, not for measuring. Free GPU time is limited per day; HF_TOKEN (a free Hugging Face account token) raises the limit.
 #   with colors: TRELLIS (shape + photo texture, ~45 s, uses more of the daily time)
 #   shape only:  Tencent Hunyuan3D-2mv (untextured, slightly sharper shape); also the fallback when colors fail
 # When the online demos fail (time used up, or down), the shape is built by the same Hunyuan model on this computer's

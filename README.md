@@ -7,8 +7,9 @@ MFQATS follows each furniture order through a five-stage inspection before it is
 
 **Upload → 3D Reconstruction → Detect Defects → Results → Recommendation**
 
-Along the way it finds surface defects in photos (YOLOv12), measures the piece with a printed marker, checks surfaces
-for dents and warping in 3D, and estimates delivery dates from past stage times (PERT and WMA).
+Along the way it finds surface defects in photos (YOLOv12), builds a 3D model of the piece with its ordered size and
+the defects marked on it, and estimates delivery dates from past stage times (PERT and WMA). Admins assign each
+order to a staff member, and every page shows the same assignment.
 
 ## Who uses it
 
@@ -55,11 +56,11 @@ MFQATS/
 │   ├── components/     Shared parts: top bar, sidebar, charts, buttons, cards
 │   ├── lib/            Shared logic: order stages, defect rate, peso formatting, Supabase client
 │   ├── styles/         Theme and the shared glass styles (tailwind.css)
-│   └── api/            Python detection server: YOLO, marker measurement, 3D reconstruction, surface check
+│   └── api/            Python detection server: YOLO defect detection and the 3D model
 ├── supabase/
 │   ├── migrations/     Database setup, applied by hand in the Supabase SQL Editor (in order)
 │   └── checks/         Read-only queries for checking the live database
-├── public/assets/      Logo and the printable measuring marker
+├── public/assets/      Logo and images
 ├── docs/               All project documents
 └── train_yolov12n_wood.ipynb   Google Colab notebook for training the defect models
 ```
