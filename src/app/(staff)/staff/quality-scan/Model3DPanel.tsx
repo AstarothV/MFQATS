@@ -147,7 +147,8 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
     savedColors.current = null;
     setProgress('Uploading photos');
     try {
-      const images = await Promise.all(photos.map((p) => (p ? shrink(p) : null)));
+      // 1024 px is plenty (the 3D services work at about 512 px) and keeps 6 photos under the website's 4.5 MB request limit
+      const images = await Promise.all(photos.map((p) => (p ? shrink(p, 1024) : null)));
       const { task } = await api<{ task: string }>(`${apiUrl}/api/model3d`, postJson({ images, color: true }));
       while (run === runRef.current) {
         await new Promise((r) => setTimeout(r, POLL_MS));

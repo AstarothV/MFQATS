@@ -159,8 +159,9 @@ laptop.
    Then it prints the laptop's address, e.g. `https://mvca-laptop.tail1234.ts.net`. **This address never changes.**
 3. On vercel.com, open the MFQATS project → **Settings → Environment Variables**. Add `YOLO_SERVER_URL` with that
    address as the value (no `/` at the end), for **Production**. Save.
-4. **Redeploy**: **Deployments** → **⋯** on the latest one → **Redeploy**. The address is read when the site is built,
-   so saving the setting alone does nothing.
+4. Nothing else: the website reads the address on every request
+   (`src/app/(staff)/staff/yolo/[...path]/route.ts`), so a saved change works right away, with no redeploy. Vercel's
+   own forwarding (a `next.config` rewrite) is not used, because it cannot reach a Tailscale Funnel address.
 5. In Supabase → **Authentication → URL Configuration**, add the Vercel address as `https://<the-site>.vercel.app/**`
    under **Redirect URLs**, so password reset links work on the published site.
 
