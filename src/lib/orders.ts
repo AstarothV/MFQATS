@@ -7,7 +7,7 @@ import type { createClient } from '@/lib/supabase/client';
 export const PROCESS_STAGES = [
   { key: 'upload', label: 'Upload', description: 'Inspection images of the furniture are captured and uploaded.' },
   { key: 'reconstruction_3d', label: '3D Reconstruction', description: 'The images are processed into a 3D representation of the furniture.' },
-  { key: 'detect_defects', label: 'Detect Defects', description: 'The furniture is scanned for defects such as cracks, holes, scratches and dents.' },
+  { key: 'detect_defects', label: 'Detect Defects', description: 'The furniture is scanned for defects such as cracks, holes, scratches and knots.' },
   { key: 'results', label: 'Results', description: 'The inspection findings, annotated images and confidence scores are reviewed.' },
   { key: 'recommendation', label: 'Recommendation', description: 'The recommended action is given: release the item, or correct it and inspect again.' },
 ] as const;

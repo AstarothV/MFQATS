@@ -17,7 +17,6 @@ web
 MFQATS (MVCA Furniture Quality Assurance and Tracking System) replaces MVCA Furniture's paper checklists and manual visual inspection with a web platform that:
 
 - detects furniture defects from photos;
-- measures surface deviations and dimensions;
 - tracks each order through the production stages in real time.
 
 It addresses two problems. Quality-control failures surface late and cause costly rework. Supervisors also lack visibility into production progress and delays. Success means:
@@ -31,8 +30,7 @@ It addresses two problems. Quality-control failures surface late and cause costl
 A single platform for a furniture MSME that ties automated defect identification directly to the live production workflow. The vision layer combines:
 
 - YOLOv12 surface-defect detection;
-- rule-based 3D surface analysis (Structure-from-Motion reconstruction, RANSAC plane fit, point-to-plane deviation);
-- PnP marker-based dimensional measurement.
+- a 3D model of the whole piece with the order's dimensions and the photo-scan defects marked on it (edit-mode view).
 
 Its results feed a stage-gated order workflow, implemented as a finite state machine (FSM) across Upload → 3D Reconstruction → Detect Defects → Results → Recommendation, with PERT/WMA delivery estimates. Most existing systems keep quality data separate from production state, or target large-scale industry.
 
@@ -68,8 +66,6 @@ Its results feed a stage-gated order workflow, implemented as a finite state mac
 
 - **Capstone manuscript:** *MFQATS: MVCA Furniture Quality Assurance and Tracking System* (June 2026). Diaz, Dugenio, Mangaring, Rubia, Sy; adviser Jay Vee L. Capiral.
 - **YOLOv12n training notebook:** `train_yolov12n_wood.ipynb`. Model registry: `src/api/weights/models.json`.
-- **Surface-analysis samples:** `src/api/samples/*.ply` (flat, dent, warp boards).
-- **Measurement marker:** printable at `public/assets/mfqats-marker-150mm.pdf`.
 - **Logo:** `public/assets/images/app_logo.png`.
 - **Absent, not to be fabricated:** customer testimonials, real production metrics or rework-reduction figures, ISO 25010 survey results, and measured detection accuracy from the pilot. Chapter 5 results are not yet written.
 

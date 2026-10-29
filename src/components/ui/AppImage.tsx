@@ -113,7 +113,9 @@ const AppImage = memo(function AppImage({
             width={width || 400}
             height={height || 300}
             sizes={sizes}
-            style={{ width: 'auto', height: 'auto' }}
+            // the max sizes keep it at the given size even when the image arrives full size (Next.js only shrinks
+            // images where its image library is installed: Vercel has it, a laptop running npm run dev may not)
+            style={{ width: 'auto', height: 'auto', maxWidth: width || 400, maxHeight: height || 300 }}
             {...props}
         />
     );

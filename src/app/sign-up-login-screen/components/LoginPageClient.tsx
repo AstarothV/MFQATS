@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { logActivity } from '@/lib/activity';
 import Link from 'next/link';
 
 type Role = 'staff' | 'admin' | 'customer';
@@ -124,6 +125,7 @@ export default function LoginPageClient() {
       if (!user) throw new Error('This reset link has expired or was opened in another browser. Request a new one.');
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
+      await logActivity(supabase, 'password_changed');
       const { data: profileData } = await supabase.from('user_profiles').select('role').eq('id', user.id).maybeSingle();
       showMessage('success', 'Password changed.');
       router.push(roleRedirect[profileData?.role || 'staff'] || '/staff-dashboard');

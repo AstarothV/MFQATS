@@ -11,20 +11,11 @@ import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
-import MeasurePanel from './MeasurePanel';
-import SurfacePanel, { type SurfaceResponse } from './SurfacePanel';
-import ReconstructPanel, { shrink } from './ReconstructPanel';
+import { shrink } from './serverApi';
 import Model3DPanel from './Model3DPanel';
+import ModelDefectsView from './ModelDefectsView';
 import { PhotoSlots, PhotoThumbs, usePhotoSet, VIEWS } from './PhotoSet';
-
-interface Detection {
-  id: string;
-  class_name: string;
-  confidence_score: number;
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  recommendation: string;
-  bounding_box: { x: number; y: number; width: number; height: number };
-}
+import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 interface DetectionLog {
   id: string;
@@ -48,10 +39,17 @@ interface DetectResponse {
   defect_count: number;
 }
 
+// The scan of one Upload photo. Kept with the file it came from: a replaced photo makes its scan stale.
+interface SideScan {
+  file: File;
+  image: string;
+  detections: Detection[];
+  result: 'pass' | 'fail';
+}
+
 // What is saved for the selected order, so Results and Recommendation can show it after a reload.
 interface Saved {
   scan: 'pass' | 'fail' | 'pending' | null; // the order's latest saved scan
-  size: 'within_tolerance' | 'out_of_tolerance' | 'pending' | null; // its latest saved measurement
 }
 
 // Same-origin path that next.config.mjs forwards to the Python server, so it also works on phones via an https link.
@@ -61,8 +59,6 @@ const LIVE_SCAN_INTERVAL_MS = 1000;
 // The page follows the five official stages; step i shows the tools for PROCESS_STAGES[i].
 const STEP_OF: Record<string, number> = Object.fromEntries(PROCESS_STAGES.map((s, i) => [s.key, i]));
 const NEXT_STAGE: Record<string, string> = { upload: 'reconstruction_3d', reconstruction_3d: 'detect_defects', detect_defects: 'results', results: 'recommendation' };
-
-const formatLabel = (s: string) => s.replace(/_/g, ' ');
 
 // Thrown when the FastAPI server can't be reached (network failure, or the Next.js proxy can't connect to it).
 class BackendOfflineError extends Error {}
@@ -91,35 +87,6 @@ async function detectDefects(imageData: string, tiled = true): Promise<DetectRes
   return res.json();
 }
 
-// Canvas is sized to the source's pixel dimensions and scaled by CSS object-contain,
-// so normalized boxes line up with the image/video regardless of aspect ratio.
-function drawDetections(canvas: HTMLCanvasElement, dets: Detection[], w: number, h: number, image?: CanvasImageSource) {
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx || !w || !h) return;
-  if (image) ctx.drawImage(image, 0, 0, w, h);
-  const lw = Math.max(2, w / 320);
-  const fs = Math.max(14, Math.round(w / 45));
-  ctx.lineWidth = lw;
-  ctx.font = `600 ${fs}px sans-serif`;
-  ctx.textBaseline = 'top';
-  for (const d of dets) {
-    const bx = d.bounding_box.x * w;
-    const by = d.bounding_box.y * h;
-    ctx.strokeStyle = '#EF4444';
-    ctx.strokeRect(bx, by, d.bounding_box.width * w, d.bounding_box.height * h);
-    const label = `${formatLabel(d.class_name)} (${d.confidence_score}%)`;
-    const tagH = fs * 1.4;
-    const tagY = by - tagH < 0 ? by : by - tagH;
-    ctx.fillStyle = '#EF4444';
-    ctx.fillRect(bx - lw / 2, tagY, ctx.measureText(label).width + fs * 0.6, tagH);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(label, bx - lw / 2 + fs * 0.3, tagY + fs * 0.2);
-  }
-}
-
-const severityBadge = (s: Detection['severity']) => (s === 'critical' || s === 'high' ? 'danger' : s === 'medium' ? 'warning' : 'info');
 const segButton = (on: boolean) =>
   `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${on ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`;
 
@@ -134,12 +101,13 @@ export default function QualityScanPage() {
   const photoSet = usePhotoSet();
 
   const [step, setStep] = useState(0);
-  const [reconTab, setReconTab] = useState<'model' | 'surface' | 'file'>('model');
-  const [detectTab, setDetectTab] = useState<'scan' | 'size'>('scan');
   // where the defect scan's picture comes from: the live camera, one of the Upload photos, or a new file
   const [source, setSource] = useState<'live' | 'photos' | 'file'>('photos');
   const mode = source === 'live' ? 'live' : 'upload';
   const [scannedSlot, setScannedSlot] = useState<number | null>(null);
+  const [sideScans, setSideScans] = useState<(SideScan | null)[]>(VIEWS.map(() => null));
+  const [scanAllAt, setScanAllAt] = useState<number | null>(null); // which photo Scan all sides is on
+  const [model3dUrl, setModel3dUrl] = useState<string | null>(null); // the 3D model built in step 2
   const [scanning, setScanning] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [detections, setDetections] = useState<Detection[]>([]);
@@ -158,8 +126,7 @@ export default function QualityScanPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [showHistory, setShowHistory] = useState(false);
-  const [surface, setSurface] = useState<SurfaceResponse | null>(null);
-  const [savedInfo, setSavedInfo] = useState<Saved>({ scan: null, size: null });
+  const [savedInfo, setSavedInfo] = useState<Saved>({ scan: null });
   const [moving, setMoving] = useState(false);
   // Camera view follows the picture's own shape (a phone held upright gives a tall picture), and can fill the screen.
   const [viewAspect, setViewAspect] = useState(16 / 9);
@@ -178,10 +145,15 @@ export default function QualityScanPage() {
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
-      const [{ data: ordersData }, { data: logsData }] = await Promise.all([
-        supabase.from('orders').select('id, order_ref, product_name, extended_status, status, queue_position').order('created_at', { ascending: false }).limit(20),
+      const ordersQuery = (withStaff: boolean) => supabase.from('orders')
+        .select(`id, order_ref, product_name, extended_status, status, queue_position${withStaff ? ', assigned_to' : ''}`)
+        .order('created_at', { ascending: false }).limit(50);
+      const [ordersRes, { data: logsData }] = await Promise.all([
+        ordersQuery(true),
         supabase.from('detection_logs').select('*, orders(order_ref, product_name)').order('created_at', { ascending: false }).limit(20),
       ]);
+      // without the staff assignment migration there is no assigned_to column yet
+      const ordersData = ordersRes.error ? (await ordersQuery(false)).data : ordersRes.data;
       if (ordersData) setOrders(ordersData);
       if (logsData) setHistory(logsData as DetectionLog[]);
       setHistoryLoading(false);
@@ -189,16 +161,22 @@ export default function QualityScanPage() {
     fetchData();
   }, [user, supabase]);
 
+  // Assigned Tasks links here with ?order=<id>: open that order once the list is in
+  const openedFromLink = useRef(false);
+  useEffect(() => {
+    if (openedFromLink.current || !orders.length) return;
+    openedFromLink.current = true;
+    const id = new URLSearchParams(window.location.search).get('order');
+    if (id && orders.some((o) => o.id === id)) chooseOrder(id);
+  }, [orders]);
+
   const selectedOrder = orders.find((o) => o.id === selectedOrderId);
   const orderStep: number | null = selectedOrder ? (STEP_OF[selectedOrder.extended_status] ?? null) : null;
 
   async function loadSaved(orderId: string) {
-    if (!orderId) { setSavedInfo({ scan: null, size: null }); return; }
-    const [{ data: scan }, { data: size }] = await Promise.all([
-      supabase.from('detection_logs').select('overall_result').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-      supabase.from('measurements').select('measurement_status').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
-    ]);
-    setSavedInfo({ scan: (scan?.overall_result as Saved['scan']) ?? null, size: (size?.measurement_status as Saved['size']) ?? null });
+    if (!orderId) { setSavedInfo({ scan: null }); return; }
+    const { data: scan } = await supabase.from('detection_logs').select('overall_result').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    setSavedInfo({ scan: (scan?.overall_result as Saved['scan']) ?? null });
   }
 
   // Choosing an order opens the step it is at, and loads what was already saved for it.
@@ -321,7 +299,8 @@ export default function QualityScanPage() {
     analyzeImage(imageData);
   }
 
-  async function analyzeImage(imageData: string) {
+  // side: the Upload photo this picture is, so its scan also fills that side in Results
+  async function analyzeImage(imageData: string, side?: { slot: number; file: File }) {
     setAnalyzing(true);
     setDetections([]);
     setResult(null);
@@ -332,6 +311,10 @@ export default function QualityScanPage() {
       setDetections(res.detections);
       setConfidenceAvg(res.confidence_avg);
       setResult(res.overall_result);
+      if (side) {
+        const scan: SideScan = { file: side.file, image: imageData, detections: res.detections, result: res.overall_result };
+        setSideScans((prev) => prev.map((s, i) => (i === side.slot ? scan : s)));
+      }
     } catch (err) {
       handleDetectError(err);
     } finally {
@@ -348,9 +331,33 @@ export default function QualityScanPage() {
       setScannedSlot(slot);
       setCapturedImage(null);
       setUploadedImage(imageData);
-      analyzeImage(imageData);
+      analyzeImage(imageData, { slot, file });
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : 'That photo could not be opened.');
+    }
+  }
+
+  // Scan every Upload photo, one after another; each fills its side in Results.
+  async function scanAllSides() {
+    const slots = photoSet.photos.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
+    if (!slots.length) return;
+    setSaved(false);
+    try {
+      for (let n = 0; n < slots.length; n++) {
+        setScanAllAt(n);
+        const slot = slots[n];
+        const file = photoSet.photos[slot]!;
+        const image = await shrink(file);
+        const res = await detectDefects(image);
+        setBackendOffline(false);
+        const scan: SideScan = { file, image, detections: res.detections, result: res.overall_result };
+        setSideScans((prev) => prev.map((s, i) => (i === slot ? scan : s)));
+      }
+      showToast('success', `Scanned ${slots.length} side${slots.length === 1 ? '' : 's'}. See them in Results.`);
+    } catch (err) {
+      handleDetectError(err);
+    } finally {
+      setScanAllAt(null);
     }
   }
 
@@ -442,7 +449,7 @@ export default function QualityScanPage() {
       setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: to } : o)));
       showToast('success', `${selectedOrder.order_ref} moved to ${statusLabel(to)}`);
       if (STEP_OF[to] !== undefined) goTo(STEP_OF[to]);
-      if (to === 'upload') clearScan(); // sent back for rework: the next inspection starts fresh
+      if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); } // sent back for rework: the next inspection starts fresh
     } catch (err: any) {
       showToast('error', err?.message || 'Could not move the order');
     } finally {
@@ -457,12 +464,12 @@ export default function QualityScanPage() {
       const { error } = await supabase.from('detection_logs').insert({
         order_id: selectedOrderId || null,
         inspector_id: user.id,
-        scan_mode: mode === 'live' ? 'live_camera' : 'image_upload',
-        image_url: capturedImage || uploadedImage || '',
-        detections: detections,
-        overall_result: result || 'pending',
-        confidence_avg: confidenceAvg,
-        defect_count: detections.length,
+        scan_mode: extra && !sides.some(Boolean) && source === 'live' ? 'live_camera' : 'image_upload',
+        image_url: (inspected.find((s) => s.result === 'fail') ?? inspected[0])?.image ?? '',
+        detections: allDetections,
+        overall_result: inspectionResult || 'pending',
+        confidence_avg: inspectionConfidence,
+        defect_count: allDetections.length,
         notes,
       });
 
@@ -470,12 +477,12 @@ export default function QualityScanPage() {
 
       // Save real defects to the defects table. Low-severity findings (live knots, resin...) are natural wood
       // features: they stay in the scan record above but don't count as defects in analytics.
-      const realDefects = detections.filter((d) => d.severity !== 'low');
+      const realDefects = allDetections.filter((d) => d.severity !== 'low');
       if (realDefects.length > 0 && selectedOrderId) {
         const defectInserts = realDefects.map((d) => ({
           order_id: selectedOrderId,
           defect_type: d.class_name,
-          description: `${formatLabel(d.class_name)} detected with ${d.confidence_score}% confidence`,
+          description: `${formatLabel(d.class_name)}${(VIEWS as readonly string[]).includes(d.side) ? ` on the ${d.side.toLowerCase()}` : ''} detected with ${d.confidence_score}% confidence`,
           severity: d.severity,
           confidence_score: d.confidence_score,
           bounding_box: d.bounding_box,
@@ -498,7 +505,7 @@ export default function QualityScanPage() {
       // follow-ups (admin notification, rework task) are created by the database trigger after_quality_scan
       showToast('success',
         !selectedOrderId ? 'Saved (not linked to an order)'
-        : result === 'fail' ? 'Saved. A rework task was created and the admin was notified.'
+        : inspectionResult === 'fail' ? 'Saved. A rework task was created and the admin was notified.'
         : 'Saved. The admin was notified.');
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to save the results');
@@ -516,16 +523,45 @@ export default function QualityScanPage() {
 
   // ---- what each step shows in the step bar ----
   const photoCount = photoSet.photos.filter(Boolean).length;
-  const failing = detections.filter((d) => d.severity !== 'low');
+  const sides = sideScans.map((s, i) => (s && s.file === photoSet.photos[i] ? s : null));
+  const extra = source !== 'photos' && (result === 'pass' || result === 'fail')
+    ? { label: source === 'live' ? 'Camera' : 'New photo', image: capturedImage || uploadedImage || '', detections, result } : null;
+  const inspected = [
+    ...sides.flatMap((s, i) => (s ? [{ label: VIEWS[i] as string, image: s.image, detections: s.detections, result: s.result }] : [])),
+    ...(extra ? [extra] : []),
+  ];
+  const allDetections = inspected.flatMap((s) => s.detections.map((d) => ({ ...d, side: s.label })));
+  const inspectionResult: 'pass' | 'fail' | null = inspected.length ? (inspected.some((s) => s.result === 'fail') ? 'fail' : 'pass') : null;
+  const inspectionConfidence = allDetections.length
+    ? Math.round((allDetections.reduce((sum, d) => sum + d.confidence_score, 0) / allDetections.length) * 10) / 10 : 0;
+  const failing = allDetections.filter((d) => d.severity !== 'low');
+  const sideTiles: SideTile[] = [
+    ...VIEWS.map((v, i) => ({ label: v as string, image: sides[i]?.image ?? photoSet.previews[i], detections: sides[i]?.detections ?? null })),
+    ...(extra ? [{ label: extra.label, image: extra.image, detections: extra.detections }] : []),
+  ];
+  // defect pins for the 3D model: each defect's photo position, on the side it was found
+  const pins = sides.flatMap((s, slot) => (s ? s.detections.map((d) => ({
+    slot, u: d.bounding_box.x + d.bounding_box.width / 2, v: d.bounding_box.y + d.bounding_box.height / 2,
+    w: d.bounding_box.width, h: d.bounding_box.height,
+    label: formatLabel(d.class_name), severity: d.severity,
+  })) : []));
   const stepNotes = [
     `${photoCount} of ${VIEWS.length} photos`,
-    surface ? (surface.status === 'flat' ? 'Surface is flat' : surface.status === 'dent' ? 'Dent found' : 'Warping found') : '3D model and surface',
-    analyzing ? 'Scanning…' : result ? (failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : 'No failing defects') : 'Scan and size check',
-    saved ? 'Saved' : result ? 'Not saved yet' : savedInfo.scan ? `Last saved: ${savedInfo.scan}` : 'Pass or fail',
+    '3D model of the piece',
+    analyzing || scanAllAt !== null ? 'Scanning…' : inspectionResult ? (failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : 'No failing defects') : 'Scan and size check',
+    saved ? 'Saved' : inspectionResult ? 'Not saved yet' : savedInfo.scan ? `Last saved: ${savedInfo.scan}` : 'Pass or fail',
     'Next action',
   ];
   // the verdict shown in Results and Recommendation: this visit's scan, else the order's last saved one
-  const verdict = result ?? savedInfo.scan;
+  const verdict = inspectionResult ?? savedInfo.scan;
+
+  const scanAllButton = (
+    <button onClick={scanAllSides} disabled={scanAllAt !== null || analyzing} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm disabled:opacity-60">
+      {scanAllAt !== null
+        ? <><Loader2 size={14} className="animate-spin" /> Scanning side {scanAllAt + 1} of {photoCount}…</>
+        : <><Images size={14} /> Scan all sides</>}
+    </button>
+  );
 
   // A footer button that moves the order on, shown on the step the order is actually at.
   function finishStage(i: number) {
@@ -557,22 +593,11 @@ export default function QualityScanPage() {
   // repair advice gathered from everything found
   const advice: { title: string; tone: 'danger' | 'warning' | 'info'; badge: string; text: string }[] = [];
   const seen = new Set<string>();
-  for (const d of [...detections].sort((a, b) => (a.severity === 'low' ? 1 : 0) - (b.severity === 'low' ? 1 : 0))) {
+  for (const d of [...allDetections].sort((a, b) => (a.severity === 'low' ? 1 : 0) - (b.severity === 'low' ? 1 : 0))) {
     if (seen.has(d.class_name)) continue;
     seen.add(d.class_name);
     const name = formatLabel(d.class_name);
     advice.push({ title: name.charAt(0).toUpperCase() + name.slice(1), tone: severityBadge(d.severity), badge: d.severity.charAt(0).toUpperCase() + d.severity.slice(1), text: d.recommendation });
-  }
-  if (savedInfo.size === 'out_of_tolerance') {
-    advice.push({ title: 'A size is outside the tolerance', tone: 'danger', badge: 'Size error', text: 'Check the parts against the cut list and correct them, then measure again.' });
-  }
-  if (surface && surface.status !== 'flat') {
-    advice.push({
-      title: surface.status === 'dent' ? 'Dent in the surface' : 'Warped surface', tone: 'danger', badge: `${surface.max_deviation_mm} mm`,
-      text: surface.status === 'dent'
-        ? 'Raise or fill the dent, sand it smooth and refinish, then scan the surface again.'
-        : 'Check whether the board can be flattened (clamping, moisture control); replace it if not.',
-    });
   }
 
   return (
@@ -621,7 +646,7 @@ export default function QualityScanPage() {
           <select id="qs-order" value={selectedOrderId} onChange={(e) => chooseOrder(e.target.value)} className="input-dark min-w-0 flex-1 basis-60 sm:max-w-md">
             <option value="">No order (practice scan)</option>
             {orders.map((o) => (
-              <option key={o.id} value={o.id}>{o.order_ref} — {o.product_name} ({statusLabel(o.extended_status)})</option>
+              <option key={o.id} value={o.id}>{o.order_ref} — {o.product_name} ({statusLabel(o.extended_status)}){o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}</option>
             ))}
           </select>
           {selectedOrder && (
@@ -717,7 +742,7 @@ export default function QualityScanPage() {
             {[
               ['Whole piece in view', 'Same distance and height for every side.'],
               ['Plain background', 'A wall or open floor, with nothing touching the furniture.'],
-              ['Take the marker off', 'The marker is only for measuring and surface scans.'],
+              ['Good light', 'Even light without strong shadows, so defects show clearly.'],
             ].map(([t, d]) => (
               <div key={t} className="rounded-2xl border border-border bg-muted/40 p-3 text-sm">
                 <p className="font-semibold text-foreground">{t}</p>
@@ -730,32 +755,18 @@ export default function QualityScanPage() {
         {/* ---- 2 · 3D Reconstruction ---- */}
         <section hidden={step !== 1} className="space-y-4">
           <div className="card-dark space-y-4 p-5">
-            {stepHead(1, 'Build a 3D view of the whole piece, or scan one surface with the printed marker to check for dents and warping.')}
-            <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl bg-muted p-1">
-              {([['model', '3D Model'], ['surface', 'Surface scan with marker'], ['file', 'From a scan file']] as const).map(([k, label]) => (
-                <button key={k} role="tab" aria-selected={reconTab === k} onClick={() => setReconTab(k)} className={segButton(reconTab === k)}>{label}</button>
-              ))}
-            </div>
-            <div hidden={reconTab !== 'model'}>
-              <Model3DPanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} />
-            </div>
+            {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order.')}
+            <Model3DPanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onModel={setModel3dUrl} />
           </div>
-          <div hidden={reconTab !== 'surface'}><ReconstructPanel apiUrl={YOLO_API_URL} onResult={setSurface} /></div>
-          <div hidden={reconTab !== 'file'}><SurfacePanel apiUrl={YOLO_API_URL} onResult={setSurface} /></div>
         </section>
 
         {/* ---- 3 · Detect Defects ---- */}
         <section hidden={step !== 2} className="space-y-4">
           <div className="card-dark space-y-4 p-5">
-            {stepHead(2, 'Scan the surfaces for defects, and check the size against the order.')}
-            <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl bg-muted p-1">
-              <button role="tab" aria-selected={detectTab === 'scan'} onClick={() => setDetectTab('scan')} className={segButton(detectTab === 'scan')}>Scan for defects</button>
-              <button role="tab" aria-selected={detectTab === 'size'} onClick={() => setDetectTab('size')} className={segButton(detectTab === 'size')}>Size check</button>
-            </div>
+            {stepHead(2, 'Scan every side of the piece for defects with YOLOv12.')}
           </div>
 
-          {/* a class, not the hidden attribute: `grid` would override [hidden] */}
-          <div className={`${detectTab === 'scan' ? 'grid' : 'hidden'} grid-cols-1 gap-4 xl:grid-cols-3`}>
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             {/* Camera / photo view */}
             <div className="xl:col-span-2">
               <div className={expanded ? 'fixed inset-0 z-50 flex flex-col bg-black' : 'card-dark overflow-hidden'}>
@@ -929,12 +940,15 @@ export default function QualityScanPage() {
                 </div>
                 {source === 'photos' && (
                   photoCount ? (
-                    <PhotoThumbs set={photoSet} selected={scannedSlot} onPick={scanPhoto} />
+                    <>
+                      <PhotoThumbs set={photoSet} selected={scannedSlot} onPick={scanPhoto} />
+                      {scanAllButton}
+                    </>
                   ) : (
                     <p className="text-xs text-muted-foreground">No Upload photos yet.</p>
                   )
                 )}
-                <p className="text-xs text-muted-foreground">Scan one picture at a time, then save it in Results. Repeat for other sides if needed.</p>
+                <p className="text-xs text-muted-foreground">Pick a photo to scan one side, or scan all of them. Results shows every side; save it there.</p>
               </div>
 
               <div className="card-dark p-4">
@@ -960,8 +974,21 @@ export default function QualityScanPage() {
             </div>
           </div>
 
-          <div hidden={detectTab !== 'size'}>
-            <MeasurePanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} showToast={showToast} />
+
+          {/* the defects on the 3D model; mounted only on this step, so the 3D view does not run in the background */}
+          <div className="card-dark space-y-3 p-5">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Defects on the 3D model</h3>
+              <p className="text-sm text-muted-foreground mt-1">What the scans found, shown on the 3D model from step 2, in edit mode or as pins.</p>
+            </div>
+            {!model3dUrl ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-4">
+                <p className="text-sm text-muted-foreground">No 3D model yet. Build it in step 2, then the defects appear on it here.</p>
+                <button onClick={() => goTo(1)} className="btn-secondary flex items-center gap-2 text-sm"><ChevronLeft size={15} /> Go to 3D Reconstruction</button>
+              </div>
+            ) : step === 2 ? (
+              <ModelDefectsView modelUrl={model3dUrl} pins={pins} />
+            ) : null}
           </div>
         </section>
 
@@ -979,47 +1006,37 @@ export default function QualityScanPage() {
                 {verdict === 'pending' ? 'PENDING' : verdict.toUpperCase()}
               </span>
               <span className="text-sm text-foreground">
-                {!result ? 'This is the order\'s last saved scan.'
-                  : result === 'pass' ? 'No defects that fail the piece.'
+                {!inspectionResult ? 'This is the order\'s last saved scan.'
+                  : inspectionResult === 'pass' ? 'No defects that fail the piece.'
                   : `${failing.length} defect${failing.length === 1 ? '' : 's'} that fail the piece. It needs rework before delivery.`}
               </span>
             </div>
           )}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-border bg-muted/40 p-3">
                   <p className="text-xs text-muted-foreground">Defects found</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{result ? detections.length : '—'}</p>
-                  <p className="text-xs text-muted-foreground">{result ? `${failing.length} failing, ${detections.length - failing.length} natural wood` : 'Scan in Detect Defects'}</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{inspectionResult ? allDetections.length : '—'}</p>
+                  <p className="text-xs text-muted-foreground">{inspectionResult ? `${failing.length} failing, ${allDetections.length - failing.length} natural wood · ${inspected.length} picture${inspected.length === 1 ? '' : 's'}` : 'Scan in Detect Defects'}</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Size check</p>
-                  <p className={`text-xl font-bold ${savedInfo.size === 'out_of_tolerance' ? 'text-danger' : savedInfo.size === 'within_tolerance' ? 'text-success' : 'text-foreground'}`}>
-                    {savedInfo.size === 'within_tolerance' ? 'Within' : savedInfo.size === 'out_of_tolerance' ? 'Size error' : '—'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{savedInfo.size ? 'latest saved measurement' : 'Not measured yet'}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Surface (3D)</p>
-                  <p className={`text-xl font-bold ${surface && surface.status !== 'flat' ? 'text-danger' : surface ? 'text-success' : 'text-foreground'}`}>
-                    {surface ? (surface.status === 'flat' ? 'Flat' : surface.status === 'dent' ? 'Dent' : 'Warp') : '—'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{surface ? `deepest ${surface.max_deviation_mm} mm, tolerance ${surface.tolerance_mm} mm` : 'Not checked in this visit'}</p>
+                  <p className="text-xs text-muted-foreground">Sides scanned</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{sides.filter(Boolean).length} of {photoCount}</p>
+                  <p className="text-xs text-muted-foreground">{photoCount === 0 ? 'No Upload photos yet' : sides.filter(Boolean).length < photoCount ? 'Scan all sides to check every photo' : 'Every Upload photo checked'}</p>
                 </div>
           </div>
 
-          {result && detections.length > 0 && (
-            <ul className="space-y-2">
-              {detections.map((d) => (
-                <li key={d.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2 text-sm">
-                  <span className="font-semibold capitalize text-foreground">{formatLabel(d.class_name)}</span>
-                  <StatusBadge variant={severityBadge(d.severity)} label={d.severity.charAt(0).toUpperCase() + d.severity.slice(1)} />
-                  <span className="text-xs text-muted-foreground">{d.confidence_score}%{d.severity === 'low' ? ' · natural wood, does not fail the piece' : ''}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Defects by side</p>
+                <p className="text-xs text-muted-foreground">Each Upload photo with what YOLOv12 found on it. Tap a side to see it larger.</p>
+              </div>
+              {photoCount > 0 && <div className="w-full sm:w-auto">{scanAllButton}</div>}
+            </div>
+            <DefectsBySide tiles={sideTiles} />
+          </div>
 
-          {result && (
+          {inspectionResult && (
             <>
               <label className="block text-sm font-medium text-foreground" htmlFor="qs-notes">Inspection notes</label>
               <textarea id="qs-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="input-dark w-full resize-none text-sm" rows={3} placeholder="Add notes about this inspection..." />
@@ -1032,7 +1049,7 @@ export default function QualityScanPage() {
                   <span className="flex items-center gap-2 text-sm font-semibold text-success"><CheckCircle2 size={15} /> Saved</span>
                 )}
                 <span className="text-xs text-muted-foreground">
-                  {!selectedOrderId ? 'Choose an order at the top to link this scan to it.' : result === 'fail' ? 'Saving creates a rework task and notifies the admin.' : 'Saving notifies the admin.'}
+                  {!selectedOrderId ? 'Choose an order at the top to link this scan to it.' : inspectionResult === 'fail' ? 'Saving creates a rework task and notifies the admin.' : 'Saving notifies the admin.'}
                 </span>
               </div>
             </>

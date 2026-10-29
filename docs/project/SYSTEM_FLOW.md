@@ -49,17 +49,18 @@ Detect Defects → Results → Recommendation. **Delivered** and **Cancelled** a
   defect scan.
 
 ### 4. 3D Reconstruction (stage 2)
-In Quality Scan step **② 3D Reconstruction** (and the size check in step ③), staff use these tools:
+In Quality Scan step **② 3D Reconstruction**, the Upload photos (front, left, back, right, top, bottom) become a
+colored **3D Model** of the whole piece. On the model:
 
-| Panel | What it does | Needs the printed marker? |
-|---|---|---|
-| **3D Model** | 1 to 6 photos (front, left, back, right, top, bottom) become a colored 3D model of the whole piece, viewable with or without colors, in full screen, with its real size from the measurements; can be downloaded as `.glb` | No (take the marker off the piece) |
-| **3D Reconstruction** | 8 to 15 photos around one surface become a to-scale 3D model (Structure from Motion), then checked for dents and warping | Yes, flat on the surface |
-| **3D Surface Check** | The same dent and warp check on a 3D scan file from another scanner | No |
-| **Measure Dimensions** | One photo with the marker: tap the two ends of an edge to measure it, compared with the size ordered (tolerance in cm); pick the furniture type and the side photographed | Yes |
+| Button | What it shows |
+|---|---|
+| **Dimensions** | Length, width and height lines on the model, with the sizes from the customer's order (the same as in the shop) |
+| **Defect pins** | A numbered pin on the side where each defect was found by the photo scans |
+| **Edit mode** | Like Blender's edit mode: the model's surface grid, with the faces where a defect was found painted red (fails the piece), amber (check) or green (natural wood) |
+| **Colors / Shape** | The model with or without its colors |
 
-Results: measurements are saved to the order. The dent/warp check uses **RANSAC plane fitting** and the
-**point-to-plane distance**: more than 2 mm off the plane is a dent; a large area off the plane is a warp.
+The defects come from the YOLOv12 scans of the photos (step ③); the 3D model itself does not find defects, and the
+pins and painted faces are at approximate spots. The model can be viewed full screen and downloaded as `.glb`.
 
 How the 3D Model is built:
 1. **Normal build**: TRELLIS (free Hugging Face service) builds the colored model from all the photos, after cutting
@@ -67,7 +68,7 @@ How the 3D Model is built:
 2. **When the free daily time runs out**: Hunyuan3D builds a grey shape from the four side photos, online, or on the
    laptop's own NVIDIA GPU if the local 3D server (Terminal 4) is running. The panel says when this happens.
 
-The 3D model is for showing the piece; it is not to scale. Sizes come from Measure Dimensions.
+The 3D model is for showing the piece; it is not to scale. Its sizes come from the order.
 
 ### 5. Detect Defects (stage 3)
 - Staff move the order to **Detect Defects**, then scan the piece in **Quality Scan** with the **live camera** or an
@@ -135,8 +136,7 @@ flowchart LR
 
 - **Website** (Next.js): all screens for the three roles. Phones reach it through the https tunnel.
 - **Supabase**: the database, logins and the automatic rules above.
-- **Detection server** (Python, FastAPI): YOLOv12 detection, marker measurement (PnP), 3D Reconstruction (SfM),
-  dent/warp check (RANSAC), and the 3D Model.
+- **Detection server** (Python, FastAPI): YOLOv12 detection and the 3D Model.
 - **Hugging Face**: the free online 3D model services (TRELLIS, Hunyuan3D), about 5 minutes of GPU time a day.
 - **Local 3D server** (optional): Hunyuan3D on an NVIDIA GPU with 4 GB+ memory, no daily limit.
 

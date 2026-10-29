@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package } from 'lucide-react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
+import { assignOrder, fetchStaff, isActive, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
 const GATE_HINTS: Record<string, string> = {
   scan_done: 'Needs a defect scan saved for this order during Detect Defects',
   scan_passed: 'Needs the latest defect scan to pass',
@@ -28,21 +29,30 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     setTimeout(() => setToast(null), 4000);
   }
 
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('orders')
-      .select('*, customer:customer_id(full_name, email, phone)')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (data) {
-      setOrders(data);
-      if (!selectedOrderId && data.length > 0) setSelectedOrderId(data[0].id);
-    }
-    setLoading(false);
-  }, [supabase, selectedOrderId]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [choosingStaff, setChoosingStaff] = useState(false);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const loadedOnce = useRef(false);
 
-  useEffect(() => { fetchOrders(); }, []);
+  // Only the first load shows the skeleton; the refreshes that follow (live updates) keep the page in place.
+  const fetchOrders = useCallback(async () => {
+    if (!loadedOnce.current) setLoading(true);
+    const query = (staffJoin: boolean) => supabase.from('orders')
+      .select(`*, customer:customer_id(full_name, email, phone)${staffJoin ? ', staff:assigned_to(full_name)' : ''}`)
+      .order('created_at', { ascending: false }).limit(50);
+    let { data, error } = await query(true);
+    if (error) ({ data } = await query(false)); // the staff column is not in the database yet (migration not run)
+    const rows = (data || null) as any[] | null;
+    if (rows) {
+      setOrders(rows);
+      setSelectedOrderId((id) => id ?? rows[0]?.id ?? null);
+    }
+    loadedOnce.current = true;
+    setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { fetchStaff(supabase).then(setStaff).catch(() => setStaff([])); }, [supabase]);
 
   // FSM edges (supabase/migrations/*_order_stage_fsm.sql). The database rejects any other move; this only greys out buttons.
   const [transitions, setTransitions] = useState<{ from_status: string; to_status: string; gate: string | null }[]>([]);
@@ -53,16 +63,8 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     });
   }, [supabase]);
 
-  // Real-time updates
-  useEffect(() => {
-    const channel = supabase
-      .channel('orders_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-        fetchOrders();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [supabase, fetchOrders]);
+  // Keeps the stage and the staff up to date while staff work on the orders
+  useEffect(() => watchOrders(supabase, 'orders_management', fetchOrders), [supabase, fetchOrders]);
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
@@ -91,7 +93,28 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
 
   async function approveOrder(orderId: string) {
     await updateOrderStatus(orderId, 'confirmed');
+    setChoosingStaff(true); // approved: show who can work on it
   }
+
+  async function setStaffFor(orderId: string, staffId: string | null) {
+    setAssigning(staffId ?? 'none');
+    try {
+      await assignOrder(supabase, orderId, staffId);
+      const name = staff.find((m) => m.id === staffId)?.full_name;
+      showToast('success', staffId ? `${name} will work on this order. They were notified.` : 'The order no longer has a staff member.');
+      setChoosingStaff(false);
+      fetchOrders();
+    } catch (err: any) {
+      showToast('error', err?.message || 'Could not assign the staff member');
+    } finally {
+      setAssigning(null);
+    }
+  }
+
+  // each staff member's active orders, and the list to choose from with the available ones first
+  const busy = workload(orders);
+  const staffChoices = [...staff].sort((a, b) => (busy.get(a.id)?.length || 0) - (busy.get(b.id)?.length || 0) || a.full_name.localeCompare(b.full_name));
+  useEffect(() => { setChoosingStaff(false); }, [selectedOrderId]);
 
   const nextMoves = transitions.filter(t => t.from_status === (activeOrder?.extended_status || 'pending'));
   const canMoveTo = (status: string) => nextMoves.some(t => t.to_status === status);
@@ -154,6 +177,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                       <th className="px-4 py-3">Order</th>
                       <th className="px-4 py-3">Customer</th>
                       <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Staff</th>
                       <th className="px-4 py-3">Due</th>
                       <th className="px-4 py-3">Value</th>
                     </tr>
@@ -172,6 +196,9 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                             variant={statusVariant(order.extended_status || order.status)}
                             label={statusLabel(order.extended_status || order.status)}
                           />
+                        </td>
+                        <td className="px-4 py-4 text-muted-foreground">
+                          {order.staff?.full_name || (isActive(order.extended_status) ? <span className="text-warning">Not assigned</span> : '—')}
                         </td>
                         <td className="px-4 py-4 text-muted-foreground whitespace-nowrap">{order.due_date || '—'}</td>
                         <td className="px-4 py-4 font-semibold text-foreground">{peso(order.amount)}</td>
@@ -231,6 +258,65 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                       </div>
                     </div>
                   </div>
+                </section>
+
+                {/* Assigned staff */}
+                <section className="card-dark rounded-3xl border border-border p-6">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="text-base font-semibold text-foreground">Assigned staff</h3>
+                    {activeOrder.assigned_to && isActive(activeOrder.extended_status) && !choosingStaff && (
+                      <button type="button" onClick={() => setChoosingStaff(true)} className="text-sm font-semibold text-primary hover:underline">Change</button>
+                    )}
+                  </div>
+                  {activeOrder.assigned_to ? (
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-muted/50 px-4 py-3 text-sm">
+                      <div>
+                        <p className="font-semibold text-foreground">{activeOrder.staff?.full_name || 'Staff member'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {activeOrder.assigned_at ? `Assigned ${new Date(activeOrder.assigned_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}` : 'Assigned'}
+                          {isActive(activeOrder.extended_status) ? ` · working on it, now at ${statusLabel(activeOrder.extended_status)}` : ''}
+                        </p>
+                      </div>
+                      {isActive(activeOrder.extended_status) && (
+                        <button type="button" onClick={() => setStaffFor(activeOrder.id, null)} disabled={!!assigning}
+                          className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-danger disabled:opacity-50">
+                          <UserMinus size={14} /> Remove
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      {(activeOrder.extended_status || 'pending') === 'pending' ? 'Approve the order first, then choose who will work on it.'
+                        : isActive(activeOrder.extended_status) ? 'Nobody is working on this order yet.' : 'No staff member was assigned.'}
+                    </p>
+                  )}
+                  {isActive(activeOrder.extended_status) && (!activeOrder.assigned_to || choosingStaff) && (
+                    staff.length === 0 ? (
+                      <p className="mt-3 text-sm text-muted-foreground">No active staff accounts. Add staff in User Management.</p>
+                    ) : (
+                      <ul className="mt-3 space-y-2">
+                        {staffChoices.filter((m) => m.id !== activeOrder.assigned_to).map((m) => {
+                          const theirs = busy.get(m.id) || [];
+                          return (
+                            <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border px-4 py-2.5 text-sm">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground">{m.full_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {theirs.length === 0 ? <span className="font-semibold text-success">Available</span>
+                                    : `Working on ${theirs.length}: ${theirs.map((o: any) => o.order_ref).join(', ')}`}
+                                  {m.department ? ` · ${m.department}` : ''}
+                                </p>
+                              </div>
+                              <button type="button" onClick={() => setStaffFor(activeOrder.id, m.id)} disabled={!!assigning}
+                                className="btn-secondary flex items-center gap-1.5 text-xs disabled:opacity-50">
+                                {assigning === m.id ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Assign
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
+                  )}
                 </section>
 
                 {/* Update Status */}
