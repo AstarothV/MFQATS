@@ -197,10 +197,7 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos }: {
           {busy ? <Loader2 size={16} className="animate-spin" /> : <Box size={16} />} {busy ? 'Building…' : 'Build 3D model'}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        About a minute. Each model uses part of the free daily time (about 4 to 6 a day); after that, a shape-only model is
-        built instead.
-      </p>
+      <p className="text-xs text-muted-foreground">About a minute.</p>
 
       {needsFront && <p className="text-sm text-warning">With more than one photo, add a front photo too.</p>}
 
