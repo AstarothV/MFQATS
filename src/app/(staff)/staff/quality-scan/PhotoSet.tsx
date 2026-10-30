@@ -31,7 +31,7 @@ export function usePhotoSet(): PhotoSet {
 }
 
 /** The six slots: each takes a photo with the camera or picks one from the gallery. */
-export function PhotoSlots({ set, disabled }: { set: PhotoSet; disabled?: boolean }) {
+export function PhotoSlots({ set, disabled, name = 'photo' }: { set: PhotoSet; disabled?: boolean; name?: string }) {
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const slotRef = useRef(0);
@@ -56,12 +56,12 @@ export function PhotoSlots({ set, disabled }: { set: PhotoSet; disabled?: boolea
           <div key={view} className={`relative aspect-square overflow-hidden rounded-2xl border bg-muted ${set.previews[i] ? 'border-border' : 'border-dashed border-border'}`}>
             {set.previews[i] ? (
               <>
-                <img src={set.previews[i]!} alt={`${view} photo`} className="h-full w-full object-cover" />
+                <img src={set.previews[i]!} alt={`${view} ${name}`} className="h-full w-full object-cover" />
                 <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs text-white">{view}</span>
                 <button
                   onClick={() => set.setSlot(i, null)}
                   disabled={disabled}
-                  aria-label={`Remove ${view.toLowerCase()} photo`}
+                  aria-label={`Remove ${view.toLowerCase()} ${name}`}
                   className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white"
                 >
                   <X size={14} />
@@ -71,10 +71,10 @@ export function PhotoSlots({ set, disabled }: { set: PhotoSet; disabled?: boolea
               <div className="flex h-full flex-col items-center justify-center gap-2 p-2">
                 <span className="text-sm font-semibold text-muted-foreground">{view}</span>
                 <div className="flex gap-2">
-                  <button onClick={() => pick(i, 'camera')} disabled={disabled} aria-label={`Take ${view.toLowerCase()} photo with the camera`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
+                  <button onClick={() => pick(i, 'camera')} disabled={disabled} aria-label={`Take ${view.toLowerCase()} ${name} with the camera`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
                     <Camera size={18} /> Camera
                   </button>
-                  <button onClick={() => pick(i, 'library')} disabled={disabled} aria-label={`Choose ${view.toLowerCase()} photo from photos`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
+                  <button onClick={() => pick(i, 'library')} disabled={disabled} aria-label={`Choose ${view.toLowerCase()} ${name} from photos`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
                     <Images size={18} /> Photos
                   </button>
                 </div>

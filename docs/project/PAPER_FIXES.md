@@ -61,7 +61,9 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
 - A scan fails when it has at least one defect that is not low severity.
 - The confidence threshold of the raw-wood model is 0.30. In our threshold test it gave the best F1-score, 0.633.
 
-- Staff can scan one side at a time, or press "Scan all sides" to scan every uploaded photo. Results shows a grid with
+- In Detect Defects, staff add a close-up photo of each side's surface (optional per side; a side without one is
+  scanned from its Upload photo), because the Upload photos are taken from farther away for the 3D model.
+- Staff can scan one side at a time, or press "Scan all sides" to scan every side. Results shows a grid with
   one tile per side and its defects; the scan of all sides is saved as one record.
 
 **Dents and warping are NOT detected**
@@ -98,6 +100,12 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
   the website; every change to orders (placed, stage moved, staff assigned), products, users, inventory, saved scans,
   defects and rework is recorded by the database itself, with who did it, what changed, the IP address and the
   browser. The Audit Logs page refreshes every 10 seconds.
+- **Customer OrderView follows the work:** each inspection photo appears in the customer's Photo Gallery as soon as
+  staff add it, and the finished 3D model appears in 3D Preview. The files are kept in a private storage bucket that
+  a customer can only read for their own orders. The page updates by itself within about 10 seconds.
+- **The order moves by itself during the first stages:** the first photo moves it from Confirmed to Upload, starting
+  the 3D build moves it to 3D Reconstruction, and the finished model moves it to Detect Defects. Later stages still
+  use the stage button.
 - Automatic actions:
   - **Saved failing scan:** a rework task with the recommended fixes is created and the admins are alerted.
   - **Passing scan:** the admins are told the results are ready.
@@ -118,11 +126,9 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
 - There is NO Laravel and NO Firebase. AR was removed from the system.
 
 **Not finished yet (say so honestly, or leave out)**
-- The customer Photo Gallery does not yet show the inspection photos from the Quality Scan.
-- 3D models are shown and downloaded but not saved with the order.
 - There is no digital checklist screen. The gates between stages are the saved scan and the passed scan. (The
   database has a qa_checklists table, but no screen uses it.)
-- The scan photo is saved inside the scan record in the database, not as a separate file in storage.
+- The annotated scan photo is saved inside the scan record in the database, not as a separate file in storage.
 
 ## B. Things to fix in the paper
 
@@ -341,7 +347,7 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
     - **5.3:** discussion;
     - **6.1 to 6.3:** summary, conclusions, recommendations.
     Possible recommendations, taken from the system's real limits: real MVCA product photos for the shop; connect
-    the customer Photo Gallery to the inspection photos; save 3D models with the order; a larger defect dataset;
+    a larger defect dataset;
     detecting dents and warping (for example with a to-scale 3D scan); measuring the real size of the piece and
     comparing it with the ordered size.
 54. **5.2 heading typo:** "ISO/**EIC** 25010" → "ISO/**IEC** 25010".

@@ -1,11 +1,11 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Maximize2, Minimize2, Info, ChevronRight,
-  ZoomIn, ZoomOut, RefreshCw, Package, Ruler,
+  Maximize2, Minimize2, Info, ChevronRight, Package, Ruler,
   Layers, Palette, Weight, Wrench, Heart, Clock, Hash, CheckCircle2
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { mediaLinks } from '@/lib/orderMedia';
 import { statusLabel } from '@/lib/orders';
 import { Skeleton, SkeletonRegion } from '@/components/ui/LoadingSkeleton';
 
@@ -26,19 +26,23 @@ interface SpecItem {
 export default function ProductDetail3D({ order }: ProductDetail3DProps) {
   const supabase = createClient();
   const [viewMode, setViewMode] = useState<ViewMode>('photo');
-  const [rotation, setRotation] = useState({ x: -15, y: 30 });
-  const [scale, setScale] = useState(1);
   const [showSpecs, setShowSpecs] = useState(false);
   const [product, setProduct] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const [modelUrl, setModelUrl] = useState<string | null>(null);
 
-  // Drag state
-  const dragRef = useRef<{ active: boolean; startX: number; startY: number; startRot: { x: number; y: number } }>({
-    active: false, startX: 0, startY: 0, startRot: { x: 0, y: 0 }
-  });
-  const viewportRef = useRef<HTMLDivElement>(null);
+  // The 3D model the workshop built for this order
+  useEffect(() => {
+    const path = order?.model_3d_path;
+    setModelUrl(null);
+    if (!path) return;
+    import('@google/model-viewer'); // registers <model-viewer>; browser-only
+    mediaLinks(supabase, [path]).then((links) => {
+      if (links[path]) { setModelUrl(links[path]); setViewMode('3d'); }
+    });
+  }, [order?.model_3d_path, supabase]);
 
   useEffect(() => {
     if (!order?.product_id) return;
@@ -61,51 +65,6 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
     fetchProduct();
   }, [order?.product_id, supabase]);
 
-  // Mouse drag handlers
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
-    if (viewMode !== '3d') return;
-    dragRef.current = { active: true, startX: e.clientX, startY: e.clientY, startRot: { ...rotation } };
-  }, [viewMode, rotation]);
-
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragRef.current.active) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    setRotation({
-      x: Math.max(-60, Math.min(60, dragRef.current.startRot.x + dy * 0.4)),
-      y: dragRef.current.startRot.y + dx * 0.5,
-    });
-  }, []);
-
-  const onMouseUp = useCallback(() => { dragRef.current.active = false; }, []);
-
-  // Touch drag handlers
-  const touchStartRef = useRef<{ x: number; y: number; rot: { x: number; y: number } } | null>(null);
-
-  const onTouchStart = useCallback((e: React.TouchEvent) => {
-    if (viewMode !== '3d') return;
-    const t = e.touches[0];
-    touchStartRef.current = { x: t.clientX, y: t.clientY, rot: { ...rotation } };
-  }, [viewMode, rotation]);
-
-  const onTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    e.preventDefault();
-    const t = e.touches[0];
-    const dx = t.clientX - touchStartRef.current.x;
-    const dy = t.clientY - touchStartRef.current.y;
-    setRotation({
-      x: Math.max(-60, Math.min(60, touchStartRef.current.rot.x + dy * 0.4)),
-      y: touchStartRef.current.rot.y + dx * 0.5,
-    });
-  }, []);
-
-  const onTouchEnd = useCallback(() => { touchStartRef.current = null; }, []);
-
-  const handleZoomIn = () => setScale(v => Math.min(2, +(v + 0.15).toFixed(2)));
-  const handleZoomOut = () => setScale(v => Math.max(0.4, +(v - 0.15).toFixed(2)));
-  const handleReset = () => { setRotation({ x: -15, y: 30 }); setScale(1); };
-
   const productName = product?.name || order?.product_name || 'Your Furniture';
   const productImage = product?.images?.[0] || '';
   const dimensions = product
@@ -127,10 +86,10 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
 
   const viewModes = [
     { key: 'photo' as ViewMode, label: 'Static Photo', desc: 'High-res product photo', emoji: '📷' },
-    { key: '3d' as ViewMode, label: '3D Preview', desc: 'Interactive 3D model', emoji: '🎲' },
+    { key: '3d' as ViewMode, label: '3D Preview', desc: modelUrl ? 'Built from your inspection photos' : 'Not built yet', emoji: '🎲' },
   ];
 
-  const activeViewportClass = viewMode === 'photo' ?'bg-slate-100 dark:bg-slate-900' :'bg-gradient-to-br from-violet-200 via-purple-200 to-white dark:from-purple-950 dark:via-violet-900 dark:to-slate-950';
+  const activeViewportClass = viewMode === 'photo' ? 'bg-white' : 'bg-[#0b0b0f]';
 
   if (loading) {
     return (
@@ -142,15 +101,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
 
   const viewportContent = (
     <div
-      ref={viewportRef}
-      className={`relative overflow-hidden rounded-2xl border border-border ${activeViewportClass} transition-colors ${isFullscreen ? 'h-full' : 'min-h-[320px]'} ${viewMode === '3d' ? 'cursor-grab active:cursor-grabbing select-none' : ''}`}
-      onMouseDown={onMouseDown}
-      onMouseMove={onMouseMove}
-      onMouseUp={onMouseUp}
-      onMouseLeave={onMouseUp}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
+      className={`relative overflow-hidden rounded-2xl border border-border ${activeViewportClass} transition-colors ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}
     >
       {/* Fullscreen toggle */}
       <button
@@ -167,7 +118,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
           <img
             src={productImage}
             alt={`${productName} product photo`}
-            className={`w-full object-cover ${isFullscreen ? 'h-full' : 'max-h-[320px]'}`}
+            className={`w-full object-contain ${isFullscreen ? 'absolute inset-0 h-full' : 'h-[320px]'}`}
             onError={() => setImgError(true)}
           />
         ) : (
@@ -183,59 +134,24 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
 
       {/* 3D Preview */}
       {viewMode === '3d' && (
-        <div className={`flex flex-col items-center justify-center px-6 py-10 ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
-          {/* 3D Object */}
-          <div
-            className="relative mb-5 transition-transform duration-100"
-            style={{
-              transform: `scale(${scale}) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
-              transformStyle: 'preserve-3d',
-              perspective: '800px',
-            }}
-          >
-            <div
-              className="flex h-32 w-48 items-center justify-center rounded-2xl border border-border bg-muted/80 shadow-xl backdrop-blur-md"
-              style={{ transform: 'translateZ(20px)' }}
-            >
-              <div className="text-center">
-                <div className="mb-2 text-5xl">🪑</div>
-                <p className="text-xs font-semibold text-foreground">{productName}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{dimensions}</p>
-              </div>
-            </div>
-            {/* Shadow */}
-            <div className="absolute -bottom-4 left-1/2 h-4 w-36 -translate-x-1/2 rounded-full bg-black/25 blur-md" />
+        modelUrl ? (
+          <model-viewer
+            src={modelUrl}
+            alt={`3D model of your ${productName}, built from its inspection photos. Drag to turn it.`}
+            camera-controls
+            auto-rotate
+            shadow-intensity="1"
+            environment-image="neutral"
+            exposure="1.3"
+            style={{ width: '100%', height: isFullscreen ? '100%' : 360, background: '#0b0b0f' }}
+          />
+        ) : (
+          <div className={`flex flex-col items-center justify-center gap-2 px-6 py-10 text-center ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
+            <div className="text-5xl">🪑</div>
+            <p className="text-sm font-semibold text-white">The 3D model is not ready yet</p>
+            <p className="max-w-xs text-xs text-white/70">It appears here once the workshop builds it from the inspection photos of your {productName}.</p>
           </div>
-
-          <p className="text-xs text-muted-foreground mb-4">Drag to rotate · Use buttons to zoom</p>
-
-          {/* Controls */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleZoomOut}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition active:scale-95"
-              aria-label="Zoom out"
-            >
-              <ZoomOut size={15} />
-            </button>
-            <button
-              onClick={handleZoomIn}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground hover:bg-muted/80 transition active:scale-95"
-              aria-label="Zoom in"
-            >
-              <ZoomIn size={15} />
-            </button>
-            <button
-              onClick={handleReset}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted/80 transition active:scale-95"
-            >
-              <RefreshCw size={13} /> Reset
-            </button>
-          </div>
-
-          {/* Zoom indicator */}
-          <p className="mt-2 text-xs text-muted-foreground">{Math.round(scale * 100)}% zoom</p>
-        </div>
+        )
       )}
 
     </div>
@@ -246,8 +162,8 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
       {/* Fullscreen Overlay */}
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-black/95 flex flex-col p-4">
-          <div className="flex-1 flex flex-col gap-4">
-            <div className="flex-1">
+          <div className="flex min-h-0 flex-1 flex-col gap-4">
+            <div className="min-h-0 flex-1">
               {viewportContent}
             </div>
             {/* Compact controls in fullscreen */}

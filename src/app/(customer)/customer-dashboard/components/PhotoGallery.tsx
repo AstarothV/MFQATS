@@ -1,7 +1,9 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { X, ZoomIn, ChevronLeft, ChevronRight, Shield, User, Calendar, Tag, ImageOff } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { mediaLinks } from '@/lib/orderMedia';
+import { watchOrders } from '@/lib/staffAssignment';
 
 interface Photo {
   id: string;
@@ -40,8 +42,9 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({});
 
+  const links = useRef<Record<string, string>>({}); // by photo id: a new link every time would reload every photo
+
   const fetchPhotos = useCallback(async () => {
-    setLoading(true);
     let query = supabase
       .from('inspection_images')
       .select('*')
@@ -49,9 +52,13 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
     if (orderId) query = query.eq('order_id', orderId);
     const { data } = await query;
     if (data) {
+      // the workshop's photos are bucket paths; older rows hold full addresses
+      const fresh = data.filter((p: any) => p.image_url && !p.image_url.startsWith('http') && !links.current[p.id]);
+      const signed = await mediaLinks(supabase, fresh.map((p: any) => p.image_url));
+      fresh.forEach((p: any) => { links.current[p.id] = signed[p.image_url]; });
       setPhotos(data.map((p: any) => ({
         id: p.id,
-        image_url: p.image_url || '',
+        image_url: links.current[p.id] || p.image_url || '',
         caption: p.caption || '',
         tags: Array.isArray(p.tags) ? p.tags : (typeof p.tags === 'string' ? (() => { try { return JSON.parse(p.tags); } catch { return []; } })() : []),
         stage_name: '',  // older rows carry workshop stage names that are no longer part of the process
@@ -66,7 +73,9 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
   }, [orderId, supabase]);
 
   useEffect(() => {
+    setLoading(true);
     fetchPhotos();
+    return watchOrders(supabase, 'order_gallery_updates', fetchPhotos);
   }, [fetchPhotos]);
 
   const getFilteredPhotos = () => {

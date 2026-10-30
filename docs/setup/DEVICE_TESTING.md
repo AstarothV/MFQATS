@@ -138,7 +138,7 @@ switches steps, and **Back / Next** move one step at a time.
 | E1 | **① Upload:** in **Front** tap **Camera** (or **Photos**), then add more sides, Top and Bottom included | Each photo fills its slot, with an ✕ to remove it; the bar shows "N of 6 photos" |
 | E2 | **② 3D Reconstruction → Build 3D model** | It uses the Upload photos (no new photos asked); about a minute later a colored model appears |
 | E3 | On the model, tap **Dimensions**, **Colors / Shape** and **⤢** | Length / width / height lines with the order's sizes; colors switch instantly; full screen |
-| E4 | **③ Detect Defects → Scan all sides** (or tap one photo) | Each Upload photo is scanned; "Found on this picture" lists the defects |
+| E4 | **③ Detect Defects → add close-ups, then Scan all sides** (or tap one photo) | Each side is scanned from its close-up, or its Upload photo if it has none; "Found on this picture" lists the defects |
 | E5 | **② → Defect pins** and **Edit mode** after scanning | Pins on the sides where defects were found; edit mode shows the surface grid with the defect faces painted |
 | E6 | **④ Results** | The verdict for every side, and the **Defects by side** grid; tap a side to see it larger. **Save results** saves all sides as one scan |
 | E7 | **⑤ Recommendation** with the order at Recommendation | Repair advice per defect; **Release for delivery** opens only after a passed scan; **Send back for rework** returns it to Upload |

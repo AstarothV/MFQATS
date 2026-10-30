@@ -5,6 +5,7 @@ import { OrderViewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkelet
 import { Package, Search, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, Truck, AlertCircle, TrendingUp, Eye, X, FileText, Image, Box, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
+import { watchOrders } from '@/lib/staffAssignment';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Link from 'next/link';
@@ -99,14 +100,7 @@ export default function OrderViewContent() {
   useEffect(() => {
     fetchOrders();
     if (!user) return;
-    const channel = supabase
-      .channel('order_view_updates')
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public', table: 'orders',
-        filter: `customer_id=eq.${user.id}`,
-      }, () => fetchOrders())
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return watchOrders(supabase, 'order_view_updates', fetchOrders);
   }, [user]);
 
   const fetchHistoryLogs = async (orderId: string) => {

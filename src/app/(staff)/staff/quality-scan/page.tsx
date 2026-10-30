@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
+import { removeOrderPhoto, saveOrderModel, saveOrderPhoto } from '@/lib/orderMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { shrink } from './serverApi';
@@ -39,7 +40,7 @@ interface DetectResponse {
   defect_count: number;
 }
 
-// The scan of one Upload photo. Kept with the file it came from: a replaced photo makes its scan stale.
+// The scan of one side's photo. Kept with the file it came from: a replaced photo makes its scan stale.
 interface SideScan {
   file: File;
   image: string;
@@ -99,9 +100,10 @@ export default function QualityScanPage() {
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const inFlightRef = useRef(false);
   const photoSet = usePhotoSet();
+  const closeUps = usePhotoSet(); // Detect Defects: a nearer photo of each side's surface, for the scan only
 
   const [step, setStep] = useState(0);
-  // where the defect scan's picture comes from: the live camera, one of the Upload photos, or a new file
+  // where the defect scan's picture comes from: the live camera, one of the side photos, or a new file
   const [source, setSource] = useState<'live' | 'photos' | 'file'>('photos');
   const mode = source === 'live' ? 'live' : 'upload';
   const [scannedSlot, setScannedSlot] = useState<number | null>(null);
@@ -179,8 +181,63 @@ export default function QualityScanPage() {
     setSavedInfo({ scan: (scan?.overall_result as Saved['scan']) ?? null });
   }
 
+  // A step forward when the work itself shows the stage has moved on, so the customer's OrderView keeps up.
+  const advancingTo = useRef('');
+  function advance(from: string, to: string) {
+    if (!selectedOrder || selectedOrder.extended_status !== from || advancingTo.current === to) return;
+    const order = selectedOrder;
+    advancingTo.current = to;
+    moveOrderStage(supabase, order, to)
+      .then(() => setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, extended_status: to } : o))))
+      .catch(() => {}) // the stage button is still there
+      .finally(() => { advancingTo.current = ''; });
+  }
+
+  const notShared = (err: any) => showToast('error', `Not shared with the customer: ${err?.message ?? 'please try again'}`);
+
+  // Every photo goes to the customer's Photo Gallery as soon as it is added, and leaves it when it is removed.
+  const sharedPhotos = useRef(new Map<string, File>()); // by caption, for the chosen order
+  useEffect(() => {
+    if (!selectedOrderId || !user) return;
+    let added = false;
+    for (const [set, kind] of [[photoSet, 'photo'], [closeUps, 'close-up']] as const) {
+      VIEWS.forEach((view, i) => {
+        const caption = `${view} ${kind}`;
+        const file = set.photos[i];
+        if (file === (sharedPhotos.current.get(caption) ?? null)) return;
+        if (file) {
+          sharedPhotos.current.set(caption, file);
+          added = true;
+          shrink(file)
+            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [view, kind === 'photo' ? 'Upload' : 'Close-up'], image }))
+            .catch(notShared);
+        } else {
+          sharedPhotos.current.delete(caption);
+          removeOrderPhoto(supabase, selectedOrderId, caption).catch(notShared);
+        }
+      });
+    }
+    if (added) advance('confirmed', 'upload');
+  }, [selectedOrderId, photoSet.photos, closeUps.photos]);
+
+  // The finished model goes to the customer's 3D Preview.
+  function modelBuilt(url: string | null) {
+    setModel3dUrl(url);
+    if (!url || !selectedOrderId) return;
+    fetch(url).then((r) => r.blob())
+      .then((blob) => saveOrderModel(supabase, selectedOrderId, blob))
+      .then(() => advance('reconstruction_3d', 'detect_defects'))
+      .catch(notShared);
+  }
+
   // Choosing an order opens the step it is at, and loads what was already saved for it.
   function chooseOrder(id: string) {
+    if (selectedOrderId && id !== selectedOrderId) { // another piece: this one's photos and scans are not its
+      sharedPhotos.current.clear();
+      VIEWS.forEach((_, i) => { photoSet.setSlot(i, null); closeUps.setSlot(i, null); });
+      clearScan();
+      setSideScans(VIEWS.map(() => null));
+    }
     setSelectedOrderId(id);
     const order = orders.find((o) => o.id === id);
     const at = order ? STEP_OF[order.extended_status] : undefined;
@@ -299,7 +356,7 @@ export default function QualityScanPage() {
     analyzeImage(imageData);
   }
 
-  // side: the Upload photo this picture is, so its scan also fills that side in Results
+  // side: the side photo this picture is, so its scan also fills that side in Results
   async function analyzeImage(imageData: string, side?: { slot: number; file: File }) {
     setAnalyzing(true);
     setDetections([]);
@@ -322,9 +379,9 @@ export default function QualityScanPage() {
     }
   }
 
-  // Scan one of the photos taken in the Upload step.
+  // Scan one side's photo.
   async function scanPhoto(slot: number) {
-    const file = photoSet.photos[slot];
+    const file = scanSet.photos[slot];
     if (!file) return;
     try {
       const imageData = await shrink(file);
@@ -337,16 +394,16 @@ export default function QualityScanPage() {
     }
   }
 
-  // Scan every Upload photo, one after another; each fills its side in Results.
+  // Scan every side's photo, one after another; each fills its side in Results.
   async function scanAllSides() {
-    const slots = photoSet.photos.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
+    const slots = scanSet.photos.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
     if (!slots.length) return;
     setSaved(false);
     try {
       for (let n = 0; n < slots.length; n++) {
         setScanAllAt(n);
         const slot = slots[n];
-        const file = photoSet.photos[slot]!;
+        const file = scanSet.photos[slot]!;
         const image = await shrink(file);
         const res = await detectDefects(image);
         setBackendOffline(false);
@@ -449,7 +506,7 @@ export default function QualityScanPage() {
       setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: to } : o)));
       showToast('success', `${selectedOrder.order_ref} moved to ${statusLabel(to)}`);
       if (STEP_OF[to] !== undefined) goTo(STEP_OF[to]);
-      if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); } // sent back for rework: the next inspection starts fresh
+      if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); VIEWS.forEach((_, i) => closeUps.setSlot(i, null)); } // sent back for rework: the next inspection starts fresh
     } catch (err: any) {
       showToast('error', err?.message || 'Could not move the order');
     } finally {
@@ -523,7 +580,14 @@ export default function QualityScanPage() {
 
   // ---- what each step shows in the step bar ----
   const photoCount = photoSet.photos.filter(Boolean).length;
-  const sides = sideScans.map((s, i) => (s && s.file === photoSet.photos[i] ? s : null));
+  // the photo each side is scanned from: its close-up, else its Upload photo
+  const scanSet = {
+    ...closeUps,
+    photos: closeUps.photos.map((f, i) => f ?? photoSet.photos[i]),
+    previews: closeUps.previews.map((p, i) => p ?? photoSet.previews[i]),
+  };
+  const scanCount = scanSet.photos.filter(Boolean).length;
+  const sides = sideScans.map((s, i) => (s && s.file === scanSet.photos[i] ? s : null));
   const extra = source !== 'photos' && (result === 'pass' || result === 'fail')
     ? { label: source === 'live' ? 'Camera' : 'New photo', image: capturedImage || uploadedImage || '', detections, result } : null;
   const inspected = [
@@ -536,7 +600,7 @@ export default function QualityScanPage() {
     ? Math.round((allDetections.reduce((sum, d) => sum + d.confidence_score, 0) / allDetections.length) * 10) / 10 : 0;
   const failing = allDetections.filter((d) => d.severity !== 'low');
   const sideTiles: SideTile[] = [
-    ...VIEWS.map((v, i) => ({ label: v as string, image: sides[i]?.image ?? photoSet.previews[i], detections: sides[i]?.detections ?? null })),
+    ...VIEWS.map((v, i) => ({ label: v as string, image: sides[i]?.image ?? scanSet.previews[i], detections: sides[i]?.detections ?? null })),
     ...(extra ? [{ label: extra.label, image: extra.image, detections: extra.detections }] : []),
   ];
   // defect pins for the 3D model: each defect's photo position, on the side it was found
@@ -545,20 +609,28 @@ export default function QualityScanPage() {
     w: d.bounding_box.width, h: d.bounding_box.height,
     label: formatLabel(d.class_name), severity: d.severity,
   })) : []));
+  const scannedSides = sides.filter(Boolean).length;
+  const allScanned = scanCount > 0 && scannedSides === scanCount;
   const stepNotes = [
     `${photoCount} of ${VIEWS.length} photos`,
     '3D model of the piece',
-    analyzing || scanAllAt !== null ? 'Scanning…' : inspectionResult ? (failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : 'No failing defects') : 'Scan and size check',
+    analyzing || scanAllAt !== null ? 'Scanning…' : failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : allScanned ? 'No failing defects' : scannedSides ? `${scannedSides} of ${scanCount} sides scanned` : 'Scan every side',
     saved ? 'Saved' : inspectionResult ? 'Not saved yet' : savedInfo.scan ? `Last saved: ${savedInfo.scan}` : 'Pass or fail',
     'Next action',
   ];
   // the verdict shown in Results and Recommendation: this visit's scan, else the order's last saved one
   const verdict = inspectionResult ?? savedInfo.scan;
+  // Detect Defects in the step bar: a cross as soon as a defect fails the piece, a check once every side is clear.
+  // A saved scan only counts until the order goes back for rework.
+  const savedScan = orderStep !== null && orderStep >= 2 ? savedInfo.scan : null;
+  const busyScanning = analyzing || scanAllAt !== null;
+  const scanMark = failing.length || (!inspected.length && savedScan === 'fail') ? 'fail'
+    : !busyScanning && (allScanned || (!inspected.length && savedScan === 'pass')) ? 'pass' : null;
 
   const scanAllButton = (
     <button onClick={scanAllSides} disabled={scanAllAt !== null || analyzing} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm disabled:opacity-60">
       {scanAllAt !== null
-        ? <><Loader2 size={14} className="animate-spin" /> Scanning side {scanAllAt + 1} of {photoCount}…</>
+        ? <><Loader2 size={14} className="animate-spin" /> Scanning side {scanAllAt + 1} of {scanCount}…</>
         : <><Images size={14} /> Scan all sides</>}
     </button>
   );
@@ -704,11 +776,12 @@ export default function QualityScanPage() {
         )}
 
         {/* Step bar */}
-        <nav aria-label="Inspection steps" className="card-dark grid grid-cols-5 gap-1.5 p-2 sm:p-3">
+        <nav aria-label="Inspection steps" className="card-dark grid grid-cols-[1fr_1.2fr_1fr_1fr_1.5fr] gap-0.5 p-2 sm:grid-cols-5 sm:gap-1.5 sm:p-3">
           {PROCESS_STAGES.map((s, i) => {
             const done = orderStep !== null && i < orderStep;
             const here = orderStep === i;
             const current = step === i;
+            const mark = i === 2 ? scanMark : null;
             return (
               <button
                 key={s.key}
@@ -717,14 +790,15 @@ export default function QualityScanPage() {
                 className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-center transition-colors sm:flex-row sm:gap-2.5 sm:px-3 sm:text-left ${current ? 'bg-primary/10 shadow-[inset_0_1px_0_var(--glass-edge)]' : 'hover:bg-muted'}`}
               >
                 {here && (
-                  <span className="absolute -top-2 right-1 rounded-full bg-warning px-1.5 text-[10px] font-bold text-white sm:right-2">Order is here</span>
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-warning px-1.5 text-[9px] font-bold text-white sm:left-auto sm:right-2 sm:translate-x-0 sm:text-[10px]">Order is here</span>
                 )}
-                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${current ? 'bg-primary text-primary-foreground' : done ? 'bg-success/15 text-success' : 'bg-muted text-muted-foreground'}`}>
-                  {done && !current ? <Check size={15} /> : i + 1}
+                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${mark === 'fail' ? 'bg-danger text-white' : mark === 'pass' ? 'bg-emerald-500/20 text-success' : current ? 'bg-primary text-primary-foreground' : done ? 'bg-emerald-500/20 text-success' : 'bg-muted text-muted-foreground'}`}>
+                  {mark === 'fail' ? <X size={16} strokeWidth={3} /> : mark === 'pass' ? <Check size={16} strokeWidth={3} /> : done && !current ? <Check size={15} /> : i + 1}
+                  {mark && <span className="sr-only">{mark === 'fail' ? 'Failed: ' : 'Passed: '}</span>}
                 </span>
                 <span className="min-w-0">
-                  <span className={`block text-[11px] font-semibold leading-tight sm:text-sm ${current ? 'text-foreground' : 'text-foreground/80'}`}>{s.label}</span>
-                  <span className="hidden truncate text-xs text-muted-foreground sm:block">{stepNotes[i]}</span>
+                  <span className={`block text-[10px] font-semibold leading-tight sm:text-sm ${current ? 'text-foreground' : 'text-foreground/80'}`}>{s.label}</span>
+                  <span className={`hidden truncate text-xs sm:block ${mark === 'fail' ? 'font-semibold text-danger' : 'text-muted-foreground'}`}>{stepNotes[i]}</span>
                 </span>
               </button>
             );
@@ -733,7 +807,7 @@ export default function QualityScanPage() {
 
         {/* ---- 1 · Upload ---- */}
         <section hidden={step !== 0} className="card-dark space-y-4 p-5">
-          {stepHead(0, 'Take the inspection photos once. They are used for the 3D model and can be scanned for defects.')}
+          {stepHead(0, 'Take the inspection photos once. They are used for the 3D model and can be scanned for defects. The customer sees them in OrderView as soon as you add them.')}
           <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${(photoCount / VIEWS.length) * 100}%` }} />
           </div>
@@ -755,8 +829,8 @@ export default function QualityScanPage() {
         {/* ---- 2 · 3D Reconstruction ---- */}
         <section hidden={step !== 1} className="space-y-4">
           <div className="card-dark space-y-4 p-5">
-            {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order.')}
-            <Model3DPanel apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onModel={setModel3dUrl} />
+            {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order. The customer sees the finished model in OrderView.')}
+            <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} />
           </div>
         </section>
 
@@ -764,6 +838,14 @@ export default function QualityScanPage() {
         <section hidden={step !== 2} className="space-y-4">
           <div className="card-dark space-y-4 p-5">
             {stepHead(2, 'Scan every side of the piece for defects with YOLOv12.')}
+          </div>
+
+          <div className="card-dark space-y-3 p-5">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Close-up of each side</h3>
+              <p className="text-sm text-muted-foreground mt-1">Go nearer than the Upload photos, with that side's whole surface filling the frame, so small defects show and land in the right place on the 3D model. A side without a close-up is scanned from its Upload photo.</p>
+            </div>
+            <PhotoSlots set={closeUps} name="close-up" />
           </div>
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -816,11 +898,11 @@ export default function QualityScanPage() {
                         {source === 'photos' ? <Images size={32} className="text-accent" /> : <Upload size={32} className="text-accent" />}
                       </div>
                       {source === 'photos' ? (
-                        photoCount ? (
-                          <p className="text-muted-foreground text-sm">Pick one of the Upload photos to scan it.</p>
+                        scanCount ? (
+                          <p className="text-muted-foreground text-sm">Pick a side's photo to scan it.</p>
                         ) : (
                           <>
-                            <p className="text-muted-foreground text-sm">No photos yet. Take them in step 1, or upload a new one.</p>
+                            <p className="text-muted-foreground text-sm">No photos yet. Add close-ups above, or take the photos in step 1.</p>
                             <button onClick={() => goTo(0)} className="btn-primary flex items-center gap-2"><ChevronLeft size={16} /> Go to Upload</button>
                           </>
                         )
@@ -932,20 +1014,20 @@ export default function QualityScanPage() {
               <div className="card-dark space-y-3 p-4">
                 <p className="text-sm font-semibold text-foreground">Picture to scan</p>
                 <div className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
-                  {([['photos', 'Upload photos', Images], ['live', 'Live camera', Camera], ['file', 'New photo', Upload]] as const).map(([k, label, Icon]) => (
+                  {([['photos', 'Side photos', Images], ['live', 'Live camera', Camera], ['file', 'New photo', Upload]] as const).map(([k, label, Icon]) => (
                     <button key={k} onClick={() => switchSource(k)} aria-pressed={source === k} className={`${segButton(source === k)} flex-col justify-center gap-1 px-1 text-xs`}>
                       <Icon size={16} /> {label}
                     </button>
                   ))}
                 </div>
                 {source === 'photos' && (
-                  photoCount ? (
+                  scanCount ? (
                     <>
-                      <PhotoThumbs set={photoSet} selected={scannedSlot} onPick={scanPhoto} />
+                      <PhotoThumbs set={scanSet} selected={scannedSlot} onPick={scanPhoto} />
                       {scanAllButton}
                     </>
                   ) : (
-                    <p className="text-xs text-muted-foreground">No Upload photos yet.</p>
+                    <p className="text-xs text-muted-foreground">No photos yet.</p>
                   )
                 )}
                 <p className="text-xs text-muted-foreground">Pick a photo to scan one side, or scan all of them. Results shows every side; save it there.</p>
@@ -990,6 +1072,19 @@ export default function QualityScanPage() {
               <ModelDefectsView modelUrl={model3dUrl} pins={pins} />
             ) : null}
           </div>
+
+          {scanMark && (
+            <div role="status" className={`flex items-start gap-3 rounded-2xl border p-4 text-sm ${scanMark === 'fail' ? 'border-red-500/30 bg-red-500/10' : 'border-emerald-500/30 bg-emerald-500/10'}`}>
+              {scanMark === 'fail' ? <X size={18} className="mt-0.5 shrink-0 text-danger" /> : <Check size={18} className="mt-0.5 shrink-0 text-success" />}
+              <p className="text-foreground">
+                <span className="font-semibold">{scanMark === 'fail' ? 'Defects found.' : 'Every side is clear.'}</span>{' '}
+                {scanMark === 'fail' && inspected.length
+                  ? `${failing.length} defect${failing.length === 1 ? '' : 's'} fail${failing.length === 1 ? 's' : ''} this piece${allScanned ? '' : `, with ${scannedSides} of ${scanCount} sides scanned so far`}.`
+                  : scanMark === 'fail' ? 'The saved scan failed this piece.' : 'No failing defects.'}
+                {' '}{allScanned || !inspected.length ? 'Ready for Results.' : 'Scan the rest, then go to Results.'}
+              </p>
+            </div>
+          )}
         </section>
 
         {/* ---- 4 · Results ---- */}
@@ -1020,8 +1115,8 @@ export default function QualityScanPage() {
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/40 p-3">
                   <p className="text-xs text-muted-foreground">Sides scanned</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{sides.filter(Boolean).length} of {photoCount}</p>
-                  <p className="text-xs text-muted-foreground">{photoCount === 0 ? 'No Upload photos yet' : sides.filter(Boolean).length < photoCount ? 'Scan all sides to check every photo' : 'Every Upload photo checked'}</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{sides.filter(Boolean).length} of {scanCount}</p>
+                  <p className="text-xs text-muted-foreground">{scanCount === 0 ? 'No photos yet' : sides.filter(Boolean).length < scanCount ? 'Scan all sides to check every photo' : 'Every side checked'}</p>
                 </div>
           </div>
 
@@ -1029,9 +1124,9 @@ export default function QualityScanPage() {
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">Defects by side</p>
-                <p className="text-xs text-muted-foreground">Each Upload photo with what YOLOv12 found on it. Tap a side to see it larger.</p>
+                <p className="text-xs text-muted-foreground">Each side's photo with what YOLOv12 found on it. Tap a side to see it larger.</p>
               </div>
-              {photoCount > 0 && <div className="w-full sm:w-auto">{scanAllButton}</div>}
+              {scanCount > 0 && <div className="w-full sm:w-auto">{scanAllButton}</div>}
             </div>
             <DefectsBySide tiles={sideTiles} />
           </div>

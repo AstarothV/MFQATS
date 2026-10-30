@@ -123,11 +123,12 @@ The approach was **incremental**: each module was connected and tested as it was
 | IT-07 | Order Management + Team + Assigned Tasks + Notifications | Admin approves an order and assigns a staff member | Available staff listed first; the same assignment shown in Order Management and Team; the staff member is notified and sees the order in Assigned Tasks | **[ ]** | **[ ]** |
 | IT-08 | Website + Database + Audit Logs | A staff member signs in and moves an order to the next stage | "Signed in", "Opened the system" and "Stage update" entries appear in Audit Logs within 10 seconds, with who did it | **[ ]** | **[ ]** |
 | IT-09 | 3D Model + online 3D service + Orders | Staff builds a 3D model from the inspection photos and turns on Dimensions | Coloured 3D model shown and downloadable; the ordered length, width and height drawn on it | **[ ]** | **[ ]** |
-| IT-10 | Quality Scan (all sides) + 3D Model | Staff presses "Scan all sides" in Detect Defects | Every side scanned; the defects shown on the 3D model in edit mode (painted grid) and as pins; Results shows one tile per side | **[ ]** | **[ ]** |
+| IT-10 | Quality Scan (all sides) + 3D Model | Staff adds close-ups and presses "Scan all sides" in Detect Defects | Every side scanned, from its close-up if it has one; the defects shown on the 3D model in edit mode (painted grid) and as pins; Results shows one tile per side | **[ ]** | **[ ]** |
 | IT-11 | Stage history + PERT + OrderView | Customer opens OrderView for an order in progress | Stage timeline and estimated completion date shown | **[ ]** | **[ ]** |
 | IT-12 | Saved scans + Dashboards | Admin opens Admin Overview and Defect Analytics | Defect rate and defect charts include the new scan | **[ ]** | **[ ]** |
+| IT-13 | Quality Scan + Storage + OrderView | Staff adds photos and builds a 3D model while the customer has OrderView open | Photos appear in Photo Gallery, the model in 3D Preview and the stage moves on, within about 10 seconds; another customer cannot open them | **[ ]** | **[ ]** |
 
-**Summary. [Fill in after running IT-02 to IT-12, for example with the demo accounts, following
+**Summary. [Fill in after running IT-02 to IT-13, for example with the demo accounts, following
 docs/setup/DEVICE_TESTING.md. Record any defect found and how it was fixed.]**
 
 ### 4.4.3 System Testing
