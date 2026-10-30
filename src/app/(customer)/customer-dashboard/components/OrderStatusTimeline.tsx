@@ -118,7 +118,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
             <span className="whitespace-nowrap text-xs font-bold text-slate-600 dark:text-slate-300">{completionPct}% complete</span>
           </div>
         </div>
-        <div className="text-right shrink-0">
+        <div className="shrink-0 text-left sm:text-right">
           <p className="text-xs text-slate-500 dark:text-slate-400" title="Estimated with PERT from today, based on how long each remaining stage usually takes">
             Estimated Completion
           </p>

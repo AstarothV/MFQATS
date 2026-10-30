@@ -6,48 +6,30 @@ import { Maximize2, X } from 'lucide-react';
 
 // Detect Defects: the 3D model built in step 2, with the defects the photo scans found, as numbered pins or painted
 // on the model's surface grid (edit mode). The 3D model itself finds nothing; the positions are approximate.
+// Both views place them with defectSpots.ts, so a defect is on the real surface and only shows from its own side.
 
 // three.js for edit mode is loaded only when it is shown
 const EditModeView = dynamic(() => import('./EditModeView'), { ssr: false });
 
-type V3 = { x: number; y: number; z: number };
 /** A defect found on one side's photo (slot = index in VIEWS; u, v = its centre and w, h = its size, 0–1 of the photo). */
 export interface Pin { slot: number; u: number; v: number; w?: number; h?: number; label: string; severity: string }
-
-// Where a defect goes on the model: the photo's spot laid onto the matching face of the model's bounding box, with
-// front facing +z (the glTF convention). Only approximate: the photo shows the background too.
-function pinOnModel({ slot, u, v }: Pin, c: V3, s: V3): { position: string; normal: string } {
-  const lo = { x: c.x - s.x / 2, y: c.y - s.y / 2, z: c.z - s.z / 2 }, hi = { x: c.x + s.x / 2, y: c.y + s.y / 2, z: c.z + s.z / 2 };
-  const at = (a: number, b: number, t: number) => a + (b - a) * Math.min(1, Math.max(0, t));
-  const down = at(hi.y, lo.y, v);
-  const [p, n] = [ // VIEWS: Front, Left, Back, Right, Top, Bottom
-    [[at(lo.x, hi.x, u), down, hi.z], '0 0 1'],
-    [[lo.x, down, at(lo.z, hi.z, u)], '-1 0 0'],
-    [[at(hi.x, lo.x, u), down, lo.z], '0 0 -1'],
-    [[hi.x, down, at(hi.z, lo.z, u)], '1 0 0'],
-    [[at(lo.x, hi.x, u), hi.y, at(lo.z, hi.z, v)], '0 1 0'],
-    [[at(lo.x, hi.x, u), lo.y, at(hi.z, lo.z, v)], '0 -1 0'],
-  ][slot] as [number[], string];
-  return { position: p.map((x) => `${x}m`).join(' '), normal: n };
-}
 
 const PIN_COLOR: Record<string, string> = { high: '#EF4444', critical: '#EF4444', medium: '#F59E0B', low: '#22C55E' };
 
 export default function ModelDefectsView({ modelUrl, pins }: { modelUrl: string; pins: Pin[] }) {
-  const viewerRef = useRef<any>(null);
   const [mode, setMode] = useState<'edit' | 'pins'>('edit');
-  const [bounds, setBounds] = useState<{ c: V3; s: V3 } | null>(null);
+  const [spots, setSpots] = useState<{ position: string; normal: string }[]>([]);
   const [full, setFull] = useState(false);
 
   useEffect(() => { import('@google/model-viewer'); }, []); // registers <model-viewer>; browser-only
+  // three.js is only loaded when the pins are shown; pinsKey because the page builds a new array on every render
+  const pinsKey = JSON.stringify(pins);
   useEffect(() => {
-    const viewer = viewerRef.current;
-    if (!viewer) return;
-    setBounds(null);
-    const onLoad = () => setBounds({ c: viewer.getBoundingBoxCenter(), s: viewer.getDimensions() });
-    viewer.addEventListener('load', onLoad);
-    return () => viewer.removeEventListener('load', onLoad);
-  }, [modelUrl]);
+    if (mode !== 'pins') return;
+    let stale = false;
+    import('./defectSpots').then(({ pinSpots }) => pinSpots(modelUrl, pins)).then((s) => { if (!stale) setSpots(s); });
+    return () => { stale = true; };
+  }, [modelUrl, pinsKey, mode]);
 
   // Esc leaves full screen; the page behind does not scroll while it is open.
   useEffect(() => {
@@ -69,7 +51,6 @@ export default function ModelDefectsView({ modelUrl, pins }: { modelUrl: string;
         className={full ? 'fixed inset-0 z-[100] bg-[#0b0b0f]' : 'relative overflow-hidden rounded-xl'}
       >
         <model-viewer
-          ref={viewerRef}
           src={modelUrl}
           alt="3D model of the furniture with the defects found. Drag to turn it."
           camera-controls
@@ -79,10 +60,10 @@ export default function ModelDefectsView({ modelUrl, pins }: { modelUrl: string;
           shadow-intensity="1"
           environment-image="neutral"
           exposure="1.3"
-          style={{ width: '100%', height: full ? '100%' : 460, background: '#0b0b0f', visibility: mode === 'edit' ? 'hidden' : 'visible' }}
+          style={{ width: '100%', height: full ? '100%' : 460, background: '#0b0b0f', visibility: mode === 'edit' ? 'hidden' : 'visible', '--min-hotspot-opacity': 0 } as React.CSSProperties}
         >
-          {bounds && mode === 'pins' && pins.map((pin, i) => {
-            const { position, normal } = pinOnModel(pin, bounds.c, bounds.s);
+          {mode === 'pins' && spots.length === pins.length && pins.map((pin, i) => {
+            const { position, normal } = spots[i];
             return (
               <div key={`pin${i}${position}`} slot={`hotspot-pin-${i}`} data-position={position} data-normal={normal}
                 className="pointer-events-none flex items-center gap-1.5">
@@ -109,8 +90,8 @@ export default function ModelDefectsView({ modelUrl, pins }: { modelUrl: string;
         {pins.length === 0
           ? 'No defects to show yet. Scan the sides above, then they appear on the model.'
           : mode === 'edit'
-            ? 'Edit mode: the model as a surface grid. Faces are painted where YOLOv12 found a defect on that side’s photo, at an approximate spot.'
-            : 'Defect pins: a numbered pin on the side where each defect was found, at an approximate spot.'}
+            ? 'Edit mode: the model as a surface grid. Faces are painted where YOLOv12 found a defect on that side’s photo, at an approximate spot, on that side only. Turn the model to see the other sides, including the bottom.'
+            : 'Defect pins: a numbered pin on the side where each defect was found, at an approximate spot. A pin only shows when its side faces you, so turn the model to see the others, including the bottom.'}
         {' '}The 3D model itself does not find defects. Drag to turn, scroll or pinch to zoom.
       </p>
     </div>

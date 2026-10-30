@@ -51,7 +51,7 @@
   },
   "dependencies": {
     "@dhiwise/component-tagger": "^1.0.15",
-    "@google/model-viewer": "^4.1.0",
+    "@google/model-viewer": "4.1.0",
     "@heroicons/react": "^2.2.0",
     "@supabase/ssr": "0.5.2",
     "@supabase/supabase-js": "2.49.4",
