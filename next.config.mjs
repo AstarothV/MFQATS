@@ -14,6 +14,7 @@ const nextConfig = {
   images: {
     remotePatterns: imageHosts,
     minimumCacheTTL: 60,
+    qualities: [75, 85], // AppImage uses 85
   },
   // The Quality Scan tools reach the Python detection server through src/app/(staff)/staff/yolo/[...path]/route.ts.
   webpack(

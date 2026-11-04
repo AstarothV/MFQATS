@@ -1,235 +1,153 @@
 'use client';
-import React, { useState } from 'react';
-import { CheckCircle2, Circle, Loader2, Lock, ChevronRight, X } from 'lucide-react';
+import React from 'react';
+import { CheckCircle2, Circle, Loader2, Lock, ChevronRight, AlertTriangle } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
+import { PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
+import { VIEWS } from '@/app/(staff)/staff/quality-scan/PhotoSet';
+import type { WorkFacts, WorkOrder } from './StaffDashboardContent';
 
-const stages = [
-  { id: 'stage-upload', name: 'Upload', status: 'complete', time: '6m', staff: 'MR' },
-  { id: 'stage-reconstruction', name: '3D Reconstruction', status: 'complete', time: '24m', staff: 'MR' },
-  { id: 'stage-detect', name: 'Detect Defects', status: 'active', time: '4m', staff: 'MR' },
-  { id: 'stage-results', name: 'Results', status: 'pending', time: '~10m est', staff: '—' },
-  { id: 'stage-recommendation', name: 'Recommendation', status: 'locked', time: '—', staff: '—' },
-];
+interface Item { label: string; done: boolean; required: boolean }
 
-const checklist = [
-  { id: 'check-order', label: 'Select the order being inspected', done: true },
-  { id: 'check-surface', label: 'Wipe sawdust off the surface and check the lighting', done: true },
-  { id: 'check-image', label: 'Capture or upload the inspection image', done: true },
-  { id: 'check-detect', label: 'Run defect detection', done: false },
-  { id: 'check-review', label: 'Review the detected defects and confidence scores', done: false },
-  { id: 'check-save', label: 'Save the scan result', done: false },
-];
+const duration = (ms: number) => {
+  const m = Math.round(ms / 60000);
+  return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${m % 60}m`;
+};
 
-export default function StageProgressPanel() {
-  const [checks, setChecks] = useState(checklist);
-  const [modal, setModal] = useState<'qa' | 'note' | null>(null);
-  const [note, setNote] = useState('');
-  const [noteSaved, setNoteSaved] = useState(false);
+// The checklist of the order's current stage, ticked from what is really saved (photos, 3D model, scans), so it is
+// the same for everyone and updates as the work is done in Quality Scan. Submit moves the order to the next stage;
+// the database still checks every move (a saved scan before Results, a passed scan before delivery).
+function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; items: Item[]; next: string | null; action: string } {
+  const count = (kind: string) => VIEWS.filter((v) => f.captions.includes(`${v} ${kind}`)).length;
+  const since = f.history.filter((h) => h.status === o.extended_status).at(-1)?.entered_at;
+  const scanHere = !!f.scan && (!since || f.scan.at >= since);
+  const passed = f.scan?.result === 'pass';
+  switch (o.extended_status) {
+    case 'confirmed': return { title: 'Before starting', next: 'upload', action: 'Start Production', items: [
+      { label: 'Order approved by the admin', done: true, required: true },
+      { label: 'Assigned to you', done: o.assigned_to === me, required: false },
+    ] };
+    case 'upload': return { title: 'Upload checklist', next: 'reconstruction_3d', action: 'Submit: go to 3D Reconstruction', items: [
+      { label: 'Front photo taken', done: f.captions.includes('Front photo'), required: true },
+      { label: `Every side photographed (${count('photo')} of ${VIEWS.length})`, done: count('photo') === VIEWS.length, required: false },
+    ] };
+    case 'reconstruction_3d': return { title: '3D Reconstruction checklist', next: 'detect_defects', action: 'Submit: go to Detect Defects', items: [
+      { label: 'Upload photos taken', done: count('photo') > 0, required: true },
+      { label: '3D model built and saved', done: !!o.model_3d_path, required: true },
+    ] };
+    case 'detect_defects': return { title: 'Detect Defects checklist', next: 'results', action: 'Submit: go to Results', items: [
+      { label: `Close-ups of the sides (${count('close-up')} of ${VIEWS.length})`, done: count('close-up') === VIEWS.length, required: false },
+      { label: 'Every side scanned and the scan saved', done: scanHere, required: true },
+    ] };
+    case 'results': return { title: 'Results checklist', next: 'recommendation', action: 'Submit: go to Recommendation', items: [
+      { label: 'Scan saved', done: !!f.scan, required: true },
+      { label: f.scan ? `Result: ${passed ? 'passed' : 'failed, needs rework'}` : 'Result', done: passed, required: false },
+    ] };
+    case 'recommendation': return passed
+      ? { title: 'Recommendation', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: 'Latest saved scan passed', done: true, required: true }] }
+      : { title: 'Recommendation', next: 'upload', action: 'Send back for rework', items: [{ label: 'Latest saved scan failed: fix the piece, then inspect it again', done: false, required: false }] };
+    default: return { title: 'Checklist', next: null, action: '', items: [] };
+  }
+}
 
-  function toggleCheck(id: string) {
-    setChecks((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, done: !c.done } : c))
+export default function StageProgressPanel({ order, facts, expected, me, moving, message, onSubmit }: {
+  order: WorkOrder | null; facts: WorkFacts | null; expected: Record<string, number>; me: string;
+  moving: boolean; message: { ok: boolean; text: string } | null; onSubmit: (to: string) => void;
+}) {
+  if (!order) {
+    return (
+      <div className="card-dark p-5 h-full flex items-center justify-center text-center">
+        <p className="text-sm text-muted-foreground">No order in progress. Orders appear here once the admin approves them.</p>
+      </div>
     );
   }
 
-  function saveNote() {
-    setNoteSaved(true);
-    setTimeout(() => {
-      setNoteSaved(false);
-      setModal(null);
-      setNote('');
-    }, 1200);
-  }
-
-  const completedCount = checks.filter((c) => c.done).length;
-  const pct = Math.round((completedCount / checks.length) * 100);
-  const allDone = completedCount === checks.length;
+  const at = PROCESS_STAGES.findIndex((s) => s.key === order.extended_status); // -1 = Confirmed, not started yet
+  const spent = (key: string) => {
+    const rows = (facts?.history ?? []).filter((h) => h.status === key);
+    if (!rows.length) return null;
+    return rows.reduce((ms, h) => ms + ((h.left_at ? new Date(h.left_at).getTime() : Date.now()) - new Date(h.entered_at).getTime()), 0);
+  };
+  const list = facts ? checklist(order, facts, me) : null;
+  const ready = !!list && list.items.filter((i) => i.required).every((i) => i.done);
 
   return (
     <div className="card-dark p-5 h-full">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-base font-semibold text-foreground">WP-2847 · Oak Dining Table</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">Order #ORD-4421 · Priority: Urgent</p>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-foreground">{order.order_ref} · {order.product_name}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{order.assigned_to === me ? 'Assigned to you' : 'Not assigned to you'}</p>
         </div>
-        <StatusBadge variant="danger" label="Urgent" dot />
+        <StatusBadge variant={statusVariant(order.extended_status)} label={statusLabel(order.extended_status)} dot />
       </div>
 
-      {/* Stage Progress Bar */}
+      {/* Stage progress */}
       <div className="flex items-center gap-1 mb-5 overflow-x-auto pb-1">
-        {stages.map((stage, idx) => {
-          const isLast = idx === stages.length - 1;
+        {PROCESS_STAGES.map((stage, idx) => {
+          const state = idx < at ? 'complete' : idx === at ? 'active' : idx === at + 1 ? 'pending' : 'locked';
+          const ms = spent(stage.key);
           return (
-            <React.Fragment key={stage.id}>
+            <React.Fragment key={stage.key}>
               <div className="flex flex-col items-center min-w-[64px]">
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 transition ${
-                    stage.status === 'complete'
-                      ? 'bg-success/20 text-success border border-success/40'
-                      : stage.status === 'active' ?'bg-primary text-primary-foreground'
-                      : stage.status === 'pending' ?'bg-muted text-muted-foreground border border-border' :'bg-muted/50 text-muted-foreground/50 border border-border/50'
-                  }`}
-                >
-                  {stage.status === 'complete' ? (
-                    <CheckCircle2 size={14} />
-                  ) : stage.status === 'active' ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : stage.status === 'locked' ? (
-                    <Lock size={12} />
-                  ) : (
-                    <Circle size={12} />
-                  )}
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mb-1 ${
+                  state === 'complete' ? 'bg-emerald-500/20 text-success'
+                    : state === 'active' ? 'bg-primary text-primary-foreground'
+                    : state === 'pending' ? 'bg-muted text-muted-foreground border border-border' : 'bg-muted/50 text-muted-foreground/50 border border-border/50'
+                }`}>
+                  {state === 'complete' ? <CheckCircle2 size={14} /> : state === 'active' ? <Loader2 size={14} className="animate-spin" /> : state === 'locked' ? <Lock size={12} /> : <Circle size={12} />}
                 </div>
-                <span
-                  className={`text-2xs text-center leading-tight whitespace-nowrap ${
-                    stage.status === 'active' ?'text-accent font-semibold'
-                      : stage.status === 'complete' ?'text-success' :'text-muted-foreground'
-                  }`}
-                >
-                  {stage.name}
+                <span className={`text-2xs text-center leading-tight whitespace-nowrap ${state === 'active' ? 'text-accent font-semibold' : state === 'complete' ? 'text-success' : 'text-muted-foreground'}`}>
+                  {stage.label}
                 </span>
-                <span className="text-2xs text-muted-foreground/70">{stage.time}</span>
+                <span className="text-2xs text-muted-foreground/70">
+                  {ms !== null ? duration(ms) : expected[stage.key] ? `~${duration(expected[stage.key] * 3600000)} est` : '—'}
+                </span>
               </div>
-              {!isLast && (
-                <div
-                  className={`flex-1 h-0.5 min-w-[12px] mt-[-14px] ${
-                    stage.status === 'complete' ? 'bg-success/40' : 'bg-border'
-                  }`}
-                />
+              {idx < PROCESS_STAGES.length - 1 && (
+                <div className={`flex-1 h-0.5 min-w-[12px] mt-[-14px] ${state === 'complete' ? 'bg-emerald-500/40' : 'bg-border'}`} />
               )}
             </React.Fragment>
           );
         })}
       </div>
 
-      {/* Current Stage Checklist */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-foreground">Detect Defects Checklist</p>
-        <div className="flex items-center gap-2">
-          <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent rounded-full transition-[width] duration-300"
-              style={{ width: `${pct}%` }}
-            />
+      {/* Checklist of the current stage, from the real work */}
+      {!list ? (
+        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-foreground">{list.title}</p>
+            <span className="text-xs text-muted-foreground tabular-nums">{list.items.filter((i) => i.done).length}/{list.items.length}</span>
           </div>
-          <span className="text-xs text-muted-foreground tabular-nums">{completedCount}/{checks.length}</span>
-        </div>
-      </div>
+          <ul className="space-y-2">
+            {list.items.map((item) => (
+              <li key={item.label} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border text-sm ${
+                item.done ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-muted/30 border-border'
+              }`}>
+                {item.done ? <CheckCircle2 size={15} className="shrink-0 text-success" /> : <Circle size={15} className="shrink-0 text-muted-foreground" />}
+                <span className={item.done ? 'text-muted-foreground' : 'text-foreground'}>{item.label}</span>
+                {!item.required && <span className="ml-auto shrink-0 text-2xs text-muted-foreground">optional</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-muted-foreground">Ticks itself as the work is saved in Quality Scan.</p>
 
-      <div className="space-y-2">
-        {checks.map((check) => (
-          <button
-            key={check.id}
-            onClick={() => toggleCheck(check.id)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition duration-150 text-left ${
-              check.done
-                ? 'bg-success/10 border-success/20 text-success' :'bg-muted/30 border-border text-foreground hover:bg-muted/60'
-            }`}
-          >
-            {check.done ? (
-              <CheckCircle2 size={15} className="shrink-0 text-success" />
-            ) : (
-              <Circle size={15} className="shrink-0 text-muted-foreground" />
-            )}
-            <span className={`text-sm ${check.done ? 'line-through text-muted-foreground' : ''}`}>
-              {check.label}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex gap-2">
-        <button
-          onClick={() => setModal('qa')}
-          className={`btn-primary flex-1 flex items-center justify-center gap-1.5 text-sm ${allDone ? 'ring-2 ring-success/50' : ''}`}
-        >
-          {allDone ? <CheckCircle2 size={14} /> : <ChevronRight size={14} />}
-          {allDone ? 'Submit Checklist' : 'Open Checklist'}
-        </button>
-        <button
-          onClick={() => setModal('note')}
-          className="btn-secondary text-sm px-3"
-        >
-          Log Note
-        </button>
-      </div>
-
-      {/* QA Modal */}
-      {modal === 'qa' && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => setModal(null)}
-        >
-          <div
-            className="card-dark rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <h4 className="text-base font-bold text-foreground">Checklist — WP-2847</h4>
-              <button onClick={() => setModal(null)} className="text-muted-foreground hover:text-foreground">
-                <X size={16} />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              {allDone
-                ? 'All Detect Defects checks complete. Ready to submit for WP-2847 (Oak Dining Table).'
-                : `${completedCount} of ${checks.length} checks completed. Complete all items before submitting.`}
+          {list.next && (
+            <button
+              onClick={() => onSubmit(list.next!)}
+              disabled={!ready || moving}
+              className="btn-primary mt-4 flex w-full items-center justify-center gap-1.5 text-sm disabled:opacity-50"
+            >
+              {moving ? <Loader2 size={14} className="animate-spin" /> : <ChevronRight size={14} />} {list.action}
+            </button>
+          )}
+          {!ready && list.next && <p className="mt-2 text-xs text-muted-foreground">Finish the items that are not optional first.</p>}
+          {message && (
+            <p role="status" className={`mt-2 flex items-start gap-1.5 text-xs ${message.ok ? 'text-success' : 'text-danger'}`}>
+              {message.ok ? <CheckCircle2 size={13} className="mt-0.5 shrink-0" /> : <AlertTriangle size={13} className="mt-0.5 shrink-0" />} {message.text}
             </p>
-            {allDone ? (
-              <button
-                onClick={() => setModal(null)}
-                className="btn-primary w-full text-sm flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 size={14} /> Submit Checklist
-              </button>
-            ) : (
-              <button onClick={() => setModal(null)} className="btn-secondary w-full text-sm">
-                Continue Checklist
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Note Modal */}
-      {modal === 'note' && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => setModal(null)}
-        >
-          <div
-            className="card-dark rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <h4 className="text-base font-bold text-foreground">Log Note — WP-2847</h4>
-              <button onClick={() => setModal(null)} className="text-muted-foreground hover:text-foreground">
-                <X size={16} />
-              </button>
-            </div>
-            <textarea
-              className="input-dark w-full resize-none text-sm"
-              rows={4}
-              placeholder="Add a note about this stage or workpiece..."
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-            />
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={saveNote}
-                disabled={!note.trim() || noteSaved}
-                className="btn-primary flex-1 text-sm flex items-center justify-center gap-2"
-              >
-                {noteSaved ? <><CheckCircle2 size={14} /> Saved!</> : 'Save Note'}
-              </button>
-              <button onClick={() => setModal(null)} className="btn-secondary text-sm px-4">
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

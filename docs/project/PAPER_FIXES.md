@@ -92,6 +92,11 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
   Order Management, Product Catalog, Inventory, Team, Rework Queue, Defect Analytics, Reports with CSV export, User
   Management, Audit Logs, Messages.
 - Staff: Workshop dashboard, Assigned Tasks, Order Workflow, Quality Scan (one step per stage), Inventory, Messages.
+  - **Workshop:** the staff member picks the order they are working on; it shows the time in the current stage
+    against the PERT expected time, the stage progress, and a checklist that ticks itself from the saved work. Submit
+    moves the order to the next stage.
+  - **Quality Scan:** the chosen order, its photos and its 3D model are kept after a page reload. A **Finish** button
+    in Recommendation releases a passed piece for delivery.
 - **Staff assignment:** when the admin approves an order, Order Management lists the staff, with the available ones
   (no active order) first, and the admin assigns one. The Team page shows the same assignments (who is working on
   what, orders without staff) and can assign too. The assigned staff member is notified, and the order appears in
@@ -126,8 +131,8 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
 - There is NO Laravel and NO Firebase. AR was removed from the system.
 
 **Not finished yet (say so honestly, or leave out)**
-- There is no digital checklist screen. The gates between stages are the saved scan and the passed scan. (The
-  database has a qa_checklists table, but no screen uses it.)
+- The stage checklist (Workshop page) ticks itself from the saved work (photos, 3D model, saved scan); it is not
+  stored as a separate record. The database has a qa_checklists table, but nothing uses it.
 - The annotated scan photo is saved inside the scan record in the database, not as a separate file in storage.
 
 ## B. Things to fix in the paper
@@ -185,7 +190,8 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
 16. **"first-time pass rates":** the dashboards show the inspection pass rate and the defect rate (failed ÷ inspected).
     Use those terms, or define "first-time pass rate" the way the system computes it.
 17. **"digital checklists":** these appear in Specific Objectives, Delimitation, the IPQC definition and Section 4.2,
-    but there is no checklist screen. Either remove them, or describe the real gates (saved scan before Results,
+    but there is no checklist form. The Workshop page shows a checklist per stage that ticks itself from the saved
+    work and moves the order on (Submit). Describe that, plus the real gates (saved scan before Results,
     passed scan before Delivery). Do not claim a feature that is not there.
 18. **Definitions to add:** 3D model (mesh), image-to-3D, edit mode (surface grid), PERT, Weighted Moving Average
     (WMA), Finite State Machine (FSM), audit log, Intersection over Union (IoU), Precision / Recall / F1-score. If the

@@ -68,10 +68,11 @@ async function loadDims(orderId: string): Promise<Dims> {
 }
 
 // Builds from the order's photos taken in the Upload step (see PhotoSet.tsx).
-export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos, onBuild, onModel }: {
+export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos, onBuild, onModel, saved }: {
   apiUrl: string; orderId: string; set: PhotoSet; onChangePhotos: () => void;
   onBuild?: () => void; // the build has started
   onModel?: (url: string | null) => void; // the finished model, for Detect Defects to show the defects on
+  saved?: string | null; // the order's model from an earlier visit (a blob URL), shown until a new one is built
 }) {
   const photos = set.photos;
   const runRef = useRef(0); // bumps when a run starts or the panel goes away, so an old run stops polling
@@ -163,6 +164,7 @@ export default function Model3DPanel({ apiUrl, orderId, set, onChangePhotos, onB
   // the model is held in the browser (a blob URL), so viewing and downloading need no second trip to the server
   useEffect(() => () => { if (modelUrl) URL.revokeObjectURL(modelUrl); }, [modelUrl]);
   useEffect(() => { onModel?.(modelUrl); }, [modelUrl]);
+  useEffect(() => { if (saved && !busy) setModelUrl(saved); }, [saved]);
 
   async function build() {
     onBuild?.();

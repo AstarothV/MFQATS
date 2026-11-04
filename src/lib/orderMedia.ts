@@ -37,9 +37,35 @@ export async function saveOrderModel(supabase: SupabaseClient, orderId: string, 
   if (old?.model_3d_path) await supabase.storage.from(BUCKET).remove([old.model_3d_path]);
 }
 
+/** Deletes a cancelled order (admins only; the database refuses anyone else) and then its files in storage. */
+export async function deleteOrder(supabase: SupabaseClient, orderId: string) {
+  const { data, error } = await supabase.from('orders').delete().eq('id', orderId).select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('The order was not deleted. Only an admin can delete it, and only once it is cancelled.');
+  const { data: files } = await supabase.storage.from(BUCKET).list(orderId);
+  if (files?.length) await supabase.storage.from(BUCKET).remove(files.map((f) => `${orderId}/${f.name}`));
+}
+
 /** Links that work for an hour, by bucket path. */
 export async function mediaLinks(supabase: SupabaseClient, paths: string[]): Promise<Record<string, string>> {
   if (!paths.length) return {};
   const { data } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 3600);
   return Object.fromEntries((data ?? []).flatMap((d) => (d.path && d.signedUrl ? [[d.path, d.signedUrl]] : [])));
+}
+
+/** The order's saved photos (by caption) and 3D model, downloaded again so the Quality Scan can carry on after a reload. */
+export async function loadOrderMedia(supabase: SupabaseClient, orderId: string) {
+  const [{ data: rows }, { data: order }] = await Promise.all([
+    supabase.from('inspection_images').select('caption, image_url').eq('order_id', orderId),
+    supabase.from('orders').select('model_3d_path').eq('id', orderId).single(),
+  ]);
+  const own = (rows ?? []).filter((r) => r.image_url && !r.image_url.startsWith('http')); // older rows are web addresses
+  const modelPath: string | null = order?.model_3d_path ?? null;
+  const links = await mediaLinks(supabase, [...own.map((r) => r.image_url), ...(modelPath ? [modelPath] : [])]);
+  const download = async (path: string) => (links[path] ? (await fetch(links[path])).blob() : null);
+  const photos = await Promise.all(own.map(async (r) => {
+    const blob = await download(r.image_url);
+    return blob ? { caption: r.caption as string, file: new File([blob], r.image_url.split('/').pop()!, { type: 'image/jpeg' }) } : null;
+  }));
+  return { photos: photos.filter((p) => p !== null), model: modelPath ? await download(modelPath) : null };
 }
