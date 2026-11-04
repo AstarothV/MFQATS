@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
-import { removeOrderPhoto, saveOrderModel, saveOrderPhoto } from '@/lib/orderMedia';
+import { loadOrderMedia, removeOrderPhoto, saveOrderModel, saveOrderPhoto } from '@/lib/orderMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { shrink } from './serverApi';
@@ -220,10 +220,32 @@ export default function QualityScanPage() {
     if (added) advance('confirmed', 'upload');
   }, [selectedOrderId, photoSet.photos, closeUps.photos]);
 
+  // After a reload (or coming back to an order) its saved photos and 3D model are put back, so the work carries on.
+  // Only empty slots are filled: photos taken before choosing the order stay.
+  const [savedModel, setSavedModel] = useState<string | null>(null);
+  useEffect(() => {
+    setSavedModel(null);
+    if (!selectedOrderId) return;
+    let stale = false;
+    loadOrderMedia(supabase, selectedOrderId).then(({ photos, model }) => {
+      if (stale) return;
+      for (const { caption, file } of photos) {
+        const [view, kind] = caption.split(' ');
+        const slot = VIEWS.indexOf(view as (typeof VIEWS)[number]);
+        const set = kind === 'photo' ? photoSet : kind === 'close-up' ? closeUps : null;
+        if (slot < 0 || !set || set.photos[slot]) continue;
+        sharedPhotos.current.set(caption, file); // already saved: not uploaded again
+        set.setSlot(slot, file);
+      }
+      if (model) setSavedModel(URL.createObjectURL(model));
+    }).catch(() => {}); // nothing saved, or offline: start with empty slots
+    return () => { stale = true; };
+  }, [selectedOrderId]);
+
   // The finished model goes to the customer's 3D Preview.
   function modelBuilt(url: string | null) {
     setModel3dUrl(url);
-    if (!url || !selectedOrderId) return;
+    if (!url || !selectedOrderId || url === savedModel) return; // the saved model is already there
     fetch(url).then((r) => r.blob())
       .then((blob) => saveOrderModel(supabase, selectedOrderId, blob))
       .then(() => advance('reconstruction_3d', 'detect_defects'))
@@ -239,6 +261,7 @@ export default function QualityScanPage() {
       setSideScans(VIEWS.map(() => null));
     }
     setSelectedOrderId(id);
+    window.history.replaceState(null, '', id ? `?order=${id}` : window.location.pathname); // a reload opens it again
     const order = orders.find((o) => o.id === id);
     const at = order ? STEP_OF[order.extended_status] : undefined;
     if (at !== undefined) goTo(at);
@@ -509,6 +532,23 @@ export default function QualityScanPage() {
       if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); VIEWS.forEach((_, i) => closeUps.setSlot(i, null)); } // sent back for rework: the next inspection starts fresh
     } catch (err: any) {
       showToast('error', err?.message || 'Could not move the order');
+    } finally {
+      setMoving(false);
+    }
+  }
+
+  // Finish: a passed piece is released for delivery; from Results it goes through Recommendation first (one step at a time).
+  async function finish() {
+    if (!selectedOrder) return;
+    const order = selectedOrder;
+    setMoving(true);
+    try {
+      if (order.extended_status === 'results') await moveOrderStage(supabase, order, 'recommendation');
+      await moveOrderStage(supabase, { ...order, extended_status: 'recommendation' }, 'delivered');
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, extended_status: 'delivered' } : o)));
+      showToast('success', `${order.order_ref} is finished and released for delivery.`);
+    } catch (err: any) {
+      showToast('error', err?.message || 'Could not finish the order');
     } finally {
       setMoving(false);
     }
@@ -830,7 +870,7 @@ export default function QualityScanPage() {
         <section hidden={step !== 1} className="space-y-4">
           <div className="card-dark space-y-4 p-5">
             {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order. The customer sees the finished model in OrderView.')}
-            <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} />
+            <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
           </div>
         </section>
 
@@ -1177,20 +1217,32 @@ export default function QualityScanPage() {
             </ul>
           )}
 
-          {selectedOrder && orderStep === 4 ? (
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => moveOrder('upload')} disabled={moving} className="btn-primary flex items-center gap-2">
-                <RotateCcw size={15} /> Send back for rework
+          {selectedOrder?.extended_status === 'delivered' ? (
+            <div role="status" className="flex items-start gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm">
+              <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
+              <p className="text-foreground"><span className="font-semibold">{selectedOrder.order_ref} is finished.</span> It passed inspection and is released for delivery. The customer has been told.</p>
+            </div>
+          ) : selectedOrder && (orderStep === 3 || orderStep === 4) ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={finish} disabled={moving || savedInfo.scan !== 'pass'} className={`${savedInfo.scan === 'pass' ? 'btn-primary' : 'btn-secondary'} flex items-center gap-2 disabled:opacity-50`}>
+                {moving ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />} Finish and release for delivery
               </button>
-              <button onClick={() => moveOrder('delivered')} disabled={moving || savedInfo.scan !== 'pass'} className="btn-secondary flex items-center gap-2">
-                <CheckCircle2 size={15} /> Release for delivery
-              </button>
+              {orderStep === 4 && (
+                <button onClick={() => moveOrder('upload')} disabled={moving} className={`${savedInfo.scan === 'pass' ? 'btn-secondary' : 'btn-primary'} flex items-center gap-2`}>
+                  <RotateCcw size={15} /> Send back for rework
+                </button>
+              )}
+              {savedInfo.scan !== 'pass' && (
+                <p className="w-full text-xs text-muted-foreground">
+                  {savedInfo.scan === 'fail' ? 'The saved scan failed, so it cannot be finished: send it back for rework.' : 'Save a passing scan in Results first.'}
+                </p>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
               {selectedOrder
-                ? `${selectedOrder.order_ref} is at ${statusLabel(selectedOrder.extended_status)}. Release and rework open when it reaches Recommendation.`
-                : 'Choose an order at the top to release it or send it back.'}
+                ? `${selectedOrder.order_ref} is at ${statusLabel(selectedOrder.extended_status)}. Finish and rework open when it reaches Results.`
+                : 'Choose an order at the top to finish it or send it back.'}
             </p>
           )}
           <p className="flex items-start gap-2 text-xs text-muted-foreground">

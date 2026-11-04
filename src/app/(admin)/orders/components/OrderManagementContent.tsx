@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus } from 'lucide-react';
+import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus, Trash2 } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
+import { deleteOrder } from '@/lib/orderMedia';
+import { useAuth } from '@/contexts/AuthContext';
 import { assignOrder, fetchStaff, isActive, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
 const GATE_HINTS: Record<string, string> = {
   scan_done: 'Needs a defect scan saved for this order during Detect Defects',
@@ -16,6 +18,8 @@ const GATE_HINTS: Record<string, string> = {
 
 export default function OrderManagementContent({ eyebrow = 'Order Management' }: { eyebrow?: string }) {
   const supabase = createClient();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin'; // this page is also the staff's Order Workflow
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -91,6 +95,22 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     }
   }
 
+  // Only cancelled orders, only admins (the database checks both too). Its scans, photos and history go with it.
+  async function removeOrder(order: any) {
+    if (!window.confirm(`Delete ${order.order_ref} for good? Its scans, photos and history are deleted too. This cannot be undone.`)) return;
+    setUpdating(true);
+    try {
+      await deleteOrder(supabase, order.id);
+      showToast('success', `${order.order_ref} was deleted`);
+      setSelectedOrderId(null);
+      fetchOrders();
+    } catch (err: any) {
+      showToast('error', err?.message || 'Could not delete the order');
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   async function approveOrder(orderId: string) {
     await updateOrderStatus(orderId, 'confirmed');
     setChoosingStaff(true); // approved: show who can work on it
@@ -134,7 +154,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
           <h1 className="page-title">Track orders through the inspection process</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered'].map(status => (
+          {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered', 'cancelled'].map(status => (
             <button
               key={status}
               type="button"
@@ -375,6 +395,16 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     >
                       <X size={16} /> Cancel Order
                     </button>
+                    {isAdmin && activeOrder.extended_status === 'cancelled' && (
+                      <button
+                        type="button"
+                        onClick={() => removeOrder(activeOrder)}
+                        disabled={updating}
+                        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-danger py-3 text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50"
+                      >
+                        <Trash2 size={16} /> Delete Order
+                      </button>
+                    )}
                   </div>
                 </section>
               </>
