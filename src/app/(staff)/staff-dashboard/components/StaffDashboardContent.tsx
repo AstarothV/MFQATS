@@ -17,6 +17,8 @@ export interface WorkOrder {
   extended_status: string;
   assigned_to: string | null;
   model_3d_path: string | null;
+  paused_at?: string | null; // the stage timer is paused (migration 014)
+  paused_seconds?: number;
 }
 
 /** What has really been done on the order, read from the database; the checklist ticks itself from it. */
@@ -59,7 +61,7 @@ export default function StaffDashboardContent() {
   const load = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase.from('orders')
-      .select('id, order_ref, product_name, extended_status, assigned_to, model_3d_path')
+      .select('*') // all columns: works before and after the pause columns are added
       .in('extended_status', ACTIVE_STATUSES).order('created_at', { ascending: false });
     const list = ((data ?? []) as WorkOrder[]).sort((a, b) => Number(b.assigned_to === user.id) - Number(a.assigned_to === user.id));
     setOrders(list);
@@ -106,6 +108,24 @@ export default function StaffDashboardContent() {
     }
   }
 
+  // Pause / resume the stage timer; saved with the order, so it is the same everywhere.
+  const [pausing, setPausing] = useState(false);
+  async function setPaused(pause: boolean) {
+    if (!order) return;
+    const now = Date.now();
+    const patch = pause
+      ? { paused_at: new Date(now).toISOString() }
+      : { paused_at: null, paused_seconds: (order.paused_seconds ?? 0) + Math.round((now - Date.parse(order.paused_at!)) / 1000) };
+    setPausing(true);
+    const { error } = await supabase.from('orders').update(patch).eq('id', order.id);
+    setPausing(false);
+    if (error) {
+      setMessage({ ok: false, text: /paused_/.test(error.message) ? 'Pause needs the latest database update (migration 014).' : error.message });
+      return;
+    }
+    setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...patch } : o)));
+  }
+
   const today = new Date().toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
   const current = facts?.history.filter((h) => h.status === order?.extended_status && !h.left_at).at(-1);
 
@@ -131,7 +151,7 @@ export default function StaffDashboardContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1">
-          <ActiveTimerWidget order={order} enteredAt={current?.entered_at ?? null} expectedHours={order ? expected[order.extended_status] : undefined} />
+          <ActiveTimerWidget order={order} enteredAt={current?.entered_at ?? null} expectedHours={order ? expected[order.extended_status] : undefined} busy={pausing} onPause={setPaused} />
         </div>
         <div className="lg:col-span-2">
           <StageProgressPanel order={order} facts={facts} expected={expected} me={user?.id ?? ''} moving={moving} message={message} onSubmit={submit} />

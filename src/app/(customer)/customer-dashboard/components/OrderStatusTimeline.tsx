@@ -105,17 +105,18 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
             </span>
           </div>
 
-          <div className="flex items-center gap-3 mt-2">
-            <div className="flex-1 h-2 overflow-hidden rounded-full border border-border bg-muted p-0.5">
-              <div className="flex h-full gap-0.5">
-                {Array.from({ length: 20 }).map((_, index) => {
-                  const filledCount = Math.max(1, Math.round(completionPct / 5));
-                  const filled = index < filledCount;
-                  return <span key={`progress-${index}`} className={`flex-1 rounded-full ${filled ? 'bg-gradient-to-r from-purple-600 to-violet-500 dark:from-purple-500 dark:to-violet-400' : 'bg-slate-200 dark:bg-white/10'}`} />;
-                })}
-              </div>
+          {/* the same progress bar as the Overview */}
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+              <span>Process Progress</span>
+              <span className="font-bold text-foreground">{completionPct}%</span>
             </div>
-            <span className="whitespace-nowrap text-xs font-bold text-slate-600 dark:text-slate-300">{completionPct}% complete</span>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-700"
+                style={{ width: `${completionPct}%` }}
+              />
+            </div>
           </div>
         </div>
         <div className="shrink-0 text-left sm:text-right">

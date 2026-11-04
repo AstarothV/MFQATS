@@ -512,7 +512,7 @@ export default function CustomerShopContent() {
             </div>
             <div className="grid gap-5 md:grid-cols-2">
               <div className="overflow-hidden rounded-2xl">
-                <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-72 md:h-80" thumbs />
+                <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-72 md:h-80" thumbs zoom />
               </div>
               <div className="space-y-4 text-sm">
                 <div className="flex items-baseline gap-2">
