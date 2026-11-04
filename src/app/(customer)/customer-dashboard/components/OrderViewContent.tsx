@@ -186,7 +186,7 @@ export default function OrderViewContent() {
         <div className="relative">
           <button
             onClick={() => setShowOrderList(v => !v)}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors"
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors"
           >
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-lg shrink-0">🪑</div>

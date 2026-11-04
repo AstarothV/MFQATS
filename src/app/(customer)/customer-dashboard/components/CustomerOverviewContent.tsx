@@ -50,6 +50,13 @@ const QUEUE_STAGES = [
 // -1 for cancelled (nothing highlighted)
 const getStageIndex = (status: string) => QUEUE_STAGES.findIndex((st) => st.key === status);
 
+const duration = (ms: number) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return 'under 1 min';
+  return m < 60 ? `${m}m` : m < 2880 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.round(m / 1440)}d`;
+};
+const when = (iso: string) => new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 export default function CustomerOverviewContent() {
   const { user } = useAuth();
   const supabase = createClient();
@@ -59,6 +66,13 @@ export default function CustomerOverviewContent() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(cached?.[0] ?? null);
   const [loading, setLoading] = useState(!cached);
   const [historyLogs, setHistoryLogs] = useState<any[]>([]);
+  // when the order entered and left each stage (the database records it), for the times under the stepper
+  const [stageTimes, setStageTimes] = useState<{ status: string; entered_at: string; left_at: string | null }[]>([]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
   const [logsLoading, setLogsLoading] = useState(false);
 
   const fetchOrders = useCallback(async () => {
@@ -109,6 +123,12 @@ export default function CustomerOverviewContent() {
     fetchLogs();
   }, [selectedOrder?.id, supabase]);
 
+  useEffect(() => {
+    if (!selectedOrder) return;
+    supabase.from('order_stage_history').select('status, entered_at, left_at').eq('order_id', selectedOrder.id).order('entered_at')
+      .then(({ data }) => setStageTimes(data ?? []));
+  }, [selectedOrder?.id, selectedOrder?.extended_status, supabase]);
+
   if (loading) {
     return (
       <PageSkeleton />
@@ -144,6 +164,85 @@ export default function CustomerOverviewContent() {
           </Link>
         </div>
       ) : (
+        <>
+          {selectedOrder && (
+            <>
+              {/* Order Header */}
+              <div className="rounded-2xl border border-border bg-card p-5">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center text-3xl shrink-0">🪑</div>
+                    <div>
+                      <h2 className="text-lg font-bold text-foreground">{selectedOrder.product_name}</h2>
+                      <p className="text-sm text-muted-foreground">Order #{selectedOrder.order_ref}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Placed {new Date(selectedOrder.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <StatusBadge
+                    variant={statusVariant(activeStatus)}
+                    label={statusLabel(activeStatus)}
+                    dot
+                  />
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
+                    <span>Process Progress</span>
+                    <span className="font-bold text-foreground">{completionPct}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-700"
+                      style={{ width: `${completionPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Stage Progress */}
+                <div className="flex flex-col xl:flex-row xl:items-start xl:gap-1">
+                  {QUEUE_STAGES.map((stage, idx) => {
+                    const StageIcon = stage.icon;
+                    const isDone = idx < stageIdx;
+                    const isActive = idx === stageIdx;
+                    // time spent in the stage (all its visits, e.g. after a rework) and when it last finished
+                    const visits = stageTimes.filter((h) => h.status === stage.key);
+                    const spent = visits.reduce((ms, h) => ms + ((h.left_at ? Date.parse(h.left_at) : now) - Date.parse(h.entered_at)), 0);
+                    const finished = visits.at(-1)?.left_at;
+                    return (
+                      <React.Fragment key={stage.key}>
+                        <div className={`flex items-center gap-3 xl:min-w-0 xl:flex-1 xl:basis-0 xl:flex-col xl:gap-1.5 xl:text-center ${isActive ? 'opacity-100' : isDone ? 'opacity-100' : 'opacity-40'}`}>
+                          <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center border ${
+                            isDone ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-500/40' : isActive ?'bg-purple-50 border-purple-300 dark:bg-purple-500/15 dark:border-purple-500/40': 'bg-muted border-border'
+                          }`}>
+                            <StageIcon size={15} className={isDone ? 'text-emerald-600 dark:text-emerald-400' : isActive ? 'text-purple-600 dark:text-purple-300' : 'text-muted-foreground'} />
+                          </div>
+                          <div className="min-w-0 flex-1 xl:flex-none">
+                          <span className={`block text-xs font-semibold leading-tight xl:flex xl:h-8 xl:items-center xl:justify-center ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{stage.label}</span>
+                          {visits.length > 0 && stage.key !== 'delivered' && (
+                            <span className={`block text-xs leading-5 tabular-nums ${isActive ? 'font-semibold text-purple-600 dark:text-purple-300' : 'text-foreground/80'}`}>
+                              {isActive ? `${duration(spent)} so far` : duration(spent)}
+                              {!isActive && finished && <span className="block text-2xs leading-4 text-muted-foreground">{when(finished)}</span>}
+                            </span>
+                          )}
+                          {stage.key === 'delivered' && visits[0] && (
+                            <span className="block text-2xs leading-4 text-muted-foreground xl:mt-5">{when(visits[0].entered_at)}</span>
+                          )}
+                          </div>
+                        </div>
+                        {idx < QUEUE_STAGES.length - 1 && (
+                          <div className={`ml-[17px] h-4 w-0.5 shrink-0 xl:ml-0 xl:mt-[17px] xl:h-0.5 xl:w-3 ${idx < stageIdx ? 'bg-emerald-400' : 'bg-border'}`} />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </>
+          )}
         <div className="flex flex-col gap-5 xl:flex-row">
           {/* Orders List */}
           <div className="xl:w-[38%] space-y-2">
@@ -199,65 +298,6 @@ export default function CustomerOverviewContent() {
           {/* Detail Panel */}
           {selectedOrder && (
             <div className="xl:flex-1 space-y-4">
-              {/* Order Header */}
-              <div className="rounded-2xl border border-border bg-card p-5">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center text-3xl shrink-0">🪑</div>
-                    <div>
-                      <h2 className="text-lg font-bold text-foreground">{selectedOrder.product_name}</h2>
-                      <p className="text-sm text-muted-foreground">Order #{selectedOrder.order_ref}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Placed {new Date(selectedOrder.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                  <StatusBadge
-                    variant={statusVariant(activeStatus)}
-                    label={statusLabel(activeStatus)}
-                    dot
-                  />
-                </div>
-
-                {/* Progress Bar */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
-                    <span>Process Progress</span>
-                    <span className="font-bold text-foreground">{completionPct}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-700"
-                      style={{ width: `${completionPct}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Stage Progress */}
-                <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                  {QUEUE_STAGES.map((stage, idx) => {
-                    const StageIcon = stage.icon;
-                    const isDone = idx < stageIdx;
-                    const isActive = idx === stageIdx;
-                    return (
-                      <React.Fragment key={stage.key}>
-                        <div className={`flex flex-col items-center gap-1 shrink-0 ${isActive ? 'opacity-100' : isDone ? 'opacity-100' : 'opacity-40'}`}>
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${
-                            isDone ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-500/15 dark:border-emerald-500/40' : isActive ?'bg-purple-50 border-purple-300 dark:bg-purple-500/15 dark:border-purple-500/40': 'bg-muted border-border'
-                          }`}>
-                            <StageIcon size={14} className={isDone ? 'text-emerald-600 dark:text-emerald-400' : isActive ? 'text-purple-600 dark:text-purple-300' : 'text-muted-foreground'} />
-                          </div>
-                          <span className="text-2xs text-muted-foreground whitespace-nowrap hidden sm:block">{stage.label}</span>
-                        </div>
-                        {idx < QUEUE_STAGES.length - 1 && (
-                          <div className={`flex-1 h-0.5 min-w-[12px] ${idx < stageIdx ? 'bg-emerald-400' : 'bg-border'}`} />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Order Details Grid */}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-border bg-card p-3">
@@ -349,6 +389,7 @@ export default function CustomerOverviewContent() {
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );
