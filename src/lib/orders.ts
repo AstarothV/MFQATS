@@ -7,9 +7,10 @@ import type { createClient } from '@/lib/supabase/client';
 export const PROCESS_STAGES = [
   { key: 'upload', label: 'Upload', description: 'Inspection images of the furniture are captured and uploaded.' },
   { key: 'reconstruction_3d', label: '3D Reconstruction', description: 'The images are processed into a 3D representation of the furniture.' },
-  { key: 'detect_defects', label: 'Detect Defects', description: 'The furniture is scanned for defects such as cracks, holes, scratches and knots.' },
+  { key: 'detect_defects', label: 'Detect Defects', description: 'The furniture is scanned for defects such as cracks, holes, scratches and knots, and a fix is recommended for each one found.' },
   { key: 'results', label: 'Results', description: 'The inspection findings, annotated images and confidence scores are reviewed.' },
-  { key: 'recommendation', label: 'Recommendation', description: 'The recommended action is given: release the item, or correct it and inspect again.' },
+  // stored as 'recommendation' (unchanged in the database); shown as Re-check / Finishing
+  { key: 'recommendation', label: 'Re-check / Finishing', description: 'The admin re-checks the results: the item is finished and released, or fixed and inspected again.' },
 ] as const;
 
 /** Every value of orders.extended_status, in order. Pending/Confirmed/Delivered/Cancelled are order statuses, not process stages. */

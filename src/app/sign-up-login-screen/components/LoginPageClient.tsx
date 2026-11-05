@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import {
   Eye, EyeOff, Loader2, CheckCircle2, ScanSearch, Layers, Timer, AlertTriangle, Moon, SunMedium, ArrowLeft,
-  User, Mail, Phone, Lock, LogIn, UserPlus,
+  User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -14,7 +14,7 @@ import { logActivity } from '@/lib/activity';
 import Link from 'next/link';
 
 type Role = 'staff' | 'admin' | 'customer';
-type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'verify-2fa';
+type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa';
 
 type LoginForm = { email: string; password: string; remember: boolean };
 type RegisterForm = { fullName: string; email: string; phone: string; password: string; confirmPassword: string };
@@ -43,9 +43,7 @@ export default function LoginPageClient() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [tab, setTab] = useState<AuthTab>('login');
-  const [otpCode, setOtpCode] = useState('');
   const [pendingEmail, setPendingEmail] = useState('');
-  const [pendingPassword, setPendingPassword] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
@@ -63,6 +61,7 @@ export default function LoginPageClient() {
     if (tabParam === 'register') setTab('register');
     if (tabParam === 'new-password') setTab('new-password');
     if (tabParam === 'forgot') setTab('forgot');
+    if (tabParam === 'mfa') setTab('mfa');
   }, [searchParams]);
 
   useEffect(() => {
@@ -91,25 +90,54 @@ export default function LoginPageClient() {
       const result = await signIn(data.email, data.password);
       if (!result?.user) throw new Error('Login failed');
 
+      // two-step sign-in turned on: the 6-digit code comes next
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+        setLoading(false);
+        setTab('mfa');
+        return;
+      }
       showMessage('success', 'Signed in successfully');
-
-      // Fetch user profile to get the role
-      const { data: profileData } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', result.user.id)
-        .maybeSingle();
-
-      const userRole = profileData?.role || 'staff';
-      
-      setLoading(false);
-      
-      // Redirect to appropriate dashboard based on role
-      router.push(roleRedirect[userRole] || '/staff-dashboard');
+      await goHome(result.user.id);
     } catch (error: any) {
       setLoading(false);
       showMessage('error', error?.message || 'Invalid credentials. Please try again.');
     }
+  }
+
+  // the signed-in person's home page, by role
+  async function goHome(userId: string) {
+    const { data: profileData } = await supabase.from('user_profiles').select('role').eq('id', userId).maybeSingle();
+    setLoading(false);
+    router.push(roleRedirect[profileData?.role || 'staff'] || '/staff-dashboard');
+  }
+
+  // second step: the 6-digit code from the authenticator app
+  async function onMfa(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const code = String(new FormData(e.currentTarget).get('code') || '').replace(/\s/g, '');
+    if (!/^\d{6}$/.test(code)) { showMessage('error', 'Enter the 6-digit code from your authenticator app.'); return; }
+    setLoading(true);
+    try {
+      const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+      if (listError) throw listError;
+      const factor = factors?.totp?.[0];
+      if (!factor) throw new Error('No authenticator app is set up for this account.');
+      const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+      if (error) throw new Error('That code did not work. Check the time on your phone and try the newest code.');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Your session ended. Sign in again.');
+      showMessage('success', 'Signed in successfully');
+      await goHome(user.id);
+    } catch (error: any) {
+      setLoading(false);
+      showMessage('error', error?.message || 'Could not check the code.');
+    }
+  }
+
+  async function cancelMfa() {
+    await supabase.auth.signOut();
+    setTab('login');
   }
 
   // The reset link signed the person in for this one purpose; save the new password, then open their home page.
@@ -338,6 +366,28 @@ export default function LoginPageClient() {
                     Create account
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* Two-step sign-in: the code from the authenticator app */}
+            {tab === 'mfa' && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Enter your code</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Open your authenticator app and type the 6-digit code for MVCA WoodWorks.</p>
+                </div>
+                <form onSubmit={onMfa} className="space-y-3" noValidate>
+                  {field('6-digit code', ShieldCheck,
+                    <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus
+                      className="input-dark w-full pl-10 text-lg tracking-[0.4em] tabular-nums" placeholder="000000" />)}
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                    Verify and sign in
+                  </button>
+                </form>
+                <button type="button" onClick={cancelMfa} className="inline-flex min-h-8 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                  <ArrowLeft size={14} /> Use a different account
+                </button>
               </div>
             )}
 

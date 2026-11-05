@@ -1,9 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Loader2, Lock, Clock, ChevronDown, ChevronUp, Hash, Armchair } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, Clock, ChevronDown, ChevronUp, Hash, Armchair, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PROCESS_STAGES, statusLabel } from '@/lib/orders';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
+import OrderChat from '@/components/OrderChat';
+
+const PROCESS_KEYS = PROCESS_STAGES.map((s) => s.key);
 
 interface OrderStatusTimelineProps {
   order?: any;
@@ -48,6 +51,16 @@ const stagePalette: Record<string, { text: string; badge: string; track: string;
 export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps) {
   const supabase = createClient();
   const [expanded, setExpanded] = useState<string | null>(null);
+  // how many messages each stage's thread has, shown on its row
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    if (!order?.id) return;
+    createClient().from('messages').select('stage').eq('order_id', order.id).then(({ data }) => {
+      const c: Record<string, number> = {};
+      for (const m of data ?? []) c[m.stage ?? ''] = (c[m.stage ?? ''] ?? 0) + 1;
+      setCounts(c);
+    });
+  }, [order?.id]);
   // PERT-based estimated completion date (supabase function order_eta); null once delivered/cancelled
   const [eta, setEta] = useState<string | null>(null);
   const [etaLoading, setEtaLoading] = useState(Boolean(order?.id));
@@ -190,6 +203,11 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
                         )}
                       </div>
                       <div className="flex items-center gap-2">
+                        {!!counts[stageName] && (
+                          <span className="flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary dark:text-accent" title="Messages about this stage">
+                            <MessageSquare size={11} aria-hidden="true" />{counts[stageName]}
+                          </span>
+                        )}
                         {hasDetails && (isExpanded ? <ChevronUp size={14} className="text-muted-foreground" /> : <ChevronDown size={14} className="text-muted-foreground" />)}
                       </div>
                     </div>
@@ -201,6 +219,14 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
                       {status === 'active' && (
                         <p className="text-xs text-purple-700 dark:text-purple-300">Currently in progress.</p>
                       )}
+                      {order?.id && (
+                        <div className="mt-3 border-t border-border pt-3">
+                          <OrderChat orderId={order.id} stage={stageName} compact
+                            title={`Questions or concerns about ${stage.label}`}
+                            hint="The workshop and the admin see this and reply here."
+                            onCount={(n) => setCounts((c) => (c[stageName] === n ? c : { ...c, [stageName]: n }))} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -209,6 +235,14 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
           })}
         </div>
       </div>
+
+      {/* the customer can talk about each stage with the workshop and the admin */}
+      {order?.id && (
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <OrderChat orderId={order.id} otherThan={PROCESS_KEYS} title="Other questions"
+            hint="Anything not about one stage. For a stage, open it above and ask there. The staff and the admin see it and reply here." />
+        </div>
+      )}
     </div>
   );
 }

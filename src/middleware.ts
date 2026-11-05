@@ -1,17 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-function getProjectRef(): string {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  return url.match(/https:\/\/([^.]+)\./)?.[1] ?? '';
-}
-
-function injectTokenFromHeader(request: NextRequest): void {
-  const token = request.headers.get('x-sb-token');
-  if (!token) return;
-  request.cookies.set(`sb-${getProjectRef()}-auth-token`, token);
-}
-
 const ROLE_ROUTES: Record<string, string[]> = {
   admin: [
     '/admin-dashboard',
@@ -26,14 +15,12 @@ const ROLE_ROUTES: Record<string, string[]> = {
   ],
   customer: [
     '/customer-dashboard',
-    '/support',
   ],
 };
 
 // Routes ONLY customers can access (admin/staff blocked)
 const CUSTOMER_ONLY_ROUTES = [
   '/customer-dashboard/shop',
-  '/customer-dashboard/order-status',
 ];
 
 const ROLE_HOME: Record<string, string> = {
@@ -48,12 +35,10 @@ const PUBLIC_PATHS = [
   '/_next',
   '/favicon.ico',
   '/assets',
-  '/api/auth',
   '/landing',
 ];
 
 export async function middleware(request: NextRequest) {
-  injectTokenFromHeader(request);
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -97,6 +82,16 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
       }
       return supabaseResponse;
+    }
+
+    // Two-step sign-in: someone who turned it on but has not entered this session's 6-digit code goes back to the code
+    // step (the database refuses their data until then too: migration 20261106000019).
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+      const url = request.nextUrl.clone();
+      url.pathname = '/sign-up-login-screen';
+      url.search = '?tab=mfa';
+      return NextResponse.redirect(url);
     }
 
     // Fetch user role from user_profiles table

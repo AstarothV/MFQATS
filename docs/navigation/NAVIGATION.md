@@ -50,7 +50,7 @@ The middleware checks the start of each page's address against the role's list:
 | Staff | `/staff-dashboard`, `/staff` |
 | Customer | `/customer-dashboard`, `/support` |
 
-- **Customer only:** `/customer-dashboard/shop` and `/customer-dashboard/order-status` are blocked for admin and staff.
+- **Customer only:** `/customer-dashboard/shop` is blocked for admin and staff.
 - **Open to everyone, no login:** the landing page (`/landing`) and the login page (`/sign-up-login-screen`).
 
 The database applies its own rules too (Supabase row-level security), so a customer can only ever read their own

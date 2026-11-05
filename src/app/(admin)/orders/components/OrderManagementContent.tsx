@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus, Trash2 } from 'lucide-react';
+import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus, Trash2, ArrowRight } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
@@ -16,6 +16,13 @@ const GATE_HINTS: Record<string, string> = {
   scan_passed: 'Needs the latest defect scan to pass',
 };
 
+const STATUS_GROUPS = {
+  All: [],
+  New: ['pending', 'confirmed'],
+  'In production': PROCESS_STAGES.map((st) => st.key),
+  Closed: ['delivered', 'cancelled'],
+} as const;
+
 export default function OrderManagementContent({ eyebrow = 'Order Management' }: { eyebrow?: string }) {
   const supabase = createClient();
   const { profile } = useAuth();
@@ -24,6 +31,8 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  // filters in four groups (a group shows all its statuses; the dropdown narrows it to one)
+  const [filterGroup, setFilterGroup] = useState<keyof typeof STATUS_GROUPS>('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [updating, setUpdating] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -74,10 +83,11 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     return orders.filter(order => {
       const matchSearch = order.order_ref?.toLowerCase().includes(search.toLowerCase()) ||
         order.customer_name?.toLowerCase().includes(search.toLowerCase());
-      const matchStatus = filterStatus === 'All' || (order.extended_status || 'pending') === filterStatus;
+      const st = order.extended_status || 'pending';
+      const matchStatus = filterStatus !== 'All' ? st === filterStatus : filterGroup === 'All' || (STATUS_GROUPS[filterGroup] as readonly string[]).includes(st);
       return matchSearch && matchStatus;
     });
-  }, [orders, search, filterStatus]);
+  }, [orders, search, filterStatus, filterGroup]);
 
   const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0];
 
@@ -153,18 +163,27 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         <h1 className="page-title">Track orders through the inspection process</h1>
         <p className="page-subtitle">Pick an order in the list to see its details, assigned staff and stage below.</p>
       </div>
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
-          {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered', 'cancelled'].map(status => (
-            <button
-              key={status}
-              type="button"
-              onClick={() => setFilterStatus(status)}
-              aria-pressed={filterStatus === status}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
-            >
-              {status === 'All' ? 'All' : statusLabel(status)}
-            </button>
-          ))}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status group">
+          {(Object.keys(STATUS_GROUPS) as (keyof typeof STATUS_GROUPS)[]).map((g) => {
+            const n = g === 'All' ? orders.length : orders.filter((o) => (STATUS_GROUPS[g] as readonly string[]).includes(o.extended_status || 'pending')).length;
+            return (
+              <button key={g} type="button" onClick={() => { setFilterGroup(g); setFilterStatus('All'); }} aria-pressed={filterGroup === g}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${filterGroup === g ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>
+                {g} <span className="ml-0.5 opacity-70">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+        {filterGroup !== 'All' && (
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="sr-only">Status in {filterGroup}</span>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="input-dark py-2 pr-8 text-sm">
+              <option value="All">All {filterGroup.toLowerCase()}</option>
+              {STATUS_GROUPS[filterGroup].map((st) => <option key={st} value={st}>{statusLabel(st)}</option>)}
+            </select>
+          </label>
+        )}
       </div>
 
       {loading ? (
@@ -344,25 +363,25 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
 
                 {/* Update Status */}
                 <section className="card-dark rounded-3xl border border-border p-6">
-                  <h3 className="text-base font-semibold text-foreground mb-4">Update Process Stage</h3>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {ORDER_STATUSES.filter(s => s !== 'cancelled').map(status => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => updateOrderStatus(activeOrder.id, status)}
-                        disabled={updating || !canMoveTo(status)}
-                        title={GATE_HINTS[nextMoves.find(t => t.to_status === status)?.gate || '']}
-                        className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
-                          (activeOrder.extended_status || 'pending') === status
-                            ? 'bg-primary text-primary-foreground' :'bg-muted text-muted-foreground hover:bg-muted/80 disabled:opacity-50'
-                        }`}
-                      >
-                        {updating && <Loader2 size={10} className="inline animate-spin mr-1" />}
-                        {statusLabel(status)}
-                      </button>
-                    ))}
-                  </div>
+                  <h3 className="text-base font-semibold text-foreground">Update Process Stage</h3>
+                  <p className="mt-1 mb-4 text-sm text-muted-foreground">Now at <span className="font-semibold text-foreground">{statusLabel(activeOrder.extended_status || 'pending')}</span>. Only the moves allowed from here are shown.</p>
+                  {(() => {
+                    // the official process decides the next steps; cancelling and delivering live in Quick Actions
+                    const moves = ORDER_STATUSES.filter((st) => st !== 'cancelled' && st !== 'delivered' && st !== (activeOrder.extended_status || 'pending') && canMoveTo(st));
+                    return moves.length === 0 ? (
+                      <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No stage moves from here.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {moves.map((st) => (
+                          <button key={st} type="button" onClick={() => updateOrderStatus(activeOrder.id, st)} disabled={updating}
+                            title={GATE_HINTS[nextMoves.find((t) => t.to_status === st)?.gate || '']}
+                            className="btn-secondary flex items-center gap-1.5 text-sm disabled:opacity-50">
+                            {updating ? <Loader2 size={13} className="animate-spin" /> : <ArrowRight size={13} />} Move to {statusLabel(st)}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </section>
 
                 {/* Actions */}

@@ -64,9 +64,9 @@ const orderSteps = [
 const inspectionStages = [
 { title: 'Upload', desc: 'Photos of the finished piece' },
 { title: '3D Reconstruction', desc: 'A 3D model of the piece' },
-{ title: 'Detect Defects', desc: 'Cracks, knots and holes found' },
+{ title: 'Detect Defects', desc: 'Defects found, with a fix for each' },
 { title: 'Results', desc: 'Pass or fail against tolerance' },
-{ title: 'Recommendation', desc: 'Rework steps if anything fails' }];
+{ title: 'Re-check / Finishing', desc: 'Approved and finished, or fixed and inspected again' }];
 
 
 const testimonials = [

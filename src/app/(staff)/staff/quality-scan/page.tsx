@@ -12,6 +12,7 @@ import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
 import { loadOrderMedia, removeOrderPhoto, saveOrderModel, saveOrderPhoto } from '@/lib/orderMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
+import OrderChat from '@/components/OrderChat';
 import { shrink } from './serverApi';
 import Model3DPanel from './Model3DPanel';
 import ModelDefectsView from './ModelDefectsView';
@@ -544,6 +545,13 @@ export default function QualityScanPage() {
     reader.readAsDataURL(file);
   }
 
+  // Redo after a fix: clear every side's scan so the piece is scanned again from the start
+  function redoScan() {
+    clearScan();
+    setSideScans(VIEWS.map(() => null));
+    showToast('success', 'Scans cleared. Scan the fixed piece again.');
+  }
+
   async function rescan() {
     clearScan();
     if (mode === 'live') {
@@ -688,7 +696,7 @@ export default function QualityScanPage() {
     '3D model of the piece',
     analyzing || scanAllAt !== null ? 'Scanning…' : failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : allScanned ? 'No failing defects' : scannedSides ? `${scannedSides} of ${scanCount} sides scanned` : 'Scan every side',
     saved ? 'Saved' : inspectionResult ? 'Not saved yet' : savedInfo.scan ? `Last saved: ${savedInfo.scan}` : 'Pass or fail',
-    'Next action',
+    savedInfo.review === 'requested' ? 'Waiting for admin' : savedInfo.review === 'approved' ? 'Approved' : 'Admin approval',
   ];
   // the verdict shown in Results and Recommendation: this visit's scan, else the order's last saved one
   const verdict = inspectionResult ?? savedInfo.scan;
@@ -909,7 +917,7 @@ export default function QualityScanPage() {
         {/* ---- 3 · Detect Defects ---- */}
         <section hidden={step !== 2} className="tab-in space-y-4">
           <div className="card-dark space-y-4 p-5">
-            {stepHead(2, 'Scan every side of the piece for defects with YOLOv12.')}
+            {stepHead(2, 'Scan every side of the piece for defects with YOLOv12. Each defect found comes with a recommended fix.')}
           </div>
 
           <div className="card-dark space-y-3 p-5">
@@ -1157,6 +1165,32 @@ export default function QualityScanPage() {
               </p>
             </div>
           )}
+
+          {/* recommended fixes for what was found; Redo clears the scans so the piece can be scanned again after a fix */}
+          {advice.length > 0 && (
+            <div className="card-dark space-y-3 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">Recommended fixes</h3>
+                  <p className="mt-0.5 text-sm text-muted-foreground">For each defect found. Fix the piece, then redo the scan; or go on to Results and the admin re-checks it.</p>
+                </div>
+                <button onClick={redoScan} disabled={analyzing || scanAllAt !== null} className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50">
+                  <RotateCcw size={15} /> Redo scan
+                </button>
+              </div>
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {advice.map((a) => (
+                  <li key={a.title} className="rounded-2xl border border-border bg-muted/40 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-foreground">{a.title}</span>
+                      <StatusBadge variant={a.tone} label={a.badge} />
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">{a.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
 
         {/* ---- 4 · Results ---- */}
@@ -1235,7 +1269,7 @@ export default function QualityScanPage() {
                   {savedInfo.review === 'requested' ? <Loader2 size={15} className="mt-0.5 shrink-0 animate-spin" /> : savedInfo.review === 'approved' ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <AlertTriangle size={15} className="mt-0.5 shrink-0" />}
                   <span>
                     {savedInfo.review === 'requested' ? 'Waiting for the admin to review the scan. Finish opens only if they approve it as a false alarm.'
-                      : savedInfo.review === 'approved' ? 'The admin approved the scan as a false alarm. You can finish the order in Recommendation.'
+                      : savedInfo.review === 'approved' ? 'The admin approved the scan as a false alarm. You can finish the order in Re-check / Finishing.'
                       : 'The admin confirmed the defects. Send the piece back for rework.'}
                     {savedInfo.reviewNote && <span className="block text-xs text-muted-foreground">Admin note: {savedInfo.reviewNote}</span>}
                   </span>
@@ -1250,25 +1284,32 @@ export default function QualityScanPage() {
           )}
         </section>
 
-        {/* ---- 5 · Recommendation ---- */}
+        {/* ---- 5 · Re-check / Finishing ---- */}
         <section hidden={step !== 4} className="tab-in card-dark space-y-4 p-5">
-          {stepHead(4, 'What to do next, based on the results.')}
-          {advice.length === 0 ? (
-            <p className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-              {verdict === 'pass' ? 'No repairs needed.' : 'Scan the piece in Detect Defects to get repair advice.'}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {advice.map((a) => (
-                <li key={a.title} className="rounded-2xl border border-border bg-muted/40 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-foreground">{a.title}</span>
-                    <StatusBadge variant={a.tone} label={a.badge} />
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">{a.text}</p>
-                </li>
-              ))}
-            </ul>
+          {stepHead(4, 'The admin re-checks the results. Finish when the scan passed or the admin approved it; otherwise redo the piece: it goes back to Upload to be fixed and inspected again.')}
+
+          {/* the admin's decision on a failed scan */}
+          {selectedOrder && savedInfo.failed && (
+            <div role="status" className={`flex items-start gap-3 rounded-2xl border p-4 text-sm ${
+              savedInfo.review === 'approved' ? 'border-emerald-500/30 bg-emerald-500/10'
+                : savedInfo.review === 'rejected' ? 'border-red-500/30 bg-red-500/10' : 'border-amber-500/30 bg-amber-500/10'}`}>
+              {savedInfo.review === 'requested' ? <Loader2 size={18} className="mt-0.5 shrink-0 animate-spin text-warning" />
+                : savedInfo.review === 'approved' ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-success" />
+                : <AlertTriangle size={18} className={`mt-0.5 shrink-0 ${savedInfo.review === 'rejected' ? 'text-danger' : 'text-warning'}`} />}
+              <p className="text-foreground">
+                <span className="font-semibold">
+                  {savedInfo.review === 'requested' ? 'Waiting for the admin to re-check.'
+                    : savedInfo.review === 'approved' ? 'Approved by the admin: a false alarm.'
+                    : savedInfo.review === 'rejected' ? 'The admin confirmed the defects.'
+                    : 'The scan failed.'}
+                </span>{' '}
+                {savedInfo.review === 'requested' ? 'Finish opens if they approve it.'
+                  : savedInfo.review === 'approved' ? 'You can finish the piece.'
+                  : savedInfo.review === 'rejected' ? 'Redo the piece: fix it, then inspect it again.'
+                  : 'Redo the piece, or ask the admin to re-check it in Results if you think it is a false alarm.'}
+                {savedInfo.reviewNote && <span className="mt-1 block text-xs text-muted-foreground">Admin note: {savedInfo.reviewNote}</span>}
+              </p>
+            </div>
           )}
 
           {selectedOrder?.extended_status === 'delivered' ? (
@@ -1283,27 +1324,29 @@ export default function QualityScanPage() {
               </button>
               {orderStep === 4 && (
                 <button onClick={() => moveOrder('upload')} disabled={moving} className={`${savedInfo.scan === 'pass' ? 'btn-secondary' : 'btn-primary'} flex items-center gap-2`}>
-                  <RotateCcw size={15} /> Send back for rework
+                  <RotateCcw size={15} /> Redo: send back to be fixed
                 </button>
               )}
-              {savedInfo.scan !== 'pass' && (
-                <p className="w-full text-xs text-muted-foreground">
-                  {savedInfo.review === 'requested' ? 'Waiting for the admin to review the scan: Finish opens if they approve it as a false alarm.'
-                    : savedInfo.scan === 'fail' ? 'The saved scan failed, so it cannot be finished: send it back for rework, or ask an admin to review it in Results.'
-                    : 'Save a passing scan in Results first.'}
-                </p>
+              {savedInfo.scan !== 'pass' && !savedInfo.failed && (
+                <p className="w-full text-xs text-muted-foreground">Save a passing scan in Results first.</p>
               )}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
               {selectedOrder
-                ? `${selectedOrder.order_ref} is at ${statusLabel(selectedOrder.extended_status)}. Finish and rework open when it reaches Results.`
+                ? `${selectedOrder.order_ref} is at ${statusLabel(selectedOrder.extended_status)}. Finish and redo open when it reaches Results.`
                 : 'Choose an order at the top to finish it or send it back.'}
             </p>
           )}
+
+          {selectedOrderId && (
+            <div className="border-t border-border pt-4">
+              <OrderChat orderId={selectedOrderId} compact hint="The customer and the admin see this too. Concerns about the piece come in here." />
+            </div>
+          )}
           <p className="flex items-start gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
             <Info size={14} className="mt-0.5 shrink-0" />
-            Release only opens when the order&apos;s latest saved scan passed. Rework sends the order back to Upload, so it is inspected again after the fix.
+            Finish only opens when the order&apos;s latest saved scan passed or the admin approved it. Redo sends the order back to Upload, so it is inspected again after the fix.
           </p>
         </section>
 

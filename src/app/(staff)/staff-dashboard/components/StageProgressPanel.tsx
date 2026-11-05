@@ -43,10 +43,10 @@ function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; ite
       { label: f.scan ? `Result: ${passed ? 'passed' : 'failed, needs rework'}` : 'Result', done: passed, required: false },
     ] };
     case 'recommendation': return f.scan?.review === 'requested'
-      ? { title: 'Recommendation', next: null, action: '', items: [{ label: 'Waiting for the admin to review the failed scan (a possible false alarm)', done: false, required: true }] }
+      ? { title: 'Re-check / Finishing', next: null, action: '', items: [{ label: 'Waiting for the admin to review the failed scan (a possible false alarm)', done: false, required: true }] }
       : passed
-      ? { title: 'Recommendation', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: 'Latest saved scan passed', done: true, required: true }] }
-      : { title: 'Recommendation', next: 'upload', action: 'Send back for rework', items: [{ label: 'Latest saved scan failed: fix the piece, then inspect it again', done: false, required: false }] };
+      ? { title: 'Re-check / Finishing', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: 'Latest saved scan passed', done: true, required: true }] }
+      : { title: 'Re-check / Finishing', next: 'upload', action: 'Send back for rework', items: [{ label: 'Latest saved scan failed: fix the piece, then inspect it again', done: false, required: false }] };
     default: return { title: 'Checklist', next: null, action: '', items: [] };
   }
 }
