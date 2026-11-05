@@ -5,8 +5,8 @@ import { useForm } from 'react-hook-form';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import {
-  Eye, EyeOff, ChevronRight, Loader2, CheckCircle2, Hammer,
-  Layers, Zap, AlertTriangle, Moon, SunMedium, ArrowLeft, User, Mail, Phone, Lock
+  Eye, EyeOff, Loader2, CheckCircle2, ScanSearch, Layers, Timer, AlertTriangle, Moon, SunMedium, ArrowLeft,
+  User, Mail, Phone, Lock, LogIn, UserPlus,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -27,9 +27,9 @@ const roleRedirect: Record<string, string> = {
 };
 
 const features = [
-  { icon: Hammer, label: 'Automated QA', desc: 'YOLOv12 defect detection on every piece' },
-  { icon: Layers, label: 'Live WIP Tracking', desc: 'Real-time workstation visibility' },
-  { icon: Zap, label: 'Auto Time Logging', desc: 'Persistent per-task elapsed timers' },
+  { icon: ScanSearch, label: 'Inspected before delivery', desc: 'Every side of each piece is scanned for defects' },
+  { icon: Layers, label: 'Follow every stage', desc: 'See your order move from the workshop to your door' },
+  { icon: Timer, label: 'Time per stage', desc: 'How long each stage took, kept with your order' },
 ];
 
 export default function LoginPageClient() {
@@ -178,207 +178,189 @@ export default function LoginPageClient() {
     }
   }
 
+  // one field row: label, an icon inside the input, and the error under it
+  const field = (label: string, Icon: typeof Mail, input: React.ReactNode, error?: string, trailing?: React.ReactNode) => (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-foreground/80">{label}</span>
+      <span className="relative block">
+        <Icon size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+        {input}
+        {trailing}
+      </span>
+      {error && <span role="alert" className="mt-1.5 block text-xs text-danger">{error}</span>}
+    </label>
+  );
+  const eye = (shown: boolean, toggle: () => void) => (
+    <button type="button" onClick={toggle} aria-label={shown ? 'Hide password' : 'Show password'}
+      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+      {shown ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  );
+  const back = (
+    <button type="button" onClick={() => setTab('login')} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+      <ArrowLeft size={14} /> Back to sign in
+    </button>
+  );
+  const switcher = tab === 'login' || tab === 'register';
+
   return (
-    <div className={`min-h-screen flex ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className="relative flex min-h-screen flex-col">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
+        <div role="status" className={`fixed top-4 right-4 z-[60] flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
           {toast.message}
         </div>
       )}
 
-      {/* Left Panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-violet-700 to-purple-900 flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.1),transparent_60%)]" />
-        <div className="relative">
-          <div className="flex items-center gap-3 mb-12">
-            <AppLogo size={40} />
-            <div>
-              <p className="text-white font-bold text-lg">MVCA WoodWorks</p>
-              <p className="text-white/60 text-xs">Quality Assurance & Tracking</p>
-            </div>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-4 leading-tight">
-            Crafting Excellence,<br />One Piece at a Time
-          </h1>
-          <p className="text-white/70 text-base max-w-sm">
-            Automated quality control, real-time production tracking, and 3D furniture inspection.
-          </p>
-        </div>
-        <div className="relative space-y-4">
-          {features.map(f => {
-            const FIcon = f.icon;
-            return (
-              <div key={f.label} className="flex items-center gap-4 rounded-2xl bg-white/10 backdrop-blur-sm p-4">
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-                  <FIcon size={18} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-semibold text-sm">{f.label}</p>
-                  <p className="text-white/60 text-xs">{f.desc}</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Right Panel */}
-      <div className="flex-1 flex flex-col bg-background">
-        <div className="flex items-center justify-between p-4 lg:p-6">
-          <Link href="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft size={16} /> Back to Home
+      {/* Top bar: the same floating glass bar as inside the app */}
+      <header className="glass-float relative z-10 mx-3 mt-2.5 flex h-14 items-center justify-between rounded-[18px] px-3 sm:px-4">
+        <Link href="/" className="flex items-center gap-2.5">
+          <AppLogo size={30} />
+          <span className="text-base font-bold text-foreground">MVCA WoodWorks</span>
+        </Link>
+        <div className="flex items-center gap-1">
+          <Link href="/" className="btn-ghost hidden items-center gap-1.5 text-sm sm:inline-flex">
+            <ArrowLeft size={15} /> Back to Home
           </Link>
-          <button type="button" onClick={toggleTheme} className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors">
-            {theme === 'dark' ? <SunMedium size={14} /> : <Moon size={14} />}
+          <button type="button" onClick={toggleTheme} className="btn-ghost flex items-center gap-1.5 text-sm" aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            {theme === 'dark' ? <SunMedium size={15} /> : <Moon size={15} />}
             {theme === 'dark' ? 'Light' : 'Dark'}
           </button>
         </div>
+      </header>
 
-        <div className="flex-1 flex items-center justify-center px-4 py-8">
-          <div className="w-full max-w-md">
+      {/* fills the screen under the top bar and centers everything in it, so nothing needs scrolling */}
+      <main className="mx-auto flex w-full max-w-5xl flex-1 items-center px-4 py-4 sm:px-6 lg:px-8">
+      <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1fr)_480px] lg:gap-12">
+        {/* Brand side (wide screens) */}
+        <section className="hidden lg:block">
+          <p className="page-eyebrow hero-rise">Quality Assurance &amp; Tracking</p>
+          <h1 className="hero-rise text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-foreground xl:text-[44px]" style={{ '--d': '80ms' } as React.CSSProperties}>
+            Crafting excellence,<br />
+            <span className="text-primary dark:text-accent">one piece at a time.</span>
+          </h1>
+          <p className="hero-rise mt-4 max-w-md text-base text-muted-foreground" style={{ '--d': '160ms' } as React.CSSProperties}>
+            Order handcrafted furniture and follow it through every stage, from the workshop to inspection to your door.
+          </p>
+          <ul className="mt-7 max-w-md space-y-2.5">
+            {features.map((f, i) => {
+              const FIcon = f.icon;
+              return (
+                <li key={f.label} className="hero-rise card-dark flex items-center gap-3.5 px-4 py-3" style={{ '--d': `${260 + i * 90}ms` } as React.CSSProperties}>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary dark:text-accent">
+                    <FIcon size={18} aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">{f.label}</span>
+                    <span className="block text-xs text-muted-foreground">{f.desc}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
 
-            {/* Login Tab */}
+        {/* The form, in a glass card */}
+        <section className="page-enter card-dark mx-auto flex w-full max-w-[480px] flex-col rounded-3xl p-6 lg:min-h-[486px] [@media(max-height:620px)]:lg:min-h-[428px] [@media(max-height:620px)]:py-5">
+          {switcher && (
+            <div role="tablist" aria-label="Sign in or register" className="relative mb-5 grid grid-cols-2 rounded-xl bg-muted/70 p-1 [@media(max-height:620px)]:mb-4">
+              <span aria-hidden="true" className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-primary shadow-[0_6px_16px_-8px_var(--primary)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${tab === 'register' ? 'translate-x-full' : ''}`} />
+              {(['login', 'register'] as const).map((t) => (
+                <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                  className={`relative z-10 rounded-lg py-2 text-sm font-semibold transition-colors duration-200 ${tab === t ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+                  {t === 'login' ? 'Sign in' : 'Register'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div key={tab} className="tab-in flex flex-1 flex-col justify-center">
+            {/* Sign in */}
             {tab === 'login' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground">Welcome back</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Sign in to your MVCA account</p>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Welcome back</h2>
+                  <p className="mt-1 text-sm text-muted-foreground [@media(max-height:620px)]:hidden">Sign in to your MVCA WoodWorks account.</p>
                 </div>
-
-                <form onSubmit={handleSubmit(onLogin)} className="space-y-4">
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Email
-                    <input {...register('email', { required: 'Email is required' })} type="email" className="input-dark w-full mt-1" placeholder="you@example.com" />
-                    {errors.email && <p className="text-xs text-danger mt-1">{errors.email.message}</p>}
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Password
-                    <div className="relative mt-1">
-                      <input {...register('password', { required: 'Password is required' })} type={showPass ? 'text' : 'password'} className="input-dark w-full pr-10" placeholder="••••••••" />
-                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    {errors.password && <p className="text-xs text-danger mt-1">{errors.password.message}</p>}
-                  </label>
+                <form onSubmit={handleSubmit(onLogin)} className="space-y-3" noValidate>
+                  {field('Email', Mail,
+                    <input {...register('email', { required: 'Enter your email' })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@example.com" />,
+                    errors.email?.message)}
+                  {field('Password', Lock,
+                    <input {...register('password', { required: 'Enter your password' })} type={showPass ? 'text' : 'password'} autoComplete="current-password" className="input-dark w-full pl-10 pr-11" placeholder="Your password" />,
+                    errors.password?.message, eye(showPass, () => setShowPass(!showPass)))}
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-                      <input {...register('remember')} type="checkbox" className="w-3.5 h-3.5 rounded" />
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
+                      <input {...register('remember')} type="checkbox" className="h-4 w-4 rounded border-border" />
                       Remember me
                     </label>
-                    <button type="button" onClick={() => setTab('forgot')} className="text-xs text-primary hover:underline">
+                    <button type="button" onClick={() => setTab('forgot')} className="-my-1.5 py-1.5 text-sm font-medium text-primary hover:underline dark:text-accent">
                       Forgot password?
                     </button>
                   </div>
-                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
-                    {loading ? <Loader2 size={16} className="animate-spin" /> : <ChevronRight size={16} />}
-                    Sign In
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                    Sign in
                   </button>
                 </form>
-
-                <p className="text-center text-sm text-muted-foreground">
-                  Don't have an account?{' '}
-                  <button type="button" onClick={() => setTab('register')} className="text-primary font-semibold hover:underline">
-                    Register
-                  </button>
-                </p>
               </div>
             )}
 
-            {/* Register Tab */}
+            {/* Register */}
             {tab === 'register' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <button type="button" onClick={() => setTab('login')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-                    <ArrowLeft size={14} /> Back to login
-                  </button>
-                  <h2 className="text-2xl font-bold text-foreground">Create Account</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Join MVCA WoodWorks as a customer</p>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Create your account</h2>
+                  <p className="mt-1 text-sm text-muted-foreground [@media(max-height:620px)]:hidden">Order furniture and follow every stage to your door.</p>
                 </div>
-                <form onSubmit={handleRegister(onRegister)} className="space-y-4">
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Full Name
-                    <div className="relative mt-1">
-                      <User size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input {...regRegister('fullName', { required: 'Full name is required' })} className="input-dark w-full pl-9" placeholder="Your full name" />
-                    </div>
-                    {regErrors.fullName && <p className="text-xs text-danger mt-1">{regErrors.fullName.message}</p>}
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Email Address
-                    <div className="relative mt-1">
-                      <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input {...regRegister('email', { required: 'Email is required', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Invalid email' } })} type="email" className="input-dark w-full pl-9" placeholder="you@example.com" />
-                    </div>
-                    {regErrors.email && <p className="text-xs text-danger mt-1">{regErrors.email.message}</p>}
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Phone Number
-                    <div className="relative mt-1">
-                      <Phone size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input {...regRegister('phone')} type="tel" className="input-dark w-full pl-9" placeholder="+63 912 345 6789" />
-                    </div>
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Password
-                    <div className="relative mt-1">
-                      <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input {...regRegister('password', { required: 'Password is required', minLength: { value: 8, message: 'Min 8 characters' } })} type={showPass ? 'text' : 'password'} className="input-dark w-full pl-9 pr-10" placeholder="Min 8 characters" />
-                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    {regErrors.password && <p className="text-xs text-danger mt-1">{regErrors.password.message}</p>}
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Confirm Password
-                    <div className="relative mt-1">
-                      <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input {...regRegister('confirmPassword', { required: 'Please confirm password', validate: val => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} className="input-dark w-full pl-9 pr-10" placeholder="Repeat password" />
-                      <button type="button" onClick={() => setShowConfirmPass(!showConfirmPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                        {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                    {regErrors.confirmPassword && <p className="text-xs text-danger mt-1">{regErrors.confirmPassword.message}</p>}
-                  </label>
-                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
-                    {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                    Create Account
+                <form onSubmit={handleRegister(onRegister)} className="space-y-3" noValidate>
+                  {field('Full name', User,
+                    <input {...regRegister('fullName', { required: 'Enter your full name' })} autoComplete="name" className="input-dark w-full pl-10" placeholder="Juan Dela Cruz" />,
+                    regErrors.fullName?.message)}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                  {field('Email', Mail,
+                    <input {...regRegister('email', { required: 'Enter your email', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email' } })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@mail.com" />,
+                    regErrors.email?.message)}
+                  {field('Phone number', Phone,
+                    <input {...regRegister('phone')} type="tel" autoComplete="tel" className="input-dark w-full pl-10" placeholder="0917 123 4567" />)}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {field('Password', Lock,
+                      <input {...regRegister('password', { required: 'Enter a password', minLength: { value: 8, message: 'At least 8 characters' } })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="8+ characters" />,
+                      regErrors.password?.message, eye(showPass, () => setShowPass(!showPass)))}
+                    {field('Confirm', Lock,
+                      <input {...regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="Repeat it" />,
+                      regErrors.confirmPassword?.message, eye(showConfirmPass, () => setShowConfirmPass(!showConfirmPass)))}
+                  </div>
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}
+                    Create account
                   </button>
                 </form>
-                <p className="text-center text-sm text-muted-foreground">
-                  Already have an account?{' '}
-                  <button type="button" onClick={() => setTab('login')} className="text-primary font-semibold hover:underline">Sign in</button>
-                </p>
               </div>
             )}
 
-            {/* Forgot Password Tab */}
+            {/* Forgot password */}
             {tab === 'forgot' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <button type="button" onClick={() => setTab('login')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-                    <ArrowLeft size={14} /> Back to login
-                  </button>
-                  <h2 className="text-2xl font-bold text-foreground">Reset Password</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Enter your email to receive a reset link</p>
+                  {back}
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Reset your password</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Enter your email and we&apos;ll send you a reset link.</p>
                   {searchParams?.get('expired') && (
                     <p role="alert" className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
                       That reset link has expired or was opened in a different browser. Send a new one, then open it in this browser.
                     </p>
                   )}
                 </div>
-                <form onSubmit={handleForgot(onForgot)} className="space-y-4">
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Email Address
-                    <input {...regForgot('email', { required: 'Email is required' })} type="email" className="input-dark w-full mt-1" placeholder="you@example.com" />
-                    {forgotErrors.email && <p className="text-xs text-danger mt-1">{forgotErrors.email.message}</p>}
-                  </label>
-                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
+                <form onSubmit={handleForgot(onForgot)} className="space-y-3" noValidate>
+                  {field('Email', Mail,
+                    <input {...regForgot('email', { required: 'Enter your email' })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@example.com" />,
+                    forgotErrors.email?.message)}
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
-                    Send Reset Link
+                    Send reset link
                   </button>
                 </form>
               </div>
@@ -386,59 +368,46 @@ export default function LoginPageClient() {
 
             {/* New password: where the reset email's link lands */}
             {tab === 'new-password' && (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground">Set a New Password</h2>
-                  <p className="text-sm text-muted-foreground mt-1">Choose a new password for your account.</p>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Set a new password</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Choose a new password for your account.</p>
                 </div>
-                <form onSubmit={onNewPassword} className="space-y-4">
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    New password
-                    <div className="relative mt-1">
-                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input name="newPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-9 pr-10" placeholder="Min 8 characters" />
-                      <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label={showPass ? 'Hide password' : 'Show password'}>
-                        {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                    </div>
-                  </label>
-                  <label className="block space-y-1 text-sm text-muted-foreground">
-                    Confirm new password
-                    <div className="relative mt-1">
-                      <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <input name="confirmNewPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-9" placeholder="Repeat password" />
-                    </div>
-                  </label>
-                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
+                <form onSubmit={onNewPassword} className="space-y-3">
+                  {field('New password', Lock,
+                    <input name="newPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-10 pr-11" placeholder="8+ characters" />,
+                    undefined, eye(showPass, () => setShowPass(!showPass)))}
+                  {field('Confirm new password', Lock,
+                    <input name="confirmNewPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-10" placeholder="Repeat it" />)}
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                    Save New Password
+                    Save new password
                   </button>
                 </form>
               </div>
             )}
 
-            {/* Reset Password Tab */}
+            {/* Reset link sent */}
             {tab === 'reset' && (
-              <div className="space-y-6">
+              <div className="space-y-4 text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary dark:text-accent">
+                  <Mail size={26} aria-hidden="true" />
+                </span>
                 <div>
-                  <h2 className="text-2xl font-bold text-foreground">Check Your Email</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    We sent a password reset link to <strong>{pendingEmail}</strong>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Check your email</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    We sent a reset link to <strong className="text-foreground">{pendingEmail}</strong>. Open it in this browser; it expires in 1 hour.
                   </p>
                 </div>
-                <div className="rounded-2xl border border-border bg-muted/50 p-5 text-center">
-                  <Mail size={32} className="mx-auto mb-3 text-primary" />
-                  <p className="text-sm text-muted-foreground">Click the link in your email to reset your password. The link expires in 1 hour.</p>
-                </div>
                 <button type="button" onClick={() => setTab('login')} className="btn-secondary w-full">
-                  Back to Login
+                  Back to sign in
                 </button>
               </div>
             )}
-
           </div>
-        </div>
+        </section>
       </div>
+      </main>
     </div>
   );
 }
