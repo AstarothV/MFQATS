@@ -5,6 +5,7 @@ import { Camera, Check, Loader2, Mail, Trash2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import MfaSettings from '@/components/MfaSettings';
+import AvatarCropper from '@/components/AvatarCropper';
 
 const PHONE = /^[+\d][\d\s-]{6,19}$/; // e.g. 0917 123 4567 or +63 917 123 4567
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -14,16 +15,6 @@ type Msg = { ok: boolean; text: string } | null;
 const Note = ({ msg }: { msg: Msg }) => msg && (
   <p role="status" className={`flex items-center gap-1.5 text-sm ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.ok && <Check size={14} />}{msg.text}</p>
 );
-
-/** A square, small copy of the picked photo (320 px WebP), so uploads stay light on any phone. */
-async function squarePhoto(file: File): Promise<Blob> {
-  const img = await createImageBitmap(file);
-  const side = Math.min(img.width, img.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = 320;
-  canvas.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 320, 320);
-  return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Could not read the photo'))), 'image/webp', 0.85));
-}
 
 // The signed-in person's own settings: photo, name/nickname/phone, sign-in email, and two-step sign-in.
 // Role and department are set by an admin, so they are only shown here.
@@ -43,6 +34,7 @@ export default function ProfileSettings() {
   const [emailMsg, setEmailMsg] = useState<Msg>(null);
 
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null); // a picked photo, being positioned before upload
   const [photoMsg, setPhotoMsg] = useState<Msg>(null);
 
   // the form starts from the profile once it has loaded (only the first time, so typing is never overwritten)
@@ -86,14 +78,20 @@ export default function ProfileSettings() {
     setEmailMsg({ ok: true, text: `Check ${to} (and your current inbox) for a confirmation link. The change happens once you open it.` });
   }
 
-  async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  // a picked photo opens the adjuster first; it is uploaded only when saved there
+  function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = '';
-    if (!file || !user) return;
+    if (!file) return;
     if (!file.type.startsWith('image/')) return setPhotoMsg({ ok: false, text: 'Choose a photo (JPG, PNG or WebP).' });
+    setPhotoMsg(null);
+    setCropFile(file);
+  }
+
+  async function uploadPhoto(blob: Blob) {
+    if (!user) return;
     setPhotoBusy(true); setPhotoMsg(null);
     try {
-      const blob = await squarePhoto(file);
       const path = `${user.id}/avatar-${Date.now()}.webp`;
       const { error: upErr } = await supabase.storage.from('avatars').upload(path, blob, { contentType: 'image/webp', upsert: true });
       if (upErr) throw new Error(/bucket/i.test(upErr.message) ? 'Photo storage is not set up yet (migration 021).' : 'Could not upload the photo.');
@@ -102,6 +100,7 @@ export default function ProfileSettings() {
       const { error } = await supabase.from('user_profiles').update({ avatar_url: url }).eq('id', user.id);
       if (error) throw new Error('Could not save the photo.');
       await refreshProfile();
+      setCropFile(null);
       setPhotoMsg({ ok: true, text: 'Photo updated.' });
     } catch (err: any) {
       setPhotoMsg({ ok: false, text: err?.message || 'Could not update the photo.' });
@@ -167,6 +166,7 @@ export default function ProfileSettings() {
             )}
           </div>
           <Note msg={photoMsg} />
+          {cropFile && <AvatarCropper file={cropFile} saving={photoBusy} onCancel={() => setCropFile(null)} onSave={uploadPhoto} />}
         </section>
 
         <div className="space-y-4">

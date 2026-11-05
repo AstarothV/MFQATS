@@ -62,7 +62,7 @@ export default function OrderChat({ orderId, title = 'Conversation about this or
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `order_id=eq.${orderId}` }, () => void load())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [orderId, load, supabase]);
+  }, [orderId, load, supabase, stage]);
 
   // keep the newest message in view, inside the box only (never scroll the page)
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function OrderChat({ orderId, title = 'Conversation about this or
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="flex items-center gap-2 text-base font-semibold text-foreground"><MessageSquare size={16} className="text-primary dark:text-accent" /> {title}</h3>
+        <h3 className="flex items-start gap-2 text-base font-semibold leading-snug text-foreground"><MessageSquare size={16} className="mt-1 shrink-0 text-primary dark:text-accent" /> <span className="min-w-0">{title}</span></h3>
         {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
       </div>
 

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { ExternalLink, Loader2, X } from 'lucide-react';
+import { ChevronDown, ExternalLink, Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -44,37 +44,46 @@ export default function OrderReviewPanel({ order, onClose }: { order: FloorOrder
   const when = (iso: string) => new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
   return createPortal(
-    <div role="dialog" aria-modal="true" aria-label={`Review of ${order.order_ref}`} className="fixed inset-0 z-[70] flex items-start justify-center overflow-y-auto bg-black/60 p-3 sm:items-center sm:p-6" onClick={onClose}>
-      <div className="w-full max-w-2xl space-y-5 rounded-3xl border border-border bg-card p-5 shadow-2xl sm:p-6" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-start justify-between gap-3">
+    <div role="dialog" aria-modal="true" aria-label={`Review of ${order.order_ref}`} className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-3 sm:p-6" onClick={onClose}>
+      {/* centered and never taller than the screen; the defects fold away so the whole panel fits without zooming out */}
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl sm:max-h-[calc(100dvh-3rem)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-border p-5">
           <div className="min-w-0">
-            <h2 className="text-xl font-bold text-foreground">{order.order_ref} · {order.product_name}</h2>
+            <h2 className="truncate text-lg font-bold text-foreground">{order.order_ref} · {order.product_name}</h2>
             <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <StatusBadge variant={statusVariant(order.status)} label={statusLabel(order.status)} />
               {order.staff ? `Worked on by ${order.staff}` : 'No staff assigned'}
             </p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="btn-ghost p-2"><X size={18} /></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="btn-ghost shrink-0 p-2"><X size={18} /></button>
         </div>
 
-        <section className="space-y-2">
-          <h3 className="text-base font-semibold text-foreground">Detected defects</h3>
-          {scan === undefined ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" /> Loading the last scan…</p>
-          ) : !scan ? (
-            <p className="rounded-2xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">No scan saved for this order yet.</p>
-          ) : (
-            <>
-              <p className="text-xs text-muted-foreground">
-                Last scan {when(scan.created_at)} · {scan.overall_result === 'fail' ? 'failed' : scan.overall_result === 'pass' ? 'passed' : scan.overall_result}
-                {scan.confidence_avg ? ` · average confidence ${Math.round(scan.confidence_avg)}%` : ''}
-              </p>
-              {dets.length === 0 ? (
-                <p className="rounded-2xl border border-border bg-muted/40 p-3 text-sm text-muted-foreground">No defects found.</p>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
+          {/* detected defects: a one-line summary that opens into the list */}
+          <details className="group rounded-2xl border border-border bg-muted/30">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-foreground">Detected defects</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {scan === undefined ? 'Loading the last scan…'
+                    : !scan ? 'No scan saved for this order yet'
+                    : `Last scan ${scan.overall_result === 'fail' ? 'failed' : scan.overall_result === 'pass' ? 'passed' : scan.overall_result} · ${dets.length} defect${dets.length === 1 ? '' : 's'} · ${when(scan.created_at)}`}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {!!dets.length && <span className="badge status-danger">{dets.length}</span>}
+                {scan === undefined ? <Loader2 size={15} className="animate-spin text-muted-foreground" /> : <ChevronDown size={16} className="text-muted-foreground transition-transform duration-200 group-open:rotate-180" />}
+              </span>
+            </summary>
+            <div className="space-y-2 border-t border-border px-4 py-3">
+              {!scan ? (
+                <p className="text-sm text-muted-foreground">Nothing to show yet.</p>
+              ) : dets.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No defects found.</p>
               ) : (
-                <ul className="grid gap-2 sm:grid-cols-2">
+                <ul className="space-y-1.5">
                   {dets.map((d, i) => (
-                    <li key={i} className="flex items-center justify-between gap-2 rounded-2xl border border-border bg-muted/40 px-3 py-2 text-sm">
+                    <li key={i} className="flex items-center justify-between gap-2 rounded-xl bg-card px-3 py-2 text-sm">
                       <span className="min-w-0">
                         <span className="block truncate font-semibold capitalize text-foreground">{formatLabel(d.class_name)}</span>
                         <span className="text-xs text-muted-foreground">{d.confidence_score}% sure{d.side ? ` · ${d.side}` : ''}</span>
@@ -84,17 +93,16 @@ export default function OrderReviewPanel({ order, onClose }: { order: FloorOrder
                   ))}
                 </ul>
               )}
-              {scan.review_status === 'requested' && (
+              {scan?.confidence_avg ? <p className="text-xs text-muted-foreground">Average confidence {Math.round(scan.confidence_avg)}%</p> : null}
+              {scan?.review_status === 'requested' && (
                 <Link href="/admin/rework" className="btn-secondary inline-flex items-center gap-2 text-sm">
                   <ExternalLink size={14} /> Review the photos and 3D model in Rework Queue
                 </Link>
               )}
-            </>
-          )}
-        </section>
+            </div>
+          </details>
 
-        <div className="border-t border-border pt-4">
-          <OrderChat orderId={order.id} title="Comments and review" hint="Your comments on this piece. The staff working on it and the customer see them and can reply." />
+          <OrderChat orderId={order.id} compact title="Comments and review" hint="The staff working on it and the customer see your comments and can reply." />
         </div>
       </div>
     </div>,

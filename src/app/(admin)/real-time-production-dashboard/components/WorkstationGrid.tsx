@@ -27,6 +27,17 @@ export function stageTime(o: FloorOrder, now = Date.now()) {
 export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null }) {
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState<FloorOrder | null>(null);
+  // a notification link (?order=<id>) opens that order's panel once the orders have loaded
+  const linked = React.useRef(false);
+  useEffect(() => {
+    if (!floor || linked.current) return;
+    linked.current = true;
+    const wanted = new URLSearchParams(window.location.search).get('order');
+    const hit = wanted ? floor.find((o) => o.id === wanted) : null;
+    if (hit) setOpen(hit);
+    // not in progress any more (e.g. delivered): show it in Order Management instead
+    else if (wanted) window.location.replace(`/orders?order=${encodeURIComponent(wanted)}`);
+  }, [floor]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(t);

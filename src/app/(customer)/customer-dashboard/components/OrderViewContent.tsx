@@ -89,10 +89,10 @@ export default function OrderViewContent() {
       .order('created_at', { ascending: false });
     if (data) {
       setOrders(data);
-      // Auto-select first order if none selected
-      if (!selectedOrderId && data.length > 0) {
-        setSelectedOrderId(data[0].id);
-      }
+      // a notification link (?order=<id>) opens that order; otherwise the newest one
+      const wanted = new URLSearchParams(window.location.search).get('order');
+      if (wanted && data.some((o: any) => o.id === wanted)) setSelectedOrderId(wanted);
+      else if (!selectedOrderId && data.length > 0) setSelectedOrderId(data[0].id);
     }
     setLoading(false);
   }, [user, supabase, selectedOrderId]);

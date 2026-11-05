@@ -58,7 +58,12 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     const rows = (data || null) as any[] | null;
     if (rows) {
       setOrders(rows);
-      setSelectedOrderId((id) => id ?? rows[0]?.id ?? null);
+      // a notification link (?order=<id>) opens that order, the first time the list loads
+      const wanted = !loadedOnce.current ? new URLSearchParams(window.location.search).get('order') : null;
+      if (wanted && rows.some((r) => r.id === wanted)) {
+        setSelectedOrderId(wanted);
+        window.setTimeout(() => document.getElementById('order-panels')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+      } else setSelectedOrderId((id) => id ?? rows[0]?.id ?? null);
     }
     loadedOnce.current = true;
     setLoading(false);

@@ -43,8 +43,8 @@ export default function AssignedTasksList() {
 
   return (
     <div className="card-dark p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-foreground">Assigned Tasks</h3>
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-base font-semibold text-foreground">Your orders</h3>
         <span className="text-xs text-muted-foreground">{tasks.length} order{tasks.length === 1 ? '' : 's'} assigned to you</span>
       </div>
 
@@ -63,8 +63,9 @@ export default function AssignedTasksList() {
             const overdue = !!t.due_date && t.due_date < today;
             return (
               <div key={t.id} className="rounded-xl border border-border bg-muted/20 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3 min-w-0">
+                {/* phones: details on top with the full width, the button under them; wider screens: side by side */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div className="w-8 h-8 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
                       <Package size={15} className="text-primary" />
                     </div>
@@ -83,7 +84,7 @@ export default function AssignedTasksList() {
                     </div>
                   </div>
                   <Link href={`/staff/quality-scan?order=${t.id}`}
-                    className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary/15 text-primary text-xs font-semibold hover:bg-primary/25 transition">
+                    className="flex min-h-10 shrink-0 items-center justify-center gap-1 rounded-lg bg-primary/15 px-3 py-2 text-sm font-semibold text-primary transition hover:bg-primary/25 dark:text-accent sm:min-h-0 sm:py-1.5 sm:text-xs">
                     Open in Quality Scan <ChevronRight size={12} />
                   </Link>
                 </div>

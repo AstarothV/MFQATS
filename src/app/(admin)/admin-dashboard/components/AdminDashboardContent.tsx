@@ -157,16 +157,17 @@ export default function AdminDashboardContent() {
           const CardIcon = card.icon;
           return (
             <div key={card.label} className="card-dark p-5 rounded-3xl border border-border shadow-sm">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-2xl font-semibold text-foreground">{card.value}</h2>
+              {/* the icon keeps its size on the right; the value side takes what is left (showing an amount never pushes it out) */}
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <h2 className="truncate text-2xl font-semibold tabular-nums text-foreground">{card.value}</h2>
                     {card.sensitive && (
                       <button
                         onClick={toggleMoney}
                         aria-label={showMoney ? 'Hide amounts' : 'Show amounts'}
                         aria-pressed={showMoney}
-                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                       >
                         {showMoney ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
@@ -174,13 +175,13 @@ export default function AdminDashboardContent() {
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">{card.label}</p>
                 </div>
-                <div className="rounded-2xl bg-muted p-3 text-primary">
+                <div className="shrink-0 rounded-2xl bg-muted p-3 text-primary">
                   <CardIcon size={20} />
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                <span>{card.detail}</span>
-                <span className="font-semibold text-foreground">{card.delta}</span>
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-muted-foreground">
+                <span className="min-w-0">{card.detail}</span>
+                <span className="whitespace-nowrap font-semibold text-foreground">{card.delta}</span>
               </div>
             </div>
           );
