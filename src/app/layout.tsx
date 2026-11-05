@@ -17,10 +17,13 @@ const dmSans = localFont({
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  // the site has its own light and dark themes: phone browsers must not darken it themselves
+  colorScheme: 'light dark',
+  themeColor: '#F5F3FF',
 };
 
 export const metadata: Metadata = {
-  title: 'MWQATS — MVCA Wood Quality Assurance & Tracking System',
+  title: 'MFQATS — MVCA WoodWorks Quality Assurance & Tracking System',
   description:
     'Enterprise manufacturing QA platform with automated defect detection, 3D models, real-time production tracking, and role-based access control.',
   icons: {
@@ -42,15 +45,14 @@ export default function RootLayout({
               const theme = storedTheme === 'dark' ? 'dark' : 'light';
               document.documentElement.classList.toggle('dark', theme === 'dark');
               document.documentElement.style.colorScheme = theme;
+              if (theme === 'dark') document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', '#0B0B0F'));
             } catch (error) {
               document.documentElement.classList.remove('dark');
               document.documentElement.style.colorScheme = 'light';
             }
           })();`}
         </Script>
-
-        <script type="module" async src="https://static.rocket.new/rocket-web.js?_cfg=https%3A%2F%2Fmwqatsm2781back.builtwithrocket.new&_be=https%3A%2F%2Fappanalytics.rocket.new&_v=0.1.18" />
-        <script type="module" defer src="https://static.rocket.new/rocket-shot.js?v=0.0.2" /></head>
+      </head>
       <body className={dmSans.className} suppressHydrationWarning>
         <AuthProvider>
           {children}

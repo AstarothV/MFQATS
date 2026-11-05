@@ -50,6 +50,9 @@ interface SideScan {
   result: 'pass' | 'fail';
 }
 
+// one-line stage names for the phone-sized step bar (the full names show from tablet size up)
+const SHORT_STAGE: Record<string, string> = { upload: 'Upload', reconstruction_3d: '3D model', detect_defects: 'Detect', results: 'Results', recommendation: 'Re-check' };
+
 // What is saved for the selected order, so Results and Recommendation can show it after a reload.
 interface Saved {
   scan: 'pass' | 'fail' | 'pending' | null; // the order's latest saved scan ('pass' too when an admin approved a false alarm)
@@ -123,7 +126,6 @@ export default function QualityScanPage() {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<'pass' | 'fail' | 'pending' | null>(null);
-  const [confidenceAvg, setConfidenceAvg] = useState(0);
   const [backendOffline, setBackendOffline] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -422,7 +424,6 @@ export default function QualityScanPage() {
       const res = await detectDefects(imageData);
       setBackendOffline(false);
       setDetections(res.detections);
-      setConfidenceAvg(res.confidence_avg);
       setResult(res.overall_result);
       if (side) {
         const scan: SideScan = { file: side.file, image: imageData, detections: res.detections, result: res.overall_result };
@@ -480,7 +481,6 @@ export default function QualityScanPage() {
     setScannedSlot(null);
     setDetections([]);
     setResult(null);
-    setConfidenceAvg(0);
     setNotes('');
     setSaved(false);
   }
@@ -856,7 +856,7 @@ export default function QualityScanPage() {
         )}
 
         {/* Step bar */}
-        <nav aria-label="Inspection steps" className="card-dark grid grid-cols-[1fr_1.2fr_1fr_1fr_1.5fr] gap-0.5 p-2 sm:grid-cols-5 sm:gap-1.5 sm:p-3">
+        <nav aria-label="Inspection steps" className="card-dark grid grid-cols-5 gap-0.5 p-2 sm:gap-1.5 sm:p-3">
           {PROCESS_STAGES.map((s, i) => {
             const done = orderStep !== null && i < orderStep;
             const here = orderStep === i;
@@ -877,7 +877,9 @@ export default function QualityScanPage() {
                   {mark && <span className="sr-only">{mark === 'fail' ? 'Failed: ' : 'Passed: '}</span>}
                 </span>
                 <span className="w-full min-w-0">
-                  <span className={`block text-[10px] font-semibold leading-tight sm:text-sm ${current ? 'text-foreground' : 'text-foreground/80'}`}>{s.label}</span>
+                  <span className={`block truncate text-[11px] font-semibold leading-tight sm:whitespace-normal sm:text-sm ${current ? 'text-foreground' : 'text-foreground/80'}`}>
+                    <span className="sm:hidden">{SHORT_STAGE[s.key]}</span><span className="hidden sm:inline">{s.label}</span>
+                  </span>
                   <span className={`hidden truncate text-xs sm:block ${mark === 'fail' ? 'font-semibold text-danger' : 'text-muted-foreground'}`}>{stepNotes[i]}</span>
                 </span>
               </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
@@ -11,9 +11,9 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/activity';
+import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
-type Role = 'staff' | 'admin' | 'customer';
 type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa';
 
 type LoginForm = { email: string; password: string; remember: boolean };
@@ -46,15 +46,14 @@ export default function LoginPageClient() {
   const [pendingEmail, setPendingEmail] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
   const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, formState: { errors: regErrors } } = useForm<RegisterForm>();
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem('mfqats-theme') as 'dark' | 'light' | null;
-    const initialTheme = storedTheme === 'dark' ? 'dark' : 'light';
+    const initialTheme = savedTheme();
     setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+    applyTheme(initialTheme, false);
 
     // Check if register tab requested; 'new-password' is where the reset email's link lands
     const tabParam = searchParams?.get('tab');
@@ -76,12 +75,9 @@ export default function LoginPageClient() {
   }
 
   function toggleTheme() {
-    setTheme(curr => {
-      const next = curr === 'dark' ? 'light' : 'dark';
-      window.localStorage.setItem('mfqats-theme', next);
-      document.documentElement.classList.toggle('dark', next === 'dark');
-      return next;
-    });
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
   }
 
   async function onLogin(data: LoginForm) {

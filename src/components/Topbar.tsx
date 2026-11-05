@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Bell, ChevronDown, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
+import { applyTheme, savedTheme } from '@/lib/theme';
 
 interface TopbarProps {
   role: 'staff' | 'admin' | 'customer';
@@ -25,6 +26,22 @@ interface Notification {
   notification_type: string;
   is_read: boolean;
   created_at: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+}
+
+/** Where a notification leads: the page that shows what it is about, for this role. */
+function notificationLink(n: Notification, role: 'staff' | 'admin' | 'customer'): string | null {
+  const type = (n.entity_type ?? '').replace(/s$/, ''); // 'orders' and 'order' are the same thing
+  const id = n.entity_id;
+  if (type === 'inventory') return role === 'admin' ? '/admin/inventory' : role === 'staff' ? '/staff-dashboard/inventory' : null;
+  if (type === 'product_item') return role === 'staff' ? '/staff-dashboard/assigned-tasks' : null;
+  if (type !== 'order' || !id) return null;
+  if (role === 'customer') return `/customer-dashboard/order-view?order=${id}`;
+  if (role === 'staff') return `/staff/quality-scan?order=${id}`;
+  if (/scan review/i.test(n.title)) return '/admin/rework';
+  if (/message/i.test(n.title)) return `/real-time-production-dashboard?order=${id}`;
+  return `/orders?order=${id}`;
 }
 
 export default function Topbar({ role, onMenuToggle }: TopbarProps) {
@@ -37,7 +54,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'User';
   const initials = displayName
@@ -48,10 +64,9 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     .slice(0, 2);
 
   useEffect(() => {
-    const storedTheme = window.localStorage.getItem('mfqats-theme') as 'dark' | 'light' | null;
-    const initialTheme = storedTheme === 'dark' ? 'dark' : 'light';
+    const initialTheme = savedTheme();
     setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+    applyTheme(initialTheme, false);
 
     if (!user) return;
     const fetchNotifications = async () => {
@@ -80,12 +95,9 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   }, [user, supabase]);
 
   function toggleTheme() {
-    setTheme((currentTheme) => {
-      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      window.localStorage.setItem('mfqats-theme', nextTheme);
-      document.documentElement.classList.toggle('dark', nextTheme === 'dark');
-      return nextTheme;
-    });
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyTheme(next);
   }
 
   async function handleLogout() {
@@ -96,6 +108,21 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     } catch {
       setLoggingOut(false);
     }
+  }
+
+  // open what the notification is about, and mark it read
+  async function openNotification(n: Notification) {
+    const to = notificationLink(n, role);
+    if (!n.is_read) {
+      setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
+      setUnreadCount((c) => Math.max(0, c - 1));
+      void supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
+    }
+    if (!to) return;
+    setNotifOpen(false);
+    // the same page with another order: load it fresh so the page opens that order
+    if (to.split('?')[0] === window.location.pathname) window.location.assign(to);
+    else router.push(to);
   }
 
   async function markAllRead() {
@@ -118,7 +145,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => { onMenuToggle(); setMobileMenuOpen(v => !v); }}
+            onClick={onMenuToggle}
             className="lg:hidden btn-ghost p-2"
             aria-label="Toggle navigation menu"
           >
@@ -168,18 +195,26 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                   {notifications.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No notifications</p>
                   ) : (
-                    notifications.map((notif) => (
-                      <div
-                        key={notif.id}
-                        className={`rounded-xl border p-3 transition-colors ${notif.is_read ? 'border-border bg-background' : 'border-primary/20 bg-primary/5'}`}
-                      >
-                        <p className={`text-xs font-semibold ${notifTypeColor[notif.notification_type] || 'text-foreground'}`}>{notif.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{notif.message}</p>
-                        <p className="text-2xs text-muted-foreground/60 mt-1">
-                          {new Date(notif.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))
+                    notifications.map((notif) => {
+                      const link = notificationLink(notif, role);
+                      return (
+                        <button
+                          type="button"
+                          key={notif.id}
+                          onClick={() => openNotification(notif)}
+                          className={`group w-full rounded-xl border p-3 text-left transition-colors ${notif.is_read ? 'border-border bg-background' : 'border-primary/20 bg-primary/5'} ${link ? 'hover:border-primary/40 hover:bg-primary/10' : 'cursor-default'}`}
+                        >
+                          <span className="flex items-start justify-between gap-2">
+                            <span className={`text-xs font-semibold ${notifTypeColor[notif.notification_type] || 'text-foreground'}`}>{notif.title}</span>
+                            {link && <ChevronRight size={14} className="mt-px shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                          </span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{notif.message}</span>
+                          <span className="mt-1 block text-2xs text-muted-foreground/60">
+                            {new Date(notif.created_at).toLocaleDateString()}
+                          </span>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>

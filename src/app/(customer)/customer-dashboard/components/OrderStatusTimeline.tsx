@@ -96,8 +96,9 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
   return (
     <div className="space-y-5">
       {/* Order Summary Card */}
-      <div className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors sm:flex-row sm:items-center">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted dark:bg-muted/80">
+      {/* phones: centred and stacked, the bar full width; wider screens: icon, details and estimate side by side */}
+      <div className="flex flex-col items-stretch gap-4 rounded-2xl border border-border bg-card p-5 text-center shadow-sm transition-colors sm:flex-row sm:items-center sm:text-left">
+        <div className="mx-auto flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted dark:bg-muted/80 sm:mx-0">
           <Armchair size={26} className="text-muted-foreground" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
@@ -105,7 +106,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
           <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Order #{order?.order_ref} · Placed {order?.created_at ? fmtDate(order.created_at) : '—'}</p>
           
           {/* Queue Position & Status */}
-          <div className="flex items-center gap-3 mt-2 flex-wrap">
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
             {order?.queue_position && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 dark:border-blue-500/30 dark:bg-blue-500/15 dark:text-blue-200">
                 <Hash size={10} />
@@ -119,7 +120,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
           </div>
 
           {/* the same progress bar as the Overview */}
-          <div className="mt-3">
+          <div className="mt-3 w-full text-left">
             <div className="flex items-center justify-between text-xs text-muted-foreground mb-1.5">
               <span>Process Progress</span>
               <span className="font-bold text-foreground">{completionPct}%</span>
@@ -132,12 +133,12 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
             </div>
           </div>
         </div>
-        <div className="shrink-0 text-left sm:text-right">
+        <div className="shrink-0 border-t border-border pt-3 sm:border-0 sm:pt-0 sm:text-right">
           <p className="text-xs text-slate-500 dark:text-slate-400" title="Estimated with PERT from today, based on how long each remaining stage usually takes">
             Estimated Completion
           </p>
           {etaLoading ? (
-            <Skeleton className="ml-auto mt-1 h-5 w-28" />
+            <Skeleton className="mx-auto mt-1 h-5 w-28 sm:mr-0" />
           ) : (
           <p className="text-base font-bold text-slate-900 dark:text-white">
             {eta ? fmtDate(eta) : extendedStatus === 'delivered' ? 'Delivered' : order?.due_date ? fmtDate(order.due_date) : 'TBD'}
@@ -159,7 +160,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
             const hasDetails = true;
 
             return (
-              <div key={stageName} className="flex gap-4">
+              <div key={stageName} className="flex gap-3 sm:gap-4">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 z-10 border ${
@@ -181,7 +182,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
                   </div>
                   {!isLast && (
                     <div
-                      className={`my-1 min-h-[24px] w-0.5 ${status === 'complete' ? 'bg-emerald-400/40' : status === 'active' ? 'bg-gradient-to-b from-purple-500 to-violet-500' : 'bg-slate-200 dark:bg-border'}`}
+                      className={`my-1 min-h-[24px] w-0.5 flex-1 rounded-full ${status === 'complete' ? 'bg-emerald-400/40' : status === 'active' ? 'bg-gradient-to-b from-purple-500 to-violet-500' : 'bg-slate-200 dark:bg-border'}`}
                     />
                   )}
                 </div>
