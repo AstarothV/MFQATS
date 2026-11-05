@@ -120,7 +120,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
       .order('created_at', { ascending: true });
     if (data) setMessages(data as InquiryMessage[]);
     setMessagesLoading(false);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    setTimeout(() => (() => { const box = messagesEndRef.current?.closest('.overflow-y-auto'); box?.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); })(), 100);
   }, [supabase]);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
         filter: `inquiry_id=eq.${selectedInquiry.id}`,
       }, (payload) => {
         setMessages(prev => [...prev, payload.new as InquiryMessage]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        setTimeout(() => (() => { const box = messagesEndRef.current?.closest('.overflow-y-auto'); box?.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); })(), 100);
       })
       .subscribe();
 
@@ -240,9 +240,10 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+          <p className="page-eyebrow">Support</p>
+          <h1 className="page-title">
             Inquiries
             {unreadCount > 0 && (
               <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-danger text-white text-xs font-bold">
@@ -250,7 +251,7 @@ export default function InquirySystem({ userRole }: InquirySystemProps) {
               </span>
             )}
           </h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="page-subtitle">
             {filteredInquiries.length} inquir{filteredInquiries.length !== 1 ? 'ies' : 'y'}
           </p>
         </div>

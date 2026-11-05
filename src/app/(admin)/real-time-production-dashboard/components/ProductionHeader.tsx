@@ -4,10 +4,11 @@ import { RefreshCw } from 'lucide-react';
 
 export default function ProductionHeader({ updated, onRefresh }: { updated: Date | null; onRefresh: () => void }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
       <div>
+        <p className="page-eyebrow">Overview</p>
         <h1 className="page-title">Inspection Progress</h1>
-        <p className="text-sm text-muted-foreground mt-0.5 flex items-center gap-2">
+        <p className="page-subtitle flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-success animate-pulse-subtle inline-block" />
           {updated
             ? `Live · updated ${updated.toLocaleString('en-PH', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`

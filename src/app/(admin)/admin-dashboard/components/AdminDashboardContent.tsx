@@ -123,7 +123,7 @@ export default function AdminDashboardContent() {
         <div>
           <p className="page-eyebrow">Administrator Overview</p>
           <h1 className="page-title">Executive Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+          <p className="page-subtitle">
             Monitor revenue, orders, inspection progress, and supplier readiness in one premium woodworks management view.
           </p>
         </div>

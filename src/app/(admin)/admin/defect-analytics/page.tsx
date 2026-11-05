@@ -91,7 +91,7 @@ export default function AdminDefectAnalyticsPage() {
         <div>
           <p className="page-eyebrow">Quality Intelligence</p>
           <h1 className="page-title">Defect Analytics</h1>
-          <p className="text-sm text-muted-foreground mt-2">Defect frequency analysis, confidence scores, and quality trends.</p>
+          <p className="page-subtitle">Defect frequency analysis, confidence scores, and quality trends.</p>
         </div>
 
         {loading ? (

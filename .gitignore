@@ -5,6 +5,7 @@ package-lock.json
 
 # Next.js build output
 .next/
+.next-*/
 out/
 
 # Production build
@@ -43,3 +44,5 @@ __pycache__/
 # rendered test photos (python src/api/test_sfm.py photos)
 src/api/samples/sfm_photos/
 .venv-hunyuan/
+# design-tool cache (local only)
+.impeccable/

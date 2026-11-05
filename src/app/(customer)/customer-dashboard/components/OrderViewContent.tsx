@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { OrderViewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkeleton';
-import { Package, Search, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, Truck, AlertCircle, TrendingUp, Eye, X, FileText, Image, Box, MessageSquare } from 'lucide-react';
+import { Package, Search, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, Truck, AlertCircle, TrendingUp, Eye, X, FileText, Image, Box, MessageSquare, Armchair, ShoppingBag } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { watchOrders } from '@/lib/staffAssignment';
@@ -139,8 +139,9 @@ export default function OrderViewContent() {
     return (
       <div className="space-y-6">
         <div>
+          <p className="page-eyebrow">Your orders</p>
           <h1 className="page-title">Order History</h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Track your furniture orders</p>
+          <p className="page-subtitle">Track your furniture orders</p>
         </div>
         <div className="rounded-2xl border border-border bg-card py-16 text-center">
           <Package size={32} className="mx-auto mb-3 text-muted-foreground" />
@@ -156,11 +157,12 @@ export default function OrderViewContent() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
+          <p className="page-eyebrow">Your orders</p>
           <h1 className="page-title">Order History</h1>
           {selectedOrder && (
-            <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+            <p className="page-subtitle">
               Latest: #{selectedOrder.order_ref} · {selectedOrder.product_name}
             </p>
           )}
@@ -176,7 +178,7 @@ export default function OrderViewContent() {
             href="/customer-dashboard/shop"
             className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground hover:opacity-90 transition"
           >
-            🛍 Shop
+            <ShoppingBag size={16} aria-hidden="true" /> Shop
           </Link>
         </div>
       </div>
@@ -189,7 +191,7 @@ export default function OrderViewContent() {
             className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left text-sm font-semibold text-foreground hover:bg-muted/30 transition-colors"
           >
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-lg shrink-0">🪑</div>
+              <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={16} aria-hidden="true" /></div>
               <div className="min-w-0">
                 <p className="font-semibold text-foreground truncate">
                   {selectedOrder?.product_name || 'Select an order'}
@@ -226,7 +228,7 @@ export default function OrderViewContent() {
                       onClick={() => handleSelectOrder(order.id)}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10' : ''}`}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-base shrink-0">🪑</div>
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={16} aria-hidden="true" /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-foreground truncate">{order.product_name}</p>
                         <p className="text-[10px] text-muted-foreground">#{order.order_ref}</p>
@@ -266,6 +268,8 @@ export default function OrderViewContent() {
       </div>
 
       {/* Tab Content — all driven by selectedOrder */}
+      {/* keyed by tab, so each switch plays the short fade-up */}
+      <div key={activeTab} className="tab-in">
       {activeTab === 'queue' && (
         <OrderStatusTimeline order={selectedOrder} />
       )}
@@ -379,6 +383,7 @@ export default function OrderViewContent() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

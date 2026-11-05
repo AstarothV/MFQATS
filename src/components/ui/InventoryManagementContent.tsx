@@ -220,10 +220,11 @@ export default function InventoryManagementContent() {
         </div>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
-          <p className="text-sm text-muted-foreground mt-2">Track raw materials, monitor stock levels, and manage supplier relationships.</p>
+          <p className="page-eyebrow">Operations</p>
+          <h1 className="page-title">Inventory Management</h1>
+          <p className="page-subtitle">Track raw materials, monitor stock levels, and manage supplier relationships.</p>
         </div>
         <div className="relative w-full lg:w-80 lg:shrink-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

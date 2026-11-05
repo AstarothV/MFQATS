@@ -204,7 +204,7 @@ export default function AdminUsersPage() {
           <div>
             <p className="page-eyebrow">Administration</p>
             <h1 className="page-title">User Management</h1>
-            <p className="text-sm text-muted-foreground mt-2">Manage system users, roles, and access permissions.</p>
+            <p className="page-subtitle">Manage system users, roles, and access permissions.</p>
           </div>
           <button onClick={openAdd} className="btn-primary flex items-center gap-2">
             <Plus size={16} /> Add Staff / User

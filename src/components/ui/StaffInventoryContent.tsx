@@ -35,10 +35,11 @@ export default function StaffInventoryContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Workshop Inventory</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="page-eyebrow">Resources</p>
+          <h1 className="page-title">Workshop Inventory</h1>
+          <p className="page-subtitle">
             Materials in stock. The admin keeps these numbers up to date in Inventory.
           </p>
         </div>

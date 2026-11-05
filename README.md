@@ -56,13 +56,12 @@ MFQATS/
 │   ├── components/     Shared parts: top bar, sidebar, charts, buttons, cards
 │   ├── lib/            Shared logic: order stages, defect rate, peso formatting, Supabase client
 │   ├── styles/         Theme and the shared glass styles (tailwind.css)
-│   └── api/            Python detection server: YOLO defect detection and the 3D model
+│   └── api/            Python detection server (YOLO defects, 3D model) and the Colab training notebook
 ├── supabase/
 │   ├── migrations/     Database setup, applied by hand in the Supabase SQL Editor (in order)
 │   └── checks/         Read-only queries for checking the live database
 ├── public/assets/      Logo and images
-├── docs/               All project documents
-└── train_yolov12n_wood.ipynb   Google Colab notebook for training the defect models
+└── docs/               All project documents (setup, how it works, design, thesis notes)
 ```
 
 ## Commands

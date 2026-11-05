@@ -5,7 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { SkeletonRegion, TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import {
   Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Target, Activity, ArrowRight,
-  Maximize2, Minimize2, Flashlight, FlashlightOff, ChevronLeft, ChevronRight, Check, Images, Info,
+  Maximize2, Minimize2, Flashlight, FlashlightOff, ChevronLeft, ChevronRight, Check, Images, Info, Send,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
@@ -18,13 +18,14 @@ import ModelDefectsView from './ModelDefectsView';
 import { PhotoSlots, PhotoThumbs, usePhotoSet, VIEWS } from './PhotoSet';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
+// The Detection History table's columns: not the photo or the detections, which made the list several MB.
+const HISTORY_COLUMNS = 'id, order_id, stage_name, scan_mode, overall_result, confidence_avg, defect_count, notes, created_at, orders(order_ref, product_name)';
+
 interface DetectionLog {
   id: string;
   order_id: string | null;
   stage_name: string;
   scan_mode: string;
-  image_url: string;
-  detections: Detection[];
   overall_result: 'pass' | 'fail' | 'pending';
   confidence_avg: number;
   defect_count: number;
@@ -50,7 +51,11 @@ interface SideScan {
 
 // What is saved for the selected order, so Results and Recommendation can show it after a reload.
 interface Saved {
-  scan: 'pass' | 'fail' | 'pending' | null; // the order's latest saved scan
+  scan: 'pass' | 'fail' | 'pending' | null; // the order's latest saved scan ('pass' too when an admin approved a false alarm)
+  id?: string | null;
+  failed?: boolean; // what the scan itself found
+  review?: 'requested' | 'approved' | 'rejected' | null; // admin review of a failed scan (migration 015)
+  reviewNote?: string | null;
 }
 
 // Same-origin path that next.config.mjs forwards to the Python server, so it also works on phones via an https link.
@@ -152,12 +157,12 @@ export default function QualityScanPage() {
         .order('created_at', { ascending: false }).limit(50);
       const [ordersRes, { data: logsData }] = await Promise.all([
         ordersQuery(true),
-        supabase.from('detection_logs').select('*, orders(order_ref, product_name)').order('created_at', { ascending: false }).limit(20),
+        supabase.from('detection_logs').select(HISTORY_COLUMNS).order('created_at', { ascending: false }).limit(20),
       ]);
       // without the staff assignment migration there is no assigned_to column yet
       const ordersData = ordersRes.error ? (await ordersQuery(false)).data : ordersRes.data;
       if (ordersData) setOrders(ordersData);
-      if (logsData) setHistory(logsData as DetectionLog[]);
+      if (logsData) setHistory(logsData as unknown as DetectionLog[]);
       setHistoryLoading(false);
     };
     fetchData();
@@ -177,8 +182,15 @@ export default function QualityScanPage() {
 
   async function loadSaved(orderId: string) {
     if (!orderId) { setSavedInfo({ scan: null }); return; }
-    const { data: scan } = await supabase.from('detection_logs').select('overall_result').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle();
-    setSavedInfo({ scan: (scan?.overall_result as Saved['scan']) ?? null });
+    const latest = (cols: string) => supabase.from('detection_logs').select(cols).eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    let { data, error } = await latest('id, overall_result, review_status, review_note');
+    if (error) ({ data } = await latest('id, overall_result')); // before migration 015 there is no review yet
+    const scan = data as any;
+    const review = (scan?.review_status ?? null) as Saved['review'];
+    setSavedInfo({
+      scan: review === 'approved' ? 'pass' : ((scan?.overall_result as Saved['scan']) ?? null),
+      id: scan?.id ?? null, failed: scan?.overall_result === 'fail', review, reviewNote: scan?.review_note ?? null,
+    });
   }
 
   // A step forward when the work itself shows the stage has moved on, so the customer's OrderView keeps up.
@@ -251,6 +263,26 @@ export default function QualityScanPage() {
       .then(() => advance('reconstruction_3d', 'detect_defects'))
       .catch(notShared);
   }
+
+  // A failed scan the staff think is a false alarm goes to an admin; while it waits, check every 10 s for the decision.
+  const [requesting, setRequesting] = useState(false);
+  async function requestReview() {
+    if (!savedInfo.id) return;
+    setRequesting(true);
+    const { error } = await supabase.from('detection_logs').update({ review_status: 'requested' }).eq('id', savedInfo.id);
+    setRequesting(false);
+    if (error) {
+      showToast('error', /review_status/.test(error.message) ? 'Admin review needs the latest database update (migration 015).' : error.message);
+      return;
+    }
+    showToast('success', 'Sent to the admin for review. You will be notified of the decision.');
+    loadSaved(selectedOrderId);
+  }
+  useEffect(() => {
+    if (savedInfo.review !== 'requested' || !selectedOrderId) return;
+    const t = setInterval(() => loadSaved(selectedOrderId), 10000);
+    return () => clearInterval(t);
+  }, [savedInfo.review, selectedOrderId]);
 
   // Choosing an order opens the step it is at, and loads what was already saved for it.
   function chooseOrder(id: string) {
@@ -592,10 +624,10 @@ export default function QualityScanPage() {
       // Refresh history
       const { data: logsData } = await supabase
         .from('detection_logs')
-        .select('*, orders(order_ref, product_name)')
+        .select(HISTORY_COLUMNS)
         .order('created_at', { ascending: false })
         .limit(20);
-      if (logsData) setHistory(logsData as DetectionLog[]);
+      if (logsData) setHistory(logsData as unknown as DetectionLog[]);
       loadSaved(selectedOrderId);
 
       setSaved(true);
@@ -730,7 +762,7 @@ export default function QualityScanPage() {
         <div>
           <p className="page-eyebrow">Quality Inspection</p>
           <h1 className="page-title">Quality Scan</h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">Inspect one order at a time, step by step.</p>
+          <p className="page-subtitle">Inspect one order at a time, step by step.</p>
         </div>
 
         {/* Backend offline alert */}
@@ -827,16 +859,16 @@ export default function QualityScanPage() {
                 key={s.key}
                 onClick={() => goTo(i)}
                 aria-current={current ? 'step' : undefined}
-                className={`relative flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-center transition-colors sm:flex-row sm:gap-2.5 sm:px-3 sm:text-left ${current ? 'bg-primary/10 shadow-[inset_0_1px_0_var(--glass-edge)]' : 'hover:bg-muted'}`}
+                className={`relative flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 py-2.5 text-center transition-colors sm:px-2 2xl:flex-row 2xl:gap-2.5 2xl:px-3 2xl:text-left ${current ? 'bg-primary/10 shadow-[inset_0_1px_0_var(--glass-edge)]' : 'hover:bg-muted'}`}
               >
                 {here && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-warning px-1.5 text-[9px] font-bold text-white sm:left-auto sm:right-2 sm:translate-x-0 sm:text-[10px]">Order is here</span>
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-warning px-1.5 text-[9px] font-bold text-white 2xl:left-auto 2xl:right-2 2xl:translate-x-0 sm:text-[10px]">Order is here</span>
                 )}
                 <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${mark === 'fail' ? 'bg-danger text-white' : mark === 'pass' ? 'bg-emerald-500/20 text-success' : current ? 'bg-primary text-primary-foreground' : done ? 'bg-emerald-500/20 text-success' : 'bg-muted text-muted-foreground'}`}>
                   {mark === 'fail' ? <X size={16} strokeWidth={3} /> : mark === 'pass' ? <Check size={16} strokeWidth={3} /> : done && !current ? <Check size={15} /> : i + 1}
                   {mark && <span className="sr-only">{mark === 'fail' ? 'Failed: ' : 'Passed: '}</span>}
                 </span>
-                <span className="min-w-0">
+                <span className="w-full min-w-0">
                   <span className={`block text-[10px] font-semibold leading-tight sm:text-sm ${current ? 'text-foreground' : 'text-foreground/80'}`}>{s.label}</span>
                   <span className={`hidden truncate text-xs sm:block ${mark === 'fail' ? 'font-semibold text-danger' : 'text-muted-foreground'}`}>{stepNotes[i]}</span>
                 </span>
@@ -846,7 +878,7 @@ export default function QualityScanPage() {
         </nav>
 
         {/* ---- 1 · Upload ---- */}
-        <section hidden={step !== 0} className="card-dark space-y-4 p-5">
+        <section hidden={step !== 0} className="tab-in card-dark space-y-4 p-5">
           {stepHead(0, 'Take the inspection photos once. They are used for the 3D model and can be scanned for defects. The customer sees them in OrderView as soon as you add them.')}
           <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
             <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${(photoCount / VIEWS.length) * 100}%` }} />
@@ -867,7 +899,7 @@ export default function QualityScanPage() {
         </section>
 
         {/* ---- 2 · 3D Reconstruction ---- */}
-        <section hidden={step !== 1} className="space-y-4">
+        <section hidden={step !== 1} className="tab-in space-y-4">
           <div className="card-dark space-y-4 p-5">
             {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order. The customer sees the finished model in OrderView.')}
             <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
@@ -875,7 +907,7 @@ export default function QualityScanPage() {
         </section>
 
         {/* ---- 3 · Detect Defects ---- */}
-        <section hidden={step !== 2} className="space-y-4">
+        <section hidden={step !== 2} className="tab-in space-y-4">
           <div className="card-dark space-y-4 p-5">
             {stepHead(2, 'Scan every side of the piece for defects with YOLOv12.')}
           </div>
@@ -1128,7 +1160,7 @@ export default function QualityScanPage() {
         </section>
 
         {/* ---- 4 · Results ---- */}
-        <section hidden={step !== 3} className="card-dark space-y-4 p-5">
+        <section hidden={step !== 3} className="tab-in card-dark space-y-4 p-5">
           {stepHead(3, 'Everything found for this order, in one place. Saving the scan finishes Detect Defects.')}
           {!verdict ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-4">
@@ -1189,6 +1221,28 @@ export default function QualityScanPage() {
               </div>
             </>
           )}
+          {selectedOrderId && savedInfo.failed && (
+            <div className="flex flex-wrap items-center justify-end gap-3 rounded-2xl border border-border bg-muted/30 p-3">
+              {!savedInfo.review ? (
+                <>
+                  <p className="mr-auto text-xs text-muted-foreground">Is the piece actually clean and this is a false alarm? An admin can review the scan.</p>
+                  <button onClick={requestReview} disabled={requesting} className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50">
+                    {requesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Send to admin for review
+                  </button>
+                </>
+              ) : (
+                <p role="status" className={`mr-auto flex items-start gap-2 text-sm ${savedInfo.review === 'approved' ? 'text-success' : savedInfo.review === 'rejected' ? 'text-danger' : 'text-warning'}`}>
+                  {savedInfo.review === 'requested' ? <Loader2 size={15} className="mt-0.5 shrink-0 animate-spin" /> : savedInfo.review === 'approved' ? <CheckCircle2 size={15} className="mt-0.5 shrink-0" /> : <AlertTriangle size={15} className="mt-0.5 shrink-0" />}
+                  <span>
+                    {savedInfo.review === 'requested' ? 'Waiting for the admin to review the scan. Finish opens only if they approve it as a false alarm.'
+                      : savedInfo.review === 'approved' ? 'The admin approved the scan as a false alarm. You can finish the order in Recommendation.'
+                      : 'The admin confirmed the defects. Send the piece back for rework.'}
+                    {savedInfo.reviewNote && <span className="block text-xs text-muted-foreground">Admin note: {savedInfo.reviewNote}</span>}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
           {selectedOrder && orderStep === 2 && (saved || savedInfo.scan) && (
             <button onClick={() => moveOrder('results')} disabled={moving} className="btn-secondary flex items-center gap-2 text-sm">
               {moving ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />} Move {selectedOrder.order_ref} to Results
@@ -1197,7 +1251,7 @@ export default function QualityScanPage() {
         </section>
 
         {/* ---- 5 · Recommendation ---- */}
-        <section hidden={step !== 4} className="card-dark space-y-4 p-5">
+        <section hidden={step !== 4} className="tab-in card-dark space-y-4 p-5">
           {stepHead(4, 'What to do next, based on the results.')}
           {advice.length === 0 ? (
             <p className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
@@ -1234,18 +1288,20 @@ export default function QualityScanPage() {
               )}
               {savedInfo.scan !== 'pass' && (
                 <p className="w-full text-xs text-muted-foreground">
-                  {savedInfo.scan === 'fail' ? 'The saved scan failed, so it cannot be finished: send it back for rework.' : 'Save a passing scan in Results first.'}
+                  {savedInfo.review === 'requested' ? 'Waiting for the admin to review the scan: Finish opens if they approve it as a false alarm.'
+                    : savedInfo.scan === 'fail' ? 'The saved scan failed, so it cannot be finished: send it back for rework, or ask an admin to review it in Results.'
+                    : 'Save a passing scan in Results first.'}
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {selectedOrder
                 ? `${selectedOrder.order_ref} is at ${statusLabel(selectedOrder.extended_status)}. Finish and rework open when it reaches Results.`
                 : 'Choose an order at the top to finish it or send it back.'}
             </p>
           )}
-          <p className="flex items-start gap-2 text-xs text-muted-foreground">
+          <p className="flex items-start gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
             <Info size={14} className="mt-0.5 shrink-0" />
             Release only opens when the order&apos;s latest saved scan passed. Rework sends the order back to Upload, so it is inspected again after the fix.
           </p>

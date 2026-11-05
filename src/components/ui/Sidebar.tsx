@@ -136,11 +136,11 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
           the new width, so collapsing never relayouts the content (charts included) on every frame. */}
       <aside
         aria-label="Main navigation"
-        className={`glass-float fixed z-40 top-[76px] bottom-3 left-3 flex flex-col rounded-[22px] p-2.5 w-[min(280px,calc(100vw-24px))] transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
-          slim ? 'lg:w-[68px]' : 'lg:w-[244px]'
+        className={`glass-float fixed z-40 top-[82px] bottom-3 left-3 flex flex-col rounded-[22px] p-2.5 w-[min(280px,calc(100vw-24px))] transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${
+          slim ? 'lg:w-[76px]' : 'lg:w-[244px]'
         } ${open ? 'translate-x-0' : '-translate-x-[calc(100%+24px)]'} lg:translate-x-0`}
       >
-        <nav className="flex flex-1 flex-col gap-3 overflow-y-auto overscroll-contain px-0.5 py-1">
+        <nav className={`flex flex-1 flex-col overflow-y-auto overscroll-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${slim ? 'gap-3 lg:gap-2' : 'gap-3'}`}>
           {groups.map((group, gi) => (
             <div key={group.title || gi}>
               {group.title && (
@@ -152,8 +152,8 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
                   {group.title}
                 </p>
               )}
-              {slim && gi > 0 && <div className="mx-3 mb-2 hidden border-t border-[var(--glass-line)] lg:block" aria-hidden="true" />}
-              <div className="flex flex-col gap-0.5">
+              {slim && gi > 0 && <div className="mx-auto mb-2 hidden w-8 border-t border-[var(--glass-line)] lg:block" aria-hidden="true" />}
+              <div className={`flex flex-col ${slim ? 'gap-0.5 lg:items-center lg:gap-1.5' : 'gap-0.5'}`}>
                 {group.items.map((item) => {
                   const NavIcon = item.icon;
                   const isActive = item.href === activeHref;
@@ -168,7 +168,7 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
                       aria-current={isActive ? 'page' : undefined}
                       title={slim ? item.label : undefined}
                       className={`flex h-10 items-center gap-3 whitespace-nowrap rounded-xl px-3 text-sm transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
-                        slim ? 'lg:justify-center lg:px-0' : ''
+                        slim ? 'lg:h-11 lg:w-11 lg:justify-center lg:px-0' : ''
                       } ${
                         isActive
                           ? 'bg-primary/15 font-semibold text-primary shadow-[inset_0_1px_0_var(--glass-edge)] dark:text-accent'
@@ -185,13 +185,13 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
           ))}
         </nav>
 
-        <div className={`mt-2 flex gap-1.5 border-t border-[var(--glass-line)] pt-2.5 ${slim ? 'lg:flex-col' : ''}`}>
+        <div className={`mt-2 flex gap-1.5 border-t border-[var(--glass-line)] pt-2.5 ${slim ? 'lg:flex-col lg:items-center' : ''}`}>
           <button
             type="button"
             onClick={handleLogout}
             title={slim ? 'Sign Out' : undefined}
             className={`flex h-10 flex-1 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-danger transition-colors duration-200 hover:bg-danger/10 ${
-              slim ? 'lg:justify-center lg:px-0' : ''
+              slim ? 'lg:h-11 lg:w-11 lg:flex-none lg:justify-center lg:px-0' : ''
             }`}
           >
             <LogOut size={18} className="shrink-0" aria-hidden="true" />
@@ -201,7 +201,7 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="hidden h-10 w-10 shrink-0 items-center justify-center self-center rounded-xl text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground lg:inline-flex"
+              className={`hidden h-10 w-10 shrink-0 items-center justify-center self-center rounded-xl ${slim ? 'lg:h-11 lg:w-11' : ''} text-muted-foreground transition-colors duration-200 hover:bg-muted hover:text-foreground lg:inline-flex`}
               aria-label={slim ? 'Expand sidebar' : 'Collapse sidebar'}
               title={slim ? 'Expand sidebar' : 'Collapse sidebar'}
             >

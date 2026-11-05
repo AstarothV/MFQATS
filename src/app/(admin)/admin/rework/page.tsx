@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { SkeletonRegion, TableSkeleton } from '@/components/ui/LoadingSkeleton';
+import ScanReviews from './ScanReviews';
 
 interface ReworkLog {
   id: string;
@@ -97,8 +98,10 @@ export default function AdminReworkPage() {
         <div>
           <p className="page-eyebrow">Quality Management</p>
           <h1 className="page-title">Rework Queue</h1>
-          <p className="text-sm text-muted-foreground mt-2">Manage rework requests, track resolution, and approve reinspections.</p>
+          <p className="page-subtitle">Manage rework requests, track resolution, and approve reinspections.</p>
         </div>
+
+        <ScanReviews onDecided={fetchReworks} />
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

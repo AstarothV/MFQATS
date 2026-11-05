@@ -148,31 +148,31 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         </div>
       )}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="page-eyebrow">{eyebrow}</p>
-          <h1 className="page-title">Track orders through the inspection process</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <div>
+        <p className="page-eyebrow">{eyebrow}</p>
+        <h1 className="page-title">Track orders through the inspection process</h1>
+        <p className="page-subtitle">Pick an order in the list to see its details, assigned staff and stage below.</p>
+      </div>
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status">
           {['All', 'pending', 'confirmed', ...PROCESS_STAGES.map(st => st.key), 'delivered', 'cancelled'].map(status => (
             <button
               key={status}
               type="button"
               onClick={() => setFilterStatus(status)}
-              className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-muted/80'}`}
+              aria-pressed={filterStatus === status}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${filterStatus === status ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
             >
               {status === 'All' ? 'All' : statusLabel(status)}
             </button>
           ))}
-        </div>
       </div>
 
       {loading ? (
         <SkeletonRegion label="Loading orders"><SplitContentSkeleton /></SkeletonRegion>
       ) : (
-        <div className="flex flex-col gap-4 xl:flex-row">
-          {/* Orders List */}
-          <section className="xl:w-[55%] card-dark rounded-3xl border border-border p-6">
+        <div className="space-y-4">
+          {/* Orders List: full width, so every column fits without scrolling sideways */}
+          <section className="card-dark rounded-3xl border border-border p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Active orders</h2>
@@ -206,7 +206,10 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     {filteredOrders.map(order => (
                       <tr
                         key={order.id}
-                        onClick={() => setSelectedOrderId(order.id)}
+                        onClick={() => {
+                          setSelectedOrderId(order.id);
+                          requestAnimationFrame(() => document.getElementById('order-panels')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+                        }}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedOrderId === order.id ? 'bg-primary/10' : ''}`}
                       >
                         <td className="px-4 py-4 font-semibold text-foreground whitespace-nowrap">{order.order_ref}</td>
@@ -230,8 +233,8 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
             )}
           </section>
 
-          {/* Order Details */}
-          <aside className="xl:w-[45%] space-y-4">
+          {/* The picked order: details, staff, stage and actions, below the list */}
+          <div id="order-panels" className="grid scroll-mt-24 gap-4 lg:grid-cols-2">
             {activeOrder && (
               <>
                 <section className="card-dark rounded-3xl border border-border p-6">
@@ -342,7 +345,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                 {/* Update Status */}
                 <section className="card-dark rounded-3xl border border-border p-6">
                   <h3 className="text-base font-semibold text-foreground mb-4">Update Process Stage</h3>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {ORDER_STATUSES.filter(s => s !== 'cancelled').map(status => (
                       <button
                         key={status}
@@ -409,7 +412,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                 </section>
               </>
             )}
-          </aside>
+          </div>
         </div>
       )}
     </div>

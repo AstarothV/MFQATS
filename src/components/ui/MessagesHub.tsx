@@ -19,9 +19,9 @@ export default function MessagesHub({ userRole, initialTab = 'chat' }: { userRol
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground uppercase tracking-[0.24em] mb-2">Communication</p>
-        <h1 className="text-3xl font-bold text-foreground">Messages</h1>
-        <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+        <p className="page-eyebrow">Communication</p>
+        <h1 className="page-title">Messages</h1>
+        <p className="page-subtitle">
           Chat with customers about their orders and answer their inquiries in one place.
         </p>
       </div>

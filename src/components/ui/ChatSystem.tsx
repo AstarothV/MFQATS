@@ -119,7 +119,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
   }, [selectedOrderId, user, fetchMessages, supabase]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    (() => { const box = messagesEndRef.current?.closest('.overflow-y-auto'); box?.scrollTo({ top: box.scrollHeight, behavior: 'smooth' }); })();
   }, [messages]);
 
   async function sendMessage() {

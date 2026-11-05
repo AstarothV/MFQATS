@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Loader2, Lock, Clock, ChevronDown, ChevronUp, Hash } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, Clock, ChevronDown, ChevronUp, Hash, Armchair } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { PROCESS_STAGES, statusLabel } from '@/lib/orders';
 import { Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -85,7 +85,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
       {/* Order Summary Card */}
       <div className="flex flex-col items-start gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors sm:flex-row sm:items-center">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-border bg-muted dark:bg-muted/80">
-          <span className="text-2xl">🪑</span>
+          <Armchair size={26} className="text-muted-foreground" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
           <h2 className="text-lg font-bold text-slate-900 dark:text-white">{order?.product_name || 'Your Order'}</h2>

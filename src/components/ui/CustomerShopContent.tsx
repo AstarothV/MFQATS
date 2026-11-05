@@ -218,8 +218,9 @@ export default function CustomerShopContent() {
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setStep('cart')} className="btn-ghost p-2">←</button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Checkout</h1>
-            <p className="text-sm text-muted-foreground">Enter your delivery details</p>
+            <p className="page-eyebrow">Shop</p>
+            <h1 className="page-title">Checkout</h1>
+            <p className="page-subtitle">Enter your delivery details</p>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -286,8 +287,9 @@ export default function CustomerShopContent() {
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setStep('browse')} className="btn-ghost p-2">←</button>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Your Cart</h1>
-              <p className="text-sm text-muted-foreground">{cartCount} item{cartCount !== 1 ? 's' : ''}</p>
+              <p className="page-eyebrow">Shop</p>
+              <h1 className="page-title">Your Cart</h1>
+              <p className="page-subtitle">{cartCount} item{cartCount !== 1 ? 's' : ''}</p>
             </div>
           </div>
           {cart.length > 0 && (
@@ -383,10 +385,11 @@ export default function CustomerShopContent() {
         </div>
       , document.body)}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Shop Our Collection</h1>
-          <p className="text-sm text-muted-foreground mt-2">Handcrafted furniture made with premium woods and expert craftsmanship.</p>
+          <p className="page-eyebrow">Shop</p>
+          <h1 className="page-title">Shop Our Collection</h1>
+          <p className="page-subtitle">Handcrafted furniture made with premium woods and expert craftsmanship.</p>
         </div>
         <div className="relative w-full lg:w-80 lg:shrink-0">
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />

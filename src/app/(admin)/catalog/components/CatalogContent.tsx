@@ -240,7 +240,7 @@ export default function CatalogContent() {
         <div>
           <p className="page-eyebrow">Product Catalog</p>
           <h1 className="page-title">Furniture Collections</h1>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl">
+          <p className="page-subtitle">
             Manage product listings, pricing, dimensions, and 3D model assets.
           </p>
         </div>

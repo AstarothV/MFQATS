@@ -1,13 +1,15 @@
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
-import { DM_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import Script from 'next/script';
 import '../styles/tailwind.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 
-const dmSans = DM_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+// DM Sans is kept in the project (variable font, weights 100-1000) instead of fetched from Google at build time:
+// Turbopack could not read the font links Google now returns, which stopped `npm run dev` from starting.
+const dmSans = localFont({
+  src: './fonts/dm-sans-latin-wght-normal.woff2',
+  weight: '100 1000',
   variable: '--font-dm-sans',
   display: 'swap',
 });

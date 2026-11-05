@@ -40,8 +40,8 @@ export default function ActiveTimerWidget({ order, enteredAt, expectedHours, bus
       <div className="relative z-10">
         <div className="mb-4 flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">Time in this stage</p>
-            <p className="text-sm font-semibold text-foreground">{order ? `${order.order_ref} · ${order.product_name}` : 'No order picked'}</p>
+            <h3 className="text-base font-semibold text-foreground">Time in this stage</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">{order ? `${order.order_ref} · ${order.product_name}` : 'No order picked'}</p>
           </div>
           {started && (
             <span className={`badge shrink-0 ${paused ? 'status-warning' : 'status-ok'}`}>
