@@ -84,7 +84,7 @@ export default function AdminAuditLogsPage() {
           <div>
             <p className="page-eyebrow">Administration</p>
             <h1 className="page-title">Audit Logs</h1>
-            <p className="text-sm text-muted-foreground mt-2">Every sign-in, visit and data change, as it happens. Updates every 10 seconds.</p>
+            <p className="page-subtitle">Every sign-in, visit and data change, as it happens. Updates every 10 seconds.</p>
           </div>
           <div className="text-sm text-muted-foreground">{total} total entries</div>
         </div>

@@ -100,8 +100,9 @@ export default function TeamManagementPage() {
         )}
 
         <div>
+          <p className="page-eyebrow">Administration</p>
           <h1 className="page-title">Team Management</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="page-subtitle">
             See who is working on which order, and assign staff to the orders customers placed.
           </p>
         </div>

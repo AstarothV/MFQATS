@@ -97,6 +97,10 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
     moves the order to the next stage.
   - **Quality Scan:** the chosen order, its photos and its 3D model are kept after a page reload. A **Finish** button
     in Recommendation releases a passed piece for delivery.
+  - **Admin review of a false alarm:** when a scan fails but the staff think the piece is clean, they send it to an
+    admin (Results). The admin sees the photo and the detections in the Rework Queue and either approves it as a
+    false alarm (the rework task closes and the piece can be finished) or confirms the defects. The scan's own result
+    is never changed; the decision, who made it and when are recorded with it.
 - **Staff assignment:** when the admin approves an order, Order Management lists the staff, with the available ones
   (no active order) first, and the admin assigns one. The Team page shows the same assignments (who is working on
   what, orders without staff) and can assign too. The assigned staff member is notified, and the order appears in

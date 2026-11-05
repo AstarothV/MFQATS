@@ -157,7 +157,7 @@ export default function AdminReportsPage() {
         <div>
           <p className="page-eyebrow">Administration</p>
           <h1 className="page-title">Reports</h1>
-          <p className="text-sm text-muted-foreground mt-2">Generate and export inspection progress, QA, defect, and inventory reports.</p>
+          <p className="page-subtitle">Generate and export inspection progress, QA, defect, and inventory reports.</p>
         </div>
 
         {loading ? (

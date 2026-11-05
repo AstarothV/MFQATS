@@ -17,26 +17,7 @@ const nextConfig = {
     qualities: [75, 85], // AppImage uses 85
   },
   // The Quality Scan tools reach the Python detection server through src/app/(staff)/staff/yolo/[...path]/route.ts.
-  webpack(
-    config,
-    {
-      dev: dev
-    }
-  ) {
-    // (The website builder's @dhiwise/component-tagger loader ran here on every .jsx/.tsx file, adding 7 data-component-*
-    // attributes to every element of every page. Removed: nothing reads them, and they slowed compiles.)
-    if (dev) {
-      const ignoredPaths = (process.env.WATCH_IGNORED_PATHS || '')
-        .split(',')
-        .map((p) => p.trim())
-        .filter(Boolean);
-      config.watchOptions = {
-        ignored: ignoredPaths.length
-          ? ignoredPaths.map((p) => `**/${p.replace(/^\/+|\/+$/g, '')}/**`)
-          : undefined,
-      };
-    }
-    return config;
-  },
+  // No webpack() hook: `npm run dev` uses Turbopack, and the old hook (a website-builder file-watch option that was
+  // never set) only made Next warn "Webpack is configured while Turbopack is not".
 };
 export default nextConfig;

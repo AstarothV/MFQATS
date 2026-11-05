@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import AppImage from '@/components/ui/AppImage';
-import { Bell, ChevronDown, Menu, X, LogOut, User, Mail, Building2, ShieldCheck, Copy, Moon, SunMedium } from 'lucide-react';
+import ProfilePanel from '@/components/ProfilePanel';
+import { Bell, ChevronDown, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 
@@ -33,7 +33,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [copyMessage, setCopyMessage] = useState('');
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -47,7 +46,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-  const profileImage = profile?.avatar_url || user?.user_metadata?.avatar_url || '';
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem('mfqats-theme') as 'dark' | 'light' | null;
@@ -105,13 +103,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     setUnreadCount(0);
-  }
-
-  async function copyEmail() {
-    if (!user?.email) return;
-    await navigator.clipboard.writeText(user.email);
-    setCopyMessage('Copied');
-    window.setTimeout(() => setCopyMessage(''), 1500);
   }
 
   const notifTypeColor: Record<string, string> = {
@@ -216,7 +207,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
                 {initials}
               </div>
-              <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">{displayName}</span>
+              <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">{profile?.nickname || displayName}</span>
               <ChevronDown size={14} className="text-muted-foreground hidden md:block" />
             </button>
 
@@ -260,74 +251,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
 
       {profileOpen && (
         <div className="fixed inset-0 z-50" onClick={() => setProfileOpen(false)}>
-          <div
-            className="glass-menu absolute right-3 top-[76px] w-[22rem] max-w-[calc(100vw-1.5rem)] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-primary/15 to-transparent p-5 border-b border-border/60">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] uppercase tracking-[0.3em] text-muted-foreground">Profile</p>
-                  <h4 className="text-lg font-bold text-foreground mt-2">{displayName}</h4>
-                  <p className="text-sm text-muted-foreground mt-1">{roleLabel[role]} account</p>
-                </div>
-                <button type="button" onClick={() => setProfileOpen(false)} className="text-muted-foreground hover:text-foreground" title="Close profile" aria-label="Close profile">
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <div className="rounded-2xl border border-border bg-foreground/5 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 rounded-full overflow-hidden bg-primary flex items-center justify-center shrink-0">
-                    {profileImage ? (
-                      <AppImage
-                        src={profileImage}
-                        alt={displayName}
-                        width={56}
-                        height={56}
-                        className="w-full h-full object-cover"
-                        unoptimized
-                      />
-                    ) : (
-                      <span className="text-sm font-bold text-primary-foreground">{initials}</span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-semibold text-foreground truncate">{displayName}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{profile?.role || role}</p>
-                    <p className="text-xs text-muted-foreground/80 mt-1">{profile?.department || 'Operations'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Mail size={14} />
-                  <span className="truncate">{user?.email || 'No email available'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <ShieldCheck size={14} />
-                  <span className="capitalize">{profile?.role || role}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Building2 size={14} />
-                  <span>{profile?.department || 'Operations'}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button type="button" onClick={copyEmail} className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm">
-                  <Copy size={14} />
-                  {copyMessage || 'Copy Email'}
-                </button>
-                <button type="button" onClick={() => setProfileOpen(false)} className="btn-primary flex-1 text-sm">
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
+          <ProfilePanel accountLabel={roleLabel[role]} onClose={() => setProfileOpen(false)} />
         </div>
       )}
     </header>

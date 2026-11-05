@@ -1,3 +1,7 @@
+// Theme colours are CSS variables (src/styles/tailwind.css), so light and dark can swap them. color-mix lets Tailwind's
+// opacity modifiers work on them (bg-primary/10, bg-muted/50); without it those classes rendered as nothing.
+const themed = (name) => `color-mix(in srgb, var(--${name}) calc(<alpha-value> * 100%), transparent)`;
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: [
@@ -11,35 +15,35 @@ module.exports = {
     },
     extend: {
       colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
+        background: themed('background'),
+        foreground: themed('foreground'),
         primary: {
-          DEFAULT: 'var(--primary)',
-          foreground: 'var(--primary-foreground)',
+          DEFAULT: themed('primary'),
+          foreground: themed('primary-foreground'),
         },
         secondary: {
-          DEFAULT: 'var(--secondary)',
-          foreground: 'var(--secondary-foreground)',
+          DEFAULT: themed('secondary'),
+          foreground: themed('secondary-foreground'),
         },
         accent: {
-          DEFAULT: 'var(--accent)',
-          foreground: 'var(--accent-foreground)',
+          DEFAULT: themed('accent'),
+          foreground: themed('accent-foreground'),
         },
         muted: {
-          DEFAULT: 'var(--muted)',
-          foreground: 'var(--muted-foreground)',
+          DEFAULT: themed('muted'),
+          foreground: themed('muted-foreground'),
         },
         card: {
-          DEFAULT: 'var(--card)',
-          foreground: 'var(--card-foreground)',
+          DEFAULT: themed('card'),
+          foreground: themed('card-foreground'),
         },
-        border: 'var(--border)',
-        input: 'var(--input)',
-        ring: 'var(--ring)',
-        success: 'var(--success)',
-        warning: 'var(--warning)',
-        danger: 'var(--danger)',
-        info: 'var(--info)',
+        border: themed('border'),
+        input: themed('input'),
+        ring: themed('ring'),
+        success: themed('success'),
+        warning: themed('warning'),
+        danger: themed('danger'),
+        info: themed('info'),
       },
       borderRadius: {
         DEFAULT: 'var(--radius)',
@@ -62,5 +66,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/forms')],
+  plugins: [require('@tailwindcss/forms')],
 };

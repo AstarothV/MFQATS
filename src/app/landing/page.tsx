@@ -102,10 +102,49 @@ const whyChoose = [
 { icon: Users, title: 'Dedicated Support', desc: 'Direct chat with our production team for any questions or updates.' }];
 
 
+// A number that counts up from 0 when it scrolls into view ("10,000+" keeps its "+" and its comma).
+function CountUp({ value }: { value: string }) {
+  const match = value.match(/^([\d,]+)(.*)$/);
+  const target = match ? Number(match[1].replace(/,/g, '')) : 0;
+  const [shown, setShown] = useState<number | null>(match ? 0 : null);
+  const ref = React.useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!match || !el) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setShown(target); return; }
+    let frame = 0;
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - start) / 1400);
+        setShown(Math.round(target * (1 - Math.pow(1 - t, 3))));
+        if (t < 1) frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    }, { threshold: 0.5 });
+    io.observe(el);
+    return () => { io.disconnect(); cancelAnimationFrame(frame); };
+  }, [target]);
+  return <span ref={ref}>{shown === null ? value : `${shown.toLocaleString('en-US')}${match![2]}`}</span>;
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  // sections and cards fade and slide in as they scroll into view
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('reveal-ready');
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('is-visible'); io.unobserve(e.target); }
+    }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+    return () => { io.disconnect(); root.classList.remove('reveal-ready'); };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -122,7 +161,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen overflow-x-clip bg-background text-foreground">{/* the slide-ins start off screen */}
       {/* Navbar */}
       <nav className={`fixed top-0 left-0 right-0 z-50 transition duration-300 ${scrolled ? 'bg-card/95 backdrop-blur-sm border-b border-border shadow-sm' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -151,7 +190,7 @@ export default function LandingPage() {
             </div>
 
             {/* Mobile Menu Button */}
-            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="md:hidden btn-ghost p-2">
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'} aria-expanded={mobileMenuOpen} className="md:hidden btn-ghost flex h-11 w-11 items-center justify-center p-0">
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
@@ -173,24 +212,26 @@ export default function LandingPage() {
         }
       </nav>
 
+      <main>
       {/* Hero Section */}
       <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
-        <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        <div className="blob-drift absolute top-1/4 right-1/4 w-96 h-96 bg-primary/15 rounded-full blur-3xl" />
+        <div className="blob-drift-slow absolute bottom-1/4 left-1/5 w-80 h-80 bg-violet-400/15 rounded-full blur-3xl" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary mb-8">
+          <div className="hero-rise inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary mb-8">
             <Zap size={14} /> Automated Quality Assurance & Tracking
           </div>
-          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight">
+          <h1 className="hero-rise text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight" style={{ '--d': '120ms' } as React.CSSProperties}>
             Handcrafted Furniture
             <br />
-            <span className="text-primary">Built to Perfection</span>
+            <span className="text-shimmer">Built to Perfection</span>
           </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10">
+          <p className="hero-rise text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10" style={{ '--d': '260ms' } as React.CSSProperties}>
             MVCA WoodWorks combines master craftsmanship with cutting-edge technology. 
             Track production in real-time and receive inspected, quality-guaranteed pieces.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="hero-rise flex flex-col sm:flex-row items-center justify-center gap-4" style={{ '--d': '400ms' } as React.CSSProperties}>
             <Link href="/sign-up-login-screen?tab=register" className="btn-primary text-base px-8 py-4 flex items-center gap-2">
               <ShoppingBag size={18} /> Browse Products <ArrowRight size={16} />
             </Link>
@@ -198,13 +239,13 @@ export default function LandingPage() {
               Login to Dashboard
             </Link>
           </div>
-          <div className="mt-12 grid grid-cols-2 gap-8 max-w-sm mx-auto">
+          <div className="hero-rise mt-12 grid grid-cols-2 gap-8 max-w-sm mx-auto" style={{ '--d': '540ms' } as React.CSSProperties}>
             {[
             { value: '500+', label: 'Happy Customers' },
             { value: '14 Days', label: 'Avg. Production' }].
             map((stat) =>
             <div key={stat.label} className="text-center">
-                <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-2xl font-bold text-foreground"><CountUp value={stat.value} /></p>
                 <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
               </div>
             )}
@@ -217,7 +258,6 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">About MVCA</p>
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
                 Where Tradition Meets Technology
               </h2>
@@ -238,30 +278,30 @@ export default function LandingPage() {
                 { label: 'Wood Species Used', value: '15+' },
                 { label: 'Inspection Process', value: '5 Stages' }].
                 map((item) =>
-                <div key={item.label} className="rounded-2xl border border-border bg-card p-4">
-                    <p className="text-xl font-bold text-primary">{item.value}</p>
+                <div key={item.label} className="lift rounded-2xl border border-border bg-card p-4">
+                    <p className="text-xl font-bold text-primary"><CountUp value={item.value} /></p>
                     <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
                   </div>
                 )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <img
+              <img loading="lazy" decoding="async"
                 src="https://img.rocket.new/generatedImages/rocket_gen_img_18c01684c-1767919236400.png"
                 alt="Master woodworker crafting an oak dining table in the MVCA workshop"
                 className="rounded-3xl object-cover h-48 w-full" />
               
-              <img
+              <img loading="lazy" decoding="async"
                 src="https://img.rocket.new/generatedImages/rocket_gen_img_1aef25360-1779359429586.png"
                 alt="Quality inspection of furniture joints and wood grain in production"
                 className="rounded-3xl object-cover h-48 w-full mt-8" />
               
-              <img
+              <img loading="lazy" decoding="async"
                 src="https://img.rocket.new/generatedImages/rocket_gen_img_1dd2e4284-1764650558520.png"
                 alt="Finished walnut bookshelf with natural wood finish ready for delivery"
                 className="rounded-3xl object-cover h-48 w-full" />
               
-              <img
+              <img loading="lazy" decoding="async"
                 src="https://img.rocket.new/generatedImages/rocket_gen_img_105d53b9a-1772882308126.png"
                 alt="Cherry wood bed frame with luxury finish in the showroom"
                 className="rounded-3xl object-cover h-48 w-full mt-8" />
@@ -275,7 +315,6 @@ export default function LandingPage() {
       <section id="products" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Our Collection</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Featured Furniture</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Each piece is handcrafted with premium wood species and finished to perfection.
@@ -283,9 +322,9 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredProducts.map((product) =>
-            <div key={product.name} className="rounded-3xl border border-border bg-card overflow-hidden hover:shadow-lg transition duration-200 group">
+            <div key={product.name} className="lift rounded-3xl border border-border bg-card overflow-hidden group">
                 <div className="relative overflow-hidden h-48 bg-white">
-                  <img src={product.image} alt={product.alt} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                  <img loading="lazy" decoding="async" src={product.image} alt={product.alt} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
                   <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium text-foreground">
                     {product.category}
                   </div>
@@ -319,7 +358,6 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Process</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">How Ordering Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               From browsing to delivery, we make the process simple and transparent.
@@ -329,11 +367,11 @@ export default function LandingPage() {
             {orderSteps.map((step, idx) => {
               const StepIcon = step.icon;
               return (
-                <div key={step.step} className="relative">
+                <div key={step.step} className="relative" data-reveal style={{ '--d': `${idx * 120}ms` } as React.CSSProperties}>
                   {idx < orderSteps.length - 1 &&
-                  <div className="hidden lg:block absolute top-8 left-full w-full h-0.5 bg-border z-0" style={{ width: 'calc(100% - 2rem)' }} />
+                  <div className="draw-line hidden lg:block absolute top-8 left-full w-full h-0.5 bg-primary/40 z-0" style={{ width: 'calc(100% - 2rem)' }} />
                   }
-                  <div className="relative z-10 rounded-3xl border border-border bg-card p-6 text-center">
+                  <div className="lift relative z-10 rounded-3xl border border-border bg-card p-6 text-center">
                     <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
                       <StepIcon size={24} className="text-primary" />
                     </div>
@@ -353,10 +391,9 @@ export default function LandingPage() {
       {/* Quality Inspection Showcase */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 to-background p-8 lg:p-12">
+          <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 to-background p-8 lg:p-12" data-reveal="zoom">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
               <div>
-                <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Quality Inspection</p>
                 <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">
                   Inspected Before It Reaches You
                 </h2>
@@ -380,7 +417,7 @@ export default function LandingPage() {
                 <div className="rounded-3xl bg-gradient-to-br from-violet-200 via-purple-200 to-white dark:from-purple-950 dark:via-violet-900 dark:to-slate-950 p-8 min-h-[300px] flex items-center justify-center">
                   <ol className="w-full max-w-xs space-y-3" aria-label="Inspection stages">
                     {inspectionStages.map((stage, i) =>
-                    <li key={stage.title} className="flex items-center gap-3 rounded-2xl border border-violet-300/60 bg-violet-400/20 backdrop-blur-sm px-4 py-3">
+                    <li key={stage.title} data-reveal="right" style={{ '--d': `${300 + i * 120}ms` } as React.CSSProperties} className="flex items-center gap-3 rounded-2xl border border-violet-300/60 bg-violet-400/20 backdrop-blur-sm px-4 py-3">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm font-bold">{i + 1}</span>
                         <div>
                           <p className="text-sm font-semibold text-foreground">{stage.title}</p>
@@ -400,14 +437,13 @@ export default function LandingPage() {
       <section className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Why MVCA</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Why Choose MVCA WoodWorks</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {whyChoose.map((item) => {
               const ItemIcon = item.icon;
               return (
-                <div key={item.title} className="rounded-3xl border border-border bg-card p-6">
+                <div key={item.title} className="lift rounded-3xl border border-border bg-card p-6">
                   <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
                     <ItemIcon size={22} className="text-primary" />
                   </div>
@@ -424,12 +460,11 @@ export default function LandingPage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Testimonials</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">What Our Customers Say</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {testimonials.map((t) =>
-            <div key={t.name} className="rounded-3xl border border-border bg-card p-6">
+            <div key={t.name} className="lift rounded-3xl border border-border bg-card p-6">
                 <div className="flex items-center gap-1 mb-4">
                   {Array.from({ length: t.rating }).map((_, i) =>
                 <Star key={i} size={14} className="text-warning fill-warning" />
@@ -456,7 +491,6 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div>
-              <p className="text-sm text-primary uppercase tracking-[0.24em] mb-3">Contact</p>
               <h2 className="text-3xl font-bold text-foreground mb-4">Get In Touch</h2>
               <p className="text-muted-foreground mb-8">
                 Have questions about our products or want to discuss a custom order? We'd love to hear from you.
@@ -501,6 +535,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
+      </main>
+
       <footer className="border-t border-border bg-card py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">

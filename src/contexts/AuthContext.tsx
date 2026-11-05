@@ -13,6 +13,7 @@ interface UserProfile {
   role: 'admin' | 'staff' | 'customer';
   department?: string;
   phone?: string;
+  nickname?: string;
   avatar_url?: string;
   is_active: boolean;
 }

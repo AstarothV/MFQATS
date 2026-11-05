@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Maximize2, Minimize2, Info, ChevronRight, Package, Ruler,
-  Layers, Palette, Weight, Wrench, Heart, Clock, Hash, CheckCircle2
+  Layers, Palette, Weight, Wrench, Heart, Clock, Hash, CheckCircle2, Armchair, Camera, Box
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { mediaLinks } from '@/lib/orderMedia';
@@ -85,8 +85,8 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
   ];
 
   const viewModes = [
-    { key: 'photo' as ViewMode, label: 'Static Photo', desc: 'High-res product photo', emoji: '📷' },
-    { key: '3d' as ViewMode, label: '3D Preview', desc: modelUrl ? 'Built from your inspection photos' : 'Not built yet', emoji: '🎲' },
+    { key: 'photo' as ViewMode, label: 'Static Photo', desc: 'High-res product photo', icon: Camera },
+    { key: '3d' as ViewMode, label: '3D Preview', desc: modelUrl ? 'Built from your inspection photos' : 'Not built yet', icon: Box },
   ];
 
   const activeViewportClass = viewMode === 'photo' ? 'bg-white' : 'bg-[#0b0b0f]';
@@ -124,7 +124,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
         ) : (
           <div className={`flex items-center justify-center ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
             <div className="text-center">
-              <div className="text-6xl mb-3">🪑</div>
+              <Armchair size={56} strokeWidth={1.5} className="mx-auto mb-3 text-muted-foreground" aria-hidden="true" />
               <p className="text-sm text-muted-foreground font-medium">{productName}</p>
               <p className="text-xs text-muted-foreground mt-1">{dimensions}</p>
             </div>
@@ -147,7 +147,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
           />
         ) : (
           <div className={`flex flex-col items-center justify-center gap-2 px-6 py-10 text-center ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
-            <div className="text-5xl">🪑</div>
+            <Armchair size={48} strokeWidth={1.5} className="text-white/60" aria-hidden="true" />
             <p className="text-sm font-semibold text-white">The 3D model is not ready yet</p>
             <p className="max-w-xs text-xs text-white/70">It appears here once the workshop builds it from the inspection photos of your {productName}.</p>
           </div>
@@ -174,7 +174,7 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                   onClick={() => setViewMode(mode.key)}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${viewMode === mode.key ? 'border-primary bg-primary/20 text-white' : 'border-white/20 bg-white/10 text-white/70 hover:bg-white/20'}`}
                 >
-                  <span>{mode.emoji}</span>
+                  <mode.icon size={16} aria-hidden="true" />
                   <span className="font-medium">{mode.label}</span>
                 </button>
               ))}
@@ -215,7 +215,9 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
                       onClick={() => setViewMode(mode.key)}
                       className={`flex w-full items-center gap-3 rounded-xl border px-3 py-3 text-left text-sm transition duration-150 active:scale-95 ${isActive ? 'border-primary bg-primary/10 text-foreground' : 'border-border bg-muted text-foreground hover:bg-muted/80'}`}
                     >
-                      <span className="text-xl">{mode.emoji}</span>
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${isActive ? 'bg-primary/15 text-primary' : 'bg-card text-muted-foreground'}`}>
+                        <mode.icon size={18} aria-hidden="true" />
+                      </span>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold">{mode.label}</p>
                         <p className="text-xs text-muted-foreground">{mode.desc}</p>

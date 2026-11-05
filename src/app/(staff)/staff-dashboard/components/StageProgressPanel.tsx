@@ -20,7 +20,7 @@ function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; ite
   const count = (kind: string) => VIEWS.filter((v) => f.captions.includes(`${v} ${kind}`)).length;
   const since = f.history.filter((h) => h.status === o.extended_status).at(-1)?.entered_at;
   const scanHere = !!f.scan && (!since || f.scan.at >= since);
-  const passed = f.scan?.result === 'pass';
+  const passed = f.scan?.result === 'pass' || f.scan?.review === 'approved'; // an admin approved a false alarm
   switch (o.extended_status) {
     case 'confirmed': return { title: 'Before starting', next: 'upload', action: 'Start Production', items: [
       { label: 'Order approved by the admin', done: true, required: true },
@@ -42,7 +42,9 @@ function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; ite
       { label: 'Scan saved', done: !!f.scan, required: true },
       { label: f.scan ? `Result: ${passed ? 'passed' : 'failed, needs rework'}` : 'Result', done: passed, required: false },
     ] };
-    case 'recommendation': return passed
+    case 'recommendation': return f.scan?.review === 'requested'
+      ? { title: 'Recommendation', next: null, action: '', items: [{ label: 'Waiting for the admin to review the failed scan (a possible false alarm)', done: false, required: true }] }
+      : passed
       ? { title: 'Recommendation', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: 'Latest saved scan passed', done: true, required: true }] }
       : { title: 'Recommendation', next: 'upload', action: 'Send back for rework', items: [{ label: 'Latest saved scan failed: fix the piece, then inspect it again', done: false, required: false }] };
     default: return { title: 'Checklist', next: null, action: '', items: [] };
@@ -112,7 +114,7 @@ export default function StageProgressPanel({ order, facts, expected, me, moving,
 
       {/* Checklist of the current stage, from the real work */}
       {!list ? (
-        <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Loading…</div>
+        <div aria-busy="true" className="flex min-h-[232px] items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 size={16} className="animate-spin" /> Loading the checklist…</div>
       ) : (
         <>
           <div className="flex items-center justify-between mb-3">

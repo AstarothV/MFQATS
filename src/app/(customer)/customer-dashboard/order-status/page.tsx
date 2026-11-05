@@ -7,8 +7,9 @@ export default function CustomerOrderStatusPage() {
     <AppLayout role="customer" currentPath="/customer-dashboard/order-status">
       <div className="space-y-6">
         <div>
+          <p className="page-eyebrow">Your orders</p>
           <h1 className="page-title">Order Status</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="page-subtitle">
             Track the progress of your current order and see each stage of the inspection process.
           </p>
         </div>

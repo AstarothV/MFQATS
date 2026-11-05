@@ -89,8 +89,9 @@ function Shell({ children, role, currentPath }: AppLayoutProps) {
   return (
     <ShellContext.Provider value={setPagePath}>
       <div
-        className="min-h-screen text-foreground pt-[76px] overflow-x-hidden"
-        style={{ '--sidebar-width': collapsed ? '96px' : '272px' } as React.CSSProperties}
+        className="min-h-screen text-foreground pt-[82px] overflow-x-hidden"
+        // sidebar: 12px from the edge + 76px collapsed / 244px open, then a 28px gap before the page content
+        style={{ '--sidebar-width': collapsed ? '116px' : '284px' } as React.CSSProperties}
       >
         <Topbar role={role} onMenuToggle={() => setSidebarOpen((prev) => !prev)} />
         <div className="flex">
@@ -102,7 +103,7 @@ function Shell({ children, role, currentPath }: AppLayoutProps) {
             onToggleCollapse={toggleCollapsed}
             onClose={() => setSidebarOpen(false)}
           />
-          <main className="flex-1 min-w-0 min-h-[calc(100vh-76px)] pt-3 pb-8 px-4 sm:px-5 lg:pl-0 lg:pr-6 xl:pr-8 2xl:pr-12 lg:ml-[var(--sidebar-width)]">
+          <main className="flex-1 min-w-0 min-h-[calc(100vh-82px)] pt-1 pb-8 px-4 sm:px-5 lg:pl-0 lg:pr-6 xl:pr-8 2xl:pr-12 lg:ml-[var(--sidebar-width)]">
             {children}
           </main>
         </div>

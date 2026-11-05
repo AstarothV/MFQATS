@@ -68,15 +68,15 @@ export function PhotoSlots({ set, disabled, name = 'photo' }: { set: PhotoSet; d
                 </button>
               </>
             ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-2 p-2">
-                <span className="text-sm font-semibold text-muted-foreground">{view}</span>
-                <div className="flex gap-2">
-                  <button onClick={() => pick(i, 'camera')} disabled={disabled} aria-label={`Take ${view.toLowerCase()} ${name} with the camera`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-                    <Camera size={18} /> Camera
-                  </button>
-                  <button onClick={() => pick(i, 'library')} disabled={disabled} aria-label={`Choose ${view.toLowerCase()} ${name} from photos`} className="flex flex-col items-center gap-1 rounded-lg bg-background/60 px-2.5 py-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-                    <Images size={18} /> Photos
-                  </button>
+              <div className="flex h-full flex-col justify-center gap-3 p-3">
+                <span className="text-center text-sm font-semibold text-foreground/80">{view}</span>
+                <div className="flex flex-col gap-2">
+                  {([['camera', Camera, 'Camera', `Take ${view.toLowerCase()} ${name} with the camera`], ['library', Images, 'Photos', `Choose ${view.toLowerCase()} ${name} from photos`]] as const).map(([from, Icon, label, aria]) => (
+                    <button key={from} onClick={() => pick(i, from)} disabled={disabled} aria-label={aria}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary disabled:opacity-50">
+                      <Icon size={16} aria-hidden="true" /> {label}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

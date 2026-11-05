@@ -101,6 +101,8 @@
   }
 
   html {
+    /* keep the scrollbar's room even when a page is short, so filtering a list never shifts the page sideways */
+    scrollbar-gutter: stable;
     scroll-behavior: smooth;
     accent-color: var(--primary);
     scrollbar-color: color-mix(in srgb, var(--muted-foreground) 40%, transparent) transparent;
@@ -128,6 +130,14 @@
 
   h1, h2, h3, h4, h5, h6, p {
     margin: 0;
+  }
+
+  /* Even line lengths: headings balance their lines, paragraphs avoid a lone last word. */
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
   }
 }
 
@@ -269,6 +279,11 @@
   animation: pageRise 360ms var(--ease-glass) backwards;
 }
 
+/* Tabs and steps: the panel that opens fades up a little (it replays each time the panel is shown). */
+.tab-in {
+  animation: pageRise 260ms var(--ease-glass) backwards;
+}
+
 @keyframes menuIn {
   from { opacity: 0; transform: scale(0.96) translateY(-4px); }
   to { opacity: 1; transform: none; }
@@ -286,6 +301,7 @@
   }
   .skeleton-reveal,
   .page-enter,
+  .tab-in,
   .glass-menu {
     animation-duration: 1ms;
   }
@@ -372,6 +388,9 @@
     @apply text-[26px] font-bold leading-tight tracking-[-0.02em] text-foreground sm:text-[28px];
     text-wrap: balance;
   }
+  .page-subtitle {
+    @apply mt-1.5 max-w-2xl text-sm text-muted-foreground;
+  }
 
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
@@ -382,3 +401,69 @@
 .fixed.inset-0 {
   margin: 0 !important;
 }
+
+/* ---- Landing page motion ----
+   [data-reveal] elements fade and slide in as they scroll into view (the page adds .is-visible); --d staggers them.
+   Hidden only once the page script runs (.reveal-ready), so the content is never lost without it. */
+.reveal-ready [data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--d, 0ms);
+}
+.reveal-ready [data-reveal='left'] { transform: translateX(-36px); }
+.reveal-ready [data-reveal='right'] { transform: translateX(36px); }
+.reveal-ready [data-reveal='zoom'] { transform: scale(0.94); }
+.reveal-ready [data-reveal].is-visible { opacity: 1; transform: none; }
+
+.hero-rise { animation: heroRise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes heroRise {
+  from { opacity: 0.35; transform: translateY(18px); filter: blur(5px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+.blob-drift { animation: blobDrift 18s ease-in-out infinite alternate; }
+.blob-drift-slow { animation: blobDrift 26s ease-in-out infinite alternate-reverse; }
+@keyframes blobDrift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(48px, -36px) scale(1.12); }
+  100% { transform: translate(-36px, 24px) scale(0.94); }
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, #6D28D9, var(--primary), #8B5CF6, var(--primary), #6D28D9);
+  background-size: 300% 100%;
+  animation: textShimmer 7s linear infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dark .text-shimmer { background-image: linear-gradient(90deg, #C4B5FD, var(--accent), #DDD6FE, var(--accent), #C4B5FD); }
+@keyframes textShimmer { to { background-position: 300% 0; } }
+
+/* lines that draw themselves when their section comes into view */
+.draw-line { transform: scaleX(0); transform-origin: left; transition: transform 0.9s ease 0.35s; }
+.is-visible .draw-line { transform: scaleX(1); }
+
+.lift { transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.3s; }
+.lift:hover { transform: translateY(-6px); box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--primary) 55%, transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-ready [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .hero-rise, .blob-drift, .blob-drift-slow { animation: none; }
+  .text-shimmer { animation: none; color: var(--primary); background: none; }
+  .draw-line { transform: none; transition: none; }
+  .lift, .lift:hover { transform: none; transition: none; }
+}
+
+/* ---- Dialogs and notices across the app: they arrive instead of appearing. ----
+   Backdrops fade (180ms), the dialog itself rises and settles (280ms), toasts drop in from the corner.
+   Fill is "backwards" only, so no transform stays behind once they have arrived. */
+@media (prefers-reduced-motion: no-preference) {
+  .fixed.inset-0 { animation: overlayIn 180ms ease-out backwards; }
+  .fixed.inset-0.items-center > *, [aria-modal='true'] > * { animation: dialogIn 280ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+  .fixed.top-4.right-4 { animation: toastIn 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+}
+@keyframes overlayIn { from { opacity: 0; } }
+@keyframes dialogIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+@keyframes toastIn { from { opacity: 0; transform: translateY(-10px) scale(0.96); } }

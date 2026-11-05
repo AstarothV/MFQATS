@@ -7,8 +7,9 @@ export default function StaffAssignedTasksPage() {
     <AppLayout role="staff" currentPath="/staff-dashboard/assigned-tasks">
       <div className="space-y-6">
         <div>
+          <p className="page-eyebrow">Workshop</p>
           <h1 className="page-title">Assigned Tasks</h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="page-subtitle">
             Review and manage work items assigned to your production team.
           </p>
         </div>

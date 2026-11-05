@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp, ShoppingBag, MessageSquare, Eye, Upload, Box, FileText } from 'lucide-react';
+import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp, ShoppingBag, MessageSquare, Eye, Upload, Box, FileText, Armchair } from 'lucide-react';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -142,10 +142,11 @@ export default function CustomerOverviewContent() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
+          <p className="page-eyebrow">Your account</p>
           <h1 className="page-title">Overview</h1>
-          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+          <p className="page-subtitle">
             {orders.length > 0 ? `${orders.length} order${orders.length !== 1 ? 's' : ''} found` : 'No orders yet'}
           </p>
         </div>
@@ -171,7 +172,7 @@ export default function CustomerOverviewContent() {
               <div className="rounded-2xl border border-border bg-card p-5">
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center text-3xl shrink-0">🪑</div>
+                    <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={28} aria-hidden="true" /></div>
                     <div>
                       <h2 className="text-lg font-bold text-foreground">{selectedOrder.product_name}</h2>
                       <p className="text-sm text-muted-foreground">Order #{selectedOrder.order_ref}</p>
@@ -246,7 +247,7 @@ export default function CustomerOverviewContent() {
         <div className="flex flex-col gap-5 xl:flex-row">
           {/* Orders List */}
           <div className="xl:w-[38%] space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1 mb-3">Your Orders</p>
+            <h2 className="px-1 mb-3 text-base font-semibold text-foreground">Your orders</h2>
             {orders.map((order) => {
               const isSelected = selectedOrder?.id === order.id;
               const st = order.extended_status || order.status;
@@ -263,8 +264,8 @@ export default function CustomerOverviewContent() {
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 text-lg">
-                        🪑
+                      <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 text-muted-foreground">
+                        <Armchair size={18} aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{order.product_name}</p>

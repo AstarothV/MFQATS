@@ -25,7 +25,7 @@ export interface WorkOrder {
 export interface WorkFacts {
   history: { status: string; entered_at: string; left_at: string | null }[];
   captions: string[]; // saved photos, e.g. "Front photo", "Top close-up"
-  scan: { result: string; at: string } | null; // the latest saved scan
+  scan: { result: string; at: string; review: string | null } | null; // the latest saved scan, and its admin review
 }
 
 const PICK_KEY = 'mfqats-workshop-order';
@@ -48,13 +48,14 @@ export default function StaffDashboardContent() {
     const [history, images, scan] = await Promise.all([
       supabase.from('order_stage_history').select('status, entered_at, left_at').eq('order_id', orderId).order('entered_at'),
       supabase.from('inspection_images').select('caption').eq('order_id', orderId),
-      supabase.from('detection_logs').select('overall_result, created_at').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('detection_logs').select('overall_result, created_at, review_status').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+        .then((r) => (r.error ? supabase.from('detection_logs').select('overall_result, created_at').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle() : r)),
     ]);
     if (selectedRef.current !== orderId) return; // another order was picked meanwhile
     setFacts({
       history: history.data ?? [],
       captions: (images.data ?? []).map((r) => r.caption),
-      scan: scan.data ? { result: scan.data.overall_result, at: scan.data.created_at } : null,
+      scan: scan.data ? { result: scan.data.overall_result, at: scan.data.created_at, review: (scan.data as any).review_status ?? null } : null,
     });
   }, [supabase]);
 
@@ -133,8 +134,9 @@ export default function StaffDashboardContent() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
+          <p className="page-eyebrow">Workshop</p>
           <h1 className="page-title">Workshop View</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{today}</p>
+          <p className="page-subtitle">{today}</p>
         </div>
         <label className="flex w-full min-w-0 items-center gap-2 text-sm text-muted-foreground sm:w-auto">
           Working on

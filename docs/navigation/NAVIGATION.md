@@ -87,12 +87,3 @@ To **remove** a page from the menu, delete its entry in `navByRole`. To **move**
 entry.
 
 ---
-
-## Unused files
-
-These files are an older navigation helper. The app doesn't use them (only the two example files import them), so you
-can ignore them, or delete them in a cleanup:
-
-`src/components/navigation.ts`, `src/components/roleNavigation.ts`, `src/components/useRoleNavigation.ts`,
-`src/components/ui/NavButton.tsx`, `src/components/ui/RoleNavigation.tsx`, `src/components/NavigationExample.tsx`,
-`src/components/RoleNavigationExample.tsx`

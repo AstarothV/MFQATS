@@ -284,7 +284,7 @@ good results in their own notebook run: a weak model adds false alarms to every 
 
 ## Retraining a model (optional)
 
-Models are trained on **Google Colab** (free GPU) with `train_yolov12n_wood.ipynb` from the project folder:
+Models are trained on **Google Colab** (free GPU) with `src/api/train_yolov12n_wood.ipynb`:
 
 1. In Colab: **File → Upload notebook** → `train_yolov12n_wood.ipynb`.
 2. **Runtime → Change runtime type → T4 GPU**.
@@ -310,4 +310,4 @@ Models are trained on **Google Colab** (free GPU) with `train_yolov12n_wood.ipyn
 | `src/api/test_*.py` | Self-tests: `python src/api/test_yolo_server.py` should print `ok` |
 | `src/api/weights/` | The trained models (`.pt`, not on GitHub) and `models.json` |
 | `src/app/(staff)/staff/quality-scan/` | The Quality Scan page and its panels |
-| `train_yolov12n_wood.ipynb` | The Colab notebook for training and testing models |
+| `src/api/train_yolov12n_wood.ipynb` | The Colab notebook for training and testing models |
