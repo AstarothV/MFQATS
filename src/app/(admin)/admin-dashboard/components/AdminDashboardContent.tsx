@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DonutChart, RevenueAreaChart } from '@/components/charts/lazy';
 import { PhilippinePeso, Package, Users, Bell, FileText, TrendingUp, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
-import { PageSkeleton } from '@/components/ui/LoadingSkeleton';
+import { SkeletonRegion, StatCardsSkeleton, ChartCardSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { readPageCache, writePageCache } from '@/lib/pageCache';
@@ -111,31 +111,45 @@ export default function AdminDashboardContent() {
     { label: 'Defect Rate', value: `${defectRate(inspections).toFixed(1)}%`, icon: Bell, delta: `${inspections.failed} of ${inspections.total} failed`, detail: 'Inspections that failed' },
   ];
 
+  // the page header needs no data, so it shows at once; only the numbers and charts below wait for the data
+  const header = (
+    <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <p className="page-eyebrow">Administrator Overview</p>
+        <h1 className="page-title">Executive Dashboard</h1>
+        <p className="page-subtitle">
+          Monitor revenue, orders, inspection progress, and supplier readiness in one premium woodworks management view.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-3 lg:flex-nowrap lg:shrink-0 lg:justify-end">
+        <Link href="/admin/reports" className="btn-secondary flex items-center gap-2">
+          <FileText size={16} /> Export Reports
+        </Link>
+        <Link href="/real-time-production-dashboard" className="btn-primary flex items-center gap-2">
+          <TrendingUp size={16} /> Inspection Monitor
+        </Link>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
-      <PageSkeleton />
+      <div className="space-y-6">
+        {header}
+        <SkeletonRegion label="Loading dashboard" className="space-y-6">
+          <StatCardsSkeleton />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <ChartCardSkeleton className="xl:col-span-2" />
+            <ChartCardSkeleton />
+          </div>
+        </SkeletonRegion>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="page-eyebrow">Administrator Overview</p>
-          <h1 className="page-title">Executive Dashboard</h1>
-          <p className="page-subtitle">
-            Monitor revenue, orders, inspection progress, and supplier readiness in one premium woodworks management view.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3 lg:flex-nowrap lg:shrink-0 lg:justify-end">
-          <Link href="/admin/reports" className="btn-secondary flex items-center gap-2">
-            <FileText size={16} /> Export Reports
-          </Link>
-          <Link href="/real-time-production-dashboard" className="btn-primary flex items-center gap-2">
-            <TrendingUp size={16} /> Inspection Monitor
-          </Link>
-        </div>
-      </div>
+      {header}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

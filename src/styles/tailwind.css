@@ -403,20 +403,64 @@
 }
 
 /* ---- Landing page motion ----
-   [data-reveal] elements fade and slide in as they scroll into view (the page adds .is-visible); --d staggers them.
-   Hidden only once the page script runs (.reveal-ready), so the content is never lost without it. */
-.reveal-ready [data-reveal] {
-  opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
-  transition-delay: var(--d, 0ms);
-}
-.reveal-ready [data-reveal='left'] { transform: translateX(-36px); }
-.reveal-ready [data-reveal='right'] { transform: translateX(36px); }
-.reveal-ready [data-reveal='zoom'] { transform: scale(0.94); }
-.reveal-ready [data-reveal].is-visible { opacity: 1; transform: none; }
+   [data-reveal] elements rise into place as they scroll into view (the page adds .is-visible); --d staggers them.
+   Hidden only once the page script runs (.reveal-ready), so the content is never lost without it. A one-time
+   animation (fill: backwards) rather than a transition, so once it ends the card's own hover lift works again. */
+.reveal-ready [data-reveal]:not(.is-visible) { opacity: 0; }
+.reveal-ready [data-reveal].is-visible { animation: revealUp 0.75s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) backwards; }
+.reveal-ready [data-reveal='left'].is-visible { animation-name: revealLeft; }
+.reveal-ready [data-reveal='right'].is-visible { animation-name: revealRight; }
+.reveal-ready [data-reveal='zoom'].is-visible { animation-name: revealZoom; }
+@keyframes revealUp { from { opacity: 0; transform: translateY(28px); } }
+@keyframes revealLeft { from { opacity: 0; transform: translateX(-36px); } }
+@keyframes revealRight { from { opacity: 0; transform: translateX(36px); } }
+@keyframes revealZoom { from { opacity: 0; transform: scale(0.94); } }
 
-.hero-rise { animation: heroRise 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: var(--d, 0ms); }
+/* the violet light that follows the mouse on the landing page (moved by CursorGlow in landing/page.tsx) */
+.cursor-glow {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 24%, transparent) 0%, transparent 70%);
+  will-change: transform;
+}
+.dark .cursor-glow { background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent) 0%, transparent 70%); }
+
+/* hero headline: each line slides up from behind its own edge */
+.line-mask { display: block; overflow: hidden; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.line-rise { display: block; animation: lineRise 0.9s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms) backwards; }
+@keyframes lineRise { from { transform: translateY(105%); } }
+
+/* landing navbar glides down once on load */
+.nav-drop { animation: navDrop 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+@keyframes navDrop { from { opacity: 0; transform: translateY(-100%); } }
+
+/* reading progress: a thin violet line under the navbar, driven by the page scroll itself (no script) */
+.scroll-progress { display: none; }
+@supports (animation-timeline: scroll()) {
+  .scroll-progress {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    transform-origin: left;
+    animation: scrollProgress linear both;
+    animation-timeline: scroll(root);
+  }
+}
+@keyframes scrollProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+.hero-rise { animation: heroRise 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards; animation-delay: var(--d, 0ms); }
 @keyframes heroRise {
   from { opacity: 0.35; transform: translateY(18px); filter: blur(5px); }
   to { opacity: 1; transform: none; filter: none; }
@@ -449,7 +493,9 @@
 .lift:hover { transform: translateY(-6px); box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--primary) 55%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .reveal-ready [data-reveal] { opacity: 1; transform: none; transition: none; }
+  .reveal-ready [data-reveal], .reveal-ready [data-reveal].is-visible { opacity: 1; animation: none; }
+  .cursor-glow, .scroll-progress { display: none; }
+  .line-rise, .nav-drop { animation: none; }
   .hero-rise, .blob-drift, .blob-drift-slow { animation: none; }
   .text-shimmer { animation: none; color: var(--primary); background: none; }
   .draw-line { transform: none; transition: none; }

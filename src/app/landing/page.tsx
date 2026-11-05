@@ -103,6 +103,37 @@ const whyChoose = [
 
 
 // A number that counts up from 0 when it scrolls into view ("10,000+" keeps its "+" and its comma).
+// A soft violet light that follows the mouse, behind the page content. It moves with transform only (no repaint of
+// the page), eases toward the pointer, and sleeps when the pointer stops. Off for touch screens and reduced motion.
+function CursorGlow() {
+  const ref = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !window.matchMedia('(pointer: fine)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    let x = window.innerWidth / 2, y = window.innerHeight / 3, tx = x, ty = y, frame = 0;
+    const tick = () => {
+      x += (tx - x) * 0.5;
+      y += (ty - y) * 0.5;
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+      frame = Math.abs(tx - x) + Math.abs(ty - y) > 0.4 ? requestAnimationFrame(tick) : 0;
+    };
+    const move = (e: PointerEvent) => {
+      tx = e.clientX; ty = e.clientY;
+      el.style.opacity = '1';
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
+    const hide = () => { el.style.opacity = '0'; };
+    window.addEventListener('pointermove', move, { passive: true });
+    document.documentElement.addEventListener('pointerleave', hide);
+    return () => {
+      window.removeEventListener('pointermove', move);
+      document.documentElement.removeEventListener('pointerleave', hide);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+  return <div ref={ref} aria-hidden="true" className="cursor-glow" />;
+}
+
 function CountUp({ value }: { value: string }) {
   const match = value.match(/^([\d,]+)(.*)$/);
   const target = match ? Number(match[1].replace(/,/g, '')) : 0;
@@ -146,6 +177,16 @@ export default function LandingPage() {
     return () => { io.disconnect(); root.classList.remove('reveal-ready'); };
   }, []);
 
+  // the section in view, so its nav link gets the underline
+  const [active, setActive] = useState('#home');
+  useEffect(() => {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) setActive(`#${e.target.id}`);
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    navLinks.forEach((l) => { const el = document.getElementById(l.href.slice(1)); if (el) io.observe(el); });
+    return () => io.disconnect();
+  }, []);
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
@@ -161,9 +202,10 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-background text-foreground">{/* the slide-ins start off screen */}
+    <div className="relative isolate min-h-screen overflow-x-clip bg-background text-foreground">{/* the slide-ins start off screen; isolate keeps the cursor light under the content */}
+      <CursorGlow />
       {/* Navbar */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition duration-300 ${scrolled ? 'bg-card/95 backdrop-blur-sm border-b border-border shadow-sm' : 'bg-transparent'}`}>
+      <nav className={`nav-drop fixed top-0 left-0 right-0 z-50 transition duration-300 ${scrolled ? 'bg-card/95 backdrop-blur-sm border-b border-border shadow-sm' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
@@ -174,14 +216,16 @@ export default function LandingPage() {
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-6">
               {navLinks.map((link) =>
-              <button key={link.label} type="button" onClick={() => scrollTo(link.href)} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <button key={link.label} type="button" onClick={() => scrollTo(link.href)} aria-current={active === link.href ? 'true' : undefined}
+                className={`relative py-1 text-sm font-medium transition-colors ${active === link.href ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
                   {link.label}
+                  <span aria-hidden="true" className={`absolute inset-x-0 -bottom-0.5 h-0.5 origin-center rounded-full bg-primary transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none ${active === link.href ? 'scale-x-100' : 'scale-x-0'}`} />
                 </button>
               )}
             </div>
 
             <div className="hidden md:flex items-center gap-3">
-              <Link href="/sign-up-login-screen" className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
+              <Link href="/sign-up-login-screen" className="inline-flex min-h-9 items-center px-1 text-sm font-semibold text-foreground hover:text-primary transition-colors">
                 Login
               </Link>
               <Link href="/sign-up-login-screen?tab=register" className="btn-primary text-sm px-4 py-2">
@@ -195,6 +239,8 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
+
+        <div aria-hidden="true" className="scroll-progress" />
 
         {/* Mobile Menu */}
         {mobileMenuOpen &&
@@ -214,32 +260,31 @@ export default function LandingPage() {
 
       <main>
       {/* Hero Section */}
-      <section id="home" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-background" />
+      <section id="home" className="relative flex min-h-[100svh] items-center justify-center overflow-hidden pt-16">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent" />
         <div className="blob-drift absolute top-1/4 right-1/4 w-96 h-96 bg-primary/15 rounded-full blur-3xl" />
         <div className="blob-drift-slow absolute bottom-1/4 left-1/5 w-80 h-80 bg-violet-400/15 rounded-full blur-3xl" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <div className="hero-rise inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary mb-8">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
+          <div className="hero-rise inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary mb-6">
             <Zap size={14} /> Automated Quality Assurance & Tracking
           </div>
-          <h1 className="hero-rise text-4xl sm:text-5xl lg:text-7xl font-bold text-foreground mb-6 leading-tight" style={{ '--d': '120ms' } as React.CSSProperties}>
-            Handcrafted Furniture
-            <br />
-            <span className="text-shimmer">Built to Perfection</span>
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-5 leading-[1.1] tracking-[-0.02em]">
+            <span className="line-mask"><span className="line-rise" style={{ '--d': '120ms' } as React.CSSProperties}>Handcrafted Furniture</span></span>
+            <span className="line-mask"><span className="line-rise" style={{ '--d': '230ms' } as React.CSSProperties}><span className="text-shimmer">Built to Perfection</span></span></span>
           </h1>
-          <p className="hero-rise text-lg sm:text-xl text-muted-foreground max-w-3xl mx-auto mb-10" style={{ '--d': '260ms' } as React.CSSProperties}>
+          <p className="hero-rise text-lg text-muted-foreground max-w-2xl mx-auto mb-8" style={{ '--d': '260ms' } as React.CSSProperties}>
             MVCA WoodWorks combines master craftsmanship with cutting-edge technology. 
             Track production in real-time and receive inspected, quality-guaranteed pieces.
           </p>
           <div className="hero-rise flex flex-col sm:flex-row items-center justify-center gap-4" style={{ '--d': '400ms' } as React.CSSProperties}>
-            <Link href="/sign-up-login-screen?tab=register" className="btn-primary text-base px-8 py-4 flex items-center gap-2">
-              <ShoppingBag size={18} /> Browse Products <ArrowRight size={16} />
+            <Link href="/sign-up-login-screen?tab=register" className="group btn-primary text-base px-8 py-4 flex items-center gap-2">
+              <ShoppingBag size={18} /> Browse Products <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
             </Link>
             <Link href="/sign-up-login-screen" className="btn-secondary text-base px-8 py-4 flex items-center gap-2">
               Login to Dashboard
             </Link>
           </div>
-          <div className="hero-rise mt-12 grid grid-cols-2 gap-8 max-w-sm mx-auto" style={{ '--d': '540ms' } as React.CSSProperties}>
+          <div className="hero-rise mt-10 grid grid-cols-2 gap-8 max-w-sm mx-auto" style={{ '--d': '540ms' } as React.CSSProperties}>
             {[
             { value: '500+', label: 'Happy Customers' },
             { value: '14 Days', label: 'Avg. Production' }].
@@ -257,7 +302,7 @@ export default function LandingPage() {
       <section id="about" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
+            <div data-reveal="left">
               <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-6">
                 Where Tradition Meets Technology
               </h2>
@@ -285,7 +330,7 @@ export default function LandingPage() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4" data-reveal="right" style={{ '--d': '120ms' } as React.CSSProperties}>
               <img loading="lazy" decoding="async"
                 src="https://img.rocket.new/generatedImages/rocket_gen_img_18c01684c-1767919236400.png"
                 alt="Master woodworker crafting an oak dining table in the MVCA workshop"
@@ -314,15 +359,15 @@ export default function LandingPage() {
       {/* Featured Products */}
       <section id="products" className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12" data-reveal>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Featured Furniture</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Each piece is handcrafted with premium wood species and finished to perfection.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredProducts.map((product) =>
-            <div key={product.name} className="lift rounded-3xl border border-border bg-card overflow-hidden group">
+            {featuredProducts.map((product, idx) =>
+            <div key={product.name} data-reveal style={{ '--d': `${idx * 90}ms` } as React.CSSProperties} className="lift rounded-3xl border border-border bg-card overflow-hidden group">
                 <div className="relative overflow-hidden h-48 bg-white">
                   <img loading="lazy" decoding="async" src={product.image} alt={product.alt} className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
                   <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium text-foreground">
@@ -338,7 +383,7 @@ export default function LandingPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-bold text-foreground">{peso(product.price)}</span>
-                    <Link href="/sign-up-login-screen?tab=register" className="text-xs text-primary font-semibold hover:underline">
+                    <Link href="/sign-up-login-screen?tab=register" className="-my-2 inline-flex min-h-8 items-center py-2 text-xs text-primary font-semibold hover:underline">
                       Order Now →
                     </Link>
                   </div>
@@ -358,7 +403,7 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">How Ordering Works</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4" data-reveal>How Ordering Works</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               From browsing to delivery, we make the process simple and transparent.
             </p>
@@ -436,14 +481,14 @@ export default function LandingPage() {
       {/* Why Choose MVCA */}
       <section className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12" data-reveal>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">Why Choose MVCA WoodWorks</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {whyChoose.map((item) => {
+            {whyChoose.map((item, idx) => {
               const ItemIcon = item.icon;
               return (
-                <div key={item.title} className="lift rounded-3xl border border-border bg-card p-6">
+                <div key={item.title} data-reveal style={{ '--d': `${idx * 90}ms` } as React.CSSProperties} className="lift rounded-3xl border border-border bg-card p-6">
                   <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
                     <ItemIcon size={22} className="text-primary" />
                   </div>
@@ -459,12 +504,12 @@ export default function LandingPage() {
       {/* Testimonials */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12" data-reveal>
             <h2 className="text-3xl sm:text-4xl font-bold text-foreground mb-4">What Our Customers Say</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {testimonials.map((t) =>
-            <div key={t.name} className="lift rounded-3xl border border-border bg-card p-6">
+            {testimonials.map((t, idx) =>
+            <div key={t.name} data-reveal style={{ '--d': `${idx * 90}ms` } as React.CSSProperties} className="lift rounded-3xl border border-border bg-card p-6">
                 <div className="flex items-center gap-1 mb-4">
                   {Array.from({ length: t.rating }).map((_, i) =>
                 <Star key={i} size={14} className="text-warning fill-warning" />
@@ -490,7 +535,7 @@ export default function LandingPage() {
       <section id="contact" className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div>
+            <div data-reveal="left">
               <h2 className="text-3xl font-bold text-foreground mb-4">Get In Touch</h2>
               <p className="text-muted-foreground mb-8">
                 Have questions about our products or want to discuss a custom order? We'd love to hear from you.
@@ -516,7 +561,7 @@ export default function LandingPage() {
                 })}
               </div>
             </div>
-            <div className="rounded-3xl border border-border bg-card p-6">
+            <div className="rounded-3xl border border-border bg-card p-6" data-reveal="right" style={{ '--d': '120ms' } as React.CSSProperties}>
               <h3 className="text-lg font-semibold text-foreground mb-4">Ready to Order?</h3>
               <p className="text-sm text-muted-foreground mb-6">
                 Create an account to browse our full catalog, track your order, and place your custom order.
@@ -546,8 +591,8 @@ export default function LandingPage() {
             </div>
             <p className="text-xs text-muted-foreground">© 2026 MVCA WoodWorks. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <Link href="/sign-up-login-screen" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Login</Link>
-              <Link href="/sign-up-login-screen?tab=register" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Register</Link>
+              <Link href="/sign-up-login-screen" className="inline-flex min-h-8 items-center text-xs text-muted-foreground hover:text-foreground transition-colors">Login</Link>
+              <Link href="/sign-up-login-screen?tab=register" className="inline-flex min-h-8 items-center text-xs text-muted-foreground hover:text-foreground transition-colors">Register</Link>
             </div>
           </div>
         </div>
