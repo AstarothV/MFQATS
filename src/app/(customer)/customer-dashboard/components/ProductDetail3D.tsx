@@ -32,17 +32,36 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [modelUrl, setModelUrl] = useState<string | null>(null);
+  const [modelState, setModelState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [attempt, setAttempt] = useState(0); // Retry fetches a fresh link
+  const viewerRef = React.useRef<HTMLElement | null>(null);
 
-  // The 3D model the workshop built for this order
+  // The 3D model the workshop built for this order. A late answer for an order that is no longer selected is ignored,
+  // so switching orders quickly never shows the previous order's model.
   useEffect(() => {
     const path = order?.model_3d_path;
+    let stale = false;
     setModelUrl(null);
+    setModelState('loading');
     if (!path) return;
     import('@google/model-viewer'); // registers <model-viewer>; browser-only
     mediaLinks(supabase, [path]).then((links) => {
-      if (links[path]) { setModelUrl(links[path]); setViewMode('3d'); }
-    });
-  }, [order?.model_3d_path, supabase]);
+      if (stale) return;
+      if (links[path]) { setModelUrl(links[path]); setViewMode('3d'); } else setModelState('failed');
+    }, () => !stale && setModelState('failed'));
+    return () => { stale = true; };
+  }, [order?.model_3d_path, supabase, attempt]);
+
+  // the viewer reports when the model is on screen, or that it could not be read
+  useEffect(() => {
+    const el = viewerRef.current;
+    if (!el) return;
+    const ok = () => setModelState('ready');
+    const bad = () => setModelState('failed');
+    el.addEventListener('load', ok);
+    el.addEventListener('error', bad);
+    return () => { el.removeEventListener('load', ok); el.removeEventListener('error', bad); };
+  }, [modelUrl, viewMode]);
 
   useEffect(() => {
     if (!order?.product_id) return;
@@ -134,8 +153,17 @@ export default function ProductDetail3D({ order }: ProductDetail3DProps) {
 
       {/* 3D Preview */}
       {viewMode === '3d' && (
-        modelUrl ? (
+        modelState === 'failed' ? (
+          <div className={`flex flex-col items-center justify-center gap-3 px-6 py-10 text-center ${isFullscreen ? 'h-full' : 'min-h-[320px]'}`}>
+            <p className="text-sm font-semibold text-white">Couldn&apos;t load the 3D model</p>
+            <p className="max-w-xs text-xs text-white/70">Check your connection, then try again.</p>
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className="btn-secondary text-sm">Retry</button>
+          </div>
+        ) : modelUrl ? (
+          // keyed by the model: a different order gets a fresh viewer instead of swapping the file in the old one
           <model-viewer
+            key={modelUrl}
+            ref={viewerRef as any}
             src={modelUrl}
             alt={`3D model of your ${productName}, built from its inspection photos. Drag to turn it.`}
             camera-controls

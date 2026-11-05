@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { statusLabel, statusVariant } from '@/lib/orders';
+import OrderReviewPanel from './OrderReviewPanel';
 
 export interface FloorOrder {
   id: string;
@@ -25,6 +26,7 @@ export function stageTime(o: FloorOrder, now = Date.now()) {
 // Every order being worked on, one card each: stage, staff, time in the stage against the expected time, last scan.
 export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null }) {
   const [now, setNow] = useState(() => Date.now());
+  const [open, setOpen] = useState<FloorOrder | null>(null);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(t);
@@ -33,7 +35,10 @@ export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null 
   return (
     <div className="card-dark p-5 h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-foreground">Orders in progress</h3>
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Orders in progress</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">Open an order to see its defects and comment on them.</p>
+        </div>
         <span className="text-xs text-muted-foreground">{floor ? `${floor.length} order${floor.length === 1 ? '' : 's'}` : ''}</span>
       </div>
 
@@ -48,7 +53,8 @@ export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null 
             const failed = o.lastScan?.result === 'fail';
             const pct = spent !== null && o.expectedHours ? Math.min(100, (spent / o.expectedHours) * 100) : 0;
             return (
-              <div key={o.id} className={`rounded-2xl border p-4 ${failed ? 'border-red-500/40 bg-red-500/5' : over ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+              <button type="button" key={o.id} onClick={() => setOpen(o)} aria-label={`Open ${o.order_ref}: defects and comments`}
+                className={`card-hover rounded-2xl border p-4 text-left transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${failed ? 'border-red-500/40 bg-red-500/5' : over ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{o.order_ref}</p>
@@ -69,11 +75,12 @@ export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null 
                     Last scan {failed ? 'failed' : 'passed'}
                   </p>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
       )}
+      {open && <OrderReviewPanel order={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }

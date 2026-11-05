@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import ProfilePanel from '@/components/ProfilePanel';
 import { Bell, ChevronDown, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
@@ -15,6 +14,8 @@ interface TopbarProps {
 }
 
 const roleLabel = { staff: 'Worker', admin: 'Supervisor', customer: 'Customer' };
+// each role's profile settings page (inside the routes that role may open)
+const PROFILE_PATH = { staff: '/staff/profile', admin: '/admin/profile', customer: '/customer-dashboard/profile' };
 const roleColor = { staff: 'status-info', admin: 'status-warning', customer: 'status-ok' };
 
 interface Notification {
@@ -32,7 +33,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const supabase = createClient();
   const [notifOpen, setNotifOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -189,12 +189,12 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
           <button
             type="button"
             onClick={toggleTheme}
-            className="hidden sm:flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200"
+            className="flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 sm:h-9 sm:px-3"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {theme === 'dark' ? <SunMedium size={14} /> : <Moon size={14} />}
-            {theme === 'dark' ? 'Light' : 'Dark'}
+            {theme === 'dark' ? <SunMedium size={16} /> : <Moon size={16} />}
+            <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
           </button>
 
           {/* User Menu */}
@@ -204,8 +204,10 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
               onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
               className="flex items-center gap-2 rounded-full bg-muted/60 py-1 pl-1 pr-2.5 hover:bg-muted transition-colors duration-200"
             >
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                {initials}
+              <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {profile?.avatar_url
+                  ? <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" /> // eslint-disable-line @next/next/no-img-element
+                  : initials}
               </div>
               <span className="hidden md:block text-sm font-medium text-foreground max-w-[120px] truncate">{profile?.nickname || displayName}</span>
               <ChevronDown size={14} className="text-muted-foreground hidden md:block" />
@@ -220,9 +222,9 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                 <button
                   type="button"
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors duration-200"
-                  onClick={() => { setUserMenuOpen(false); setProfileOpen(true); }}
+                  onClick={() => { setUserMenuOpen(false); router.push(PROFILE_PATH[role]); }}
                 >
-                  <User size={14} /> Profile
+                  <User size={14} /> Profile settings
                 </button>
                 <button
                   type="button"
@@ -247,12 +249,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
           onClick={() => { setNotifOpen(false); setUserMenuOpen(false); }}
           aria-label="Close menu"
         />
-      )}
-
-      {profileOpen && (
-        <div className="fixed inset-0 z-50" onClick={() => setProfileOpen(false)}>
-          <ProfilePanel accountLabel={roleLabel[role]} onClose={() => setProfileOpen(false)} />
-        </div>
       )}
     </header>
   );
