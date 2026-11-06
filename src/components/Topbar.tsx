@@ -8,6 +8,7 @@ import { Bell, ChevronDown, ChevronRight, Menu, X, LogOut, User, Moon, SunMedium
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { applyTheme, savedTheme } from '@/lib/theme';
+import { notificationLink, readable } from '@/lib/notifications';
 
 interface TopbarProps {
   role: 'staff' | 'admin' | 'customer';
@@ -28,20 +29,6 @@ interface Notification {
   created_at: string;
   entity_type?: string | null;
   entity_id?: string | null;
-}
-
-/** Where a notification leads: the page that shows what it is about, for this role. */
-function notificationLink(n: Notification, role: 'staff' | 'admin' | 'customer'): string | null {
-  const type = (n.entity_type ?? '').replace(/s$/, ''); // 'orders' and 'order' are the same thing
-  const id = n.entity_id;
-  if (type === 'inventory') return role === 'admin' ? '/admin/inventory' : role === 'staff' ? '/staff-dashboard/inventory' : null;
-  if (type === 'product_item') return role === 'staff' ? '/staff-dashboard/assigned-tasks' : null;
-  if (type !== 'order' || !id) return null;
-  if (role === 'customer') return `/customer-dashboard/order-view?order=${id}`;
-  if (role === 'staff') return `/staff/quality-scan?order=${id}`;
-  if (/scan review/i.test(n.title)) return '/admin/rework';
-  if (/message/i.test(n.title)) return `/real-time-production-dashboard?order=${id}`;
-  return `/orders?order=${id}`;
 }
 
 export default function Topbar({ role, onMenuToggle }: TopbarProps) {
@@ -177,7 +164,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             </button>
 
             {notifOpen && (
-              <div className="glass-menu absolute right-0 top-12 z-50 w-80 max-w-[calc(100vw-2rem)] p-4">
+              <div className="glass-menu fixed inset-x-3 top-[72px] z-50 p-4 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
                   <div className="flex items-center gap-2">
@@ -208,7 +195,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                             <span className={`text-xs font-semibold ${notifTypeColor[notif.notification_type] || 'text-foreground'}`}>{notif.title}</span>
                             {link && <ChevronRight size={14} className="mt-px shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
                           </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">{notif.message}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{readable(notif.message)}</span>
                           <span className="mt-1 block text-2xs text-muted-foreground/60">
                             {new Date(notif.created_at).toLocaleDateString()}
                           </span>

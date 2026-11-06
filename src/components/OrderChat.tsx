@@ -87,15 +87,15 @@ export default function OrderChat({ orderId, title = 'Conversation about this or
   return (
     <section className="space-y-3">
       <div>
-        <h3 className="flex items-start gap-2 text-base font-semibold leading-snug text-foreground"><MessageSquare size={16} className="mt-1 shrink-0 text-primary dark:text-accent" /> <span className="min-w-0">{title}</span></h3>
-        {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
+        <h3 className={`flex items-start gap-2 font-semibold leading-snug text-foreground ${compact ? 'text-sm' : 'text-base'}`}><MessageSquare size={compact ? 15 : 16} className={`${compact ? 'mt-0.5' : 'mt-1'} shrink-0 text-primary dark:text-accent`} /> <span className="min-w-0">{title}</span></h3>
+        {hint && <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground [text-wrap:wrap]">{hint}</p>}
       </div>
 
       <div ref={boxRef} className={`space-y-2.5 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-muted/30 p-3 ${compact ? 'max-h-56' : 'max-h-80'}`} aria-live="polite">
         {msgs === null ? (
           <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" /> Loading…</p>
         ) : msgs.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">No messages yet. Start the conversation below.</p>
+          <p className="py-4 text-center text-sm text-muted-foreground [text-wrap:wrap]">No messages yet. Start the conversation below.</p>
         ) : msgs.map((m) => {
           const mine = m.sender_id === user?.id;
           const role = ROLE[m.sender_role ?? ''];

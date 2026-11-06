@@ -11,6 +11,7 @@ import { readPageCache, writePageCache } from '@/lib/pageCache';
 import { isProcessStage, statusLabel, statusVariant } from '@/lib/orders';
 import { defectRate, fetchInspectionCounts } from '@/lib/inspections';
 import { peso, pesoShort } from '@/lib/money';
+import { notificationLink, readable, timeAgo } from '@/lib/notifications';
 import Link from 'next/link';
 
 const COLORS = ['#7C3AED', '#A78BFA', '#F59E0B', '#22C55E', '#38BDF8'];
@@ -311,20 +312,28 @@ export default function AdminDashboardContent() {
             {notifications.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No alerts</p>
             ) : (
-              notifications.map((notif) => (
-                <div key={notif.id} className="rounded-3xl border border-border bg-background p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{notif.title}</p>
-                      <p className="text-sm text-muted-foreground mt-1">{notif.message}</p>
-                    </div>
-                    <StatusBadge
-                      variant={notif.notification_type === 'error' ? 'danger' : notif.notification_type === 'warning' ? 'warning' : 'info'}
-                      label={notif.notification_type === 'error' ? 'Action' : notif.notification_type === 'warning' ? 'Watch' : 'Info'}
-                    />
-                  </div>
-                </div>
-              ))
+              notifications.map((notif) => {
+                // the label and time on top, then the title and message across the full width; opens what it is about
+                const tone = notif.notification_type === 'error' ? 'danger' : notif.notification_type === 'warning' ? 'warning' : 'info';
+                const link = notificationLink(notif, 'admin');
+                const inner = (
+                  <>
+                    <span className="flex items-center justify-between gap-2">
+                      <StatusBadge variant={tone} label={tone === 'danger' ? 'Action' : tone === 'warning' ? 'Watch' : 'Info'} />
+                      <span className="text-xs tabular-nums text-muted-foreground">{timeAgo(notif.created_at)}</span>
+                    </span>
+                    <span className="mt-2 block text-sm font-semibold leading-snug text-foreground">{notif.title}</span>
+                    <span className="mt-1 block text-sm leading-relaxed text-muted-foreground [text-wrap:pretty]">{readable(notif.message)}</span>
+                  </>
+                );
+                return link ? (
+                  <Link key={notif.id} href={link} className="block rounded-2xl border border-border bg-background p-4 transition-colors hover:border-primary/40 hover:bg-primary/5">
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={notif.id} className="rounded-2xl border border-border bg-background p-4">{inner}</div>
+                );
+              })
             )}
           </div>
           <Link href="/admin/audit-logs" className="mt-4 block text-center text-xs text-primary hover:text-accent font-medium transition-colors">
