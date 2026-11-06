@@ -146,8 +146,9 @@ TEMPLATES = {
         'Reset your password', 'A link to choose a new password for MVCA WoodWorks.',
         'Reset your password',
         p('We got a request to reset the password for <strong>{{ .Email }}</strong>. Choose a new one with the button below.')
-        + button('Reset my password')
-        + f'\n          <p style="margin:16px 0 0; font-family:{FONT}; font-size:13px; line-height:20px; color:{INK}; background:#F8F5FF; border:1px solid {LINE}; border-radius:12px; padding:12px 14px;">Open the link <strong>in the same browser</strong> where you asked for the reset. It works for 1 hour.</p>',
+        # works in any browser or phone (see src/app/auth/reset/route.ts); RedirectTo is that site's /auth/reset
+        + button('Reset my password', '{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery')
+        + f'\n          <p style="margin:16px 0 0; font-family:{FONT}; font-size:13px; line-height:20px; color:{INK}; background:#F8F5FF; border:1px solid {LINE}; border-radius:12px; padding:12px 14px;">The link works once, for 1 hour, on any phone or computer.</p>',
         "Didn't ask for a reset? You can ignore this email; your password stays the same.")),
     'reauthentication': ('Your MVCA WoodWorks confirmation code', page(
         'Confirm it is you', 'Your code to confirm this change.',
