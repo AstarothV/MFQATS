@@ -14,6 +14,7 @@
 | `setup/` | [DEVICE_TESTING.md](setup/DEVICE_TESTING.md) | Every test session: start-up order, checks, step-by-step tests per device, the optional local 3D server, and a test log |
 | `project/` | [SYSTEM_FLOW.md](project/SYSTEM_FLOW.md) | How the system works: each order stage, who does it, what each Quality Scan panel does, what happens automatically |
 | `setup/` | [RUN_PUBLISHED_SYSTEM.md](setup/RUN_PUBLISHED_SYSTEM.md) | Running the published site (Vercel) with the detection server on the laptop |
+| `../supabase/email-templates/` | [README.md](../supabase/email-templates/README.md) | The branded sign-in emails (confirm sign-up, reset password...) and how to put them in Supabase |
 | `project/` | [THESIS_4.4-4.5_TESTING.md](project/THESIS_4.4-4.5_TESTING.md) | Draft of paper sections 4.4 (Software Testing Plan) and 4.5 (User Acceptance Testing) |
 | `project/` | [PAPER_FIXES.md](project/PAPER_FIXES.md) | Corrections to make in the thesis paper so it matches the system |
 | `navigation/` | [NAVIGATION.md](navigation/NAVIGATION.md) | Each role's menu and pages, who can open what, and how to add a page |
