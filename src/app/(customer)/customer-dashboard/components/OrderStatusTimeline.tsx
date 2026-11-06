@@ -216,7 +216,7 @@ export default function OrderStatusTimeline({ order }: OrderStatusTimelineProps)
 
                   {isExpanded && hasDetails && (
                     <div className="mt-2 animate-fade-in space-y-1.5 rounded-xl border border-border bg-muted p-3 dark:bg-muted/80">
-                      <p className="text-xs text-muted-foreground">{stage.description}</p>
+                      <p className="text-xs leading-relaxed text-muted-foreground [text-wrap:wrap]">{stage.description}</p>
                       {status === 'active' && (
                         <p className="text-xs text-purple-700 dark:text-purple-300">Currently in progress.</p>
                       )}

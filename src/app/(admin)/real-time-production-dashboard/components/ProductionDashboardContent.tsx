@@ -49,11 +49,11 @@ export default function ProductionDashboardContent() {
 
       <KPICardGrid key={`k${round}`} />
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4">
-        <div className="xl:col-span-3">
+      <div className="grid grid-cols-1 gap-4 2xl:grid-cols-4">
+        <div className="2xl:col-span-3">
           <WorkstationGrid floor={floor} />
         </div>
-        <div className="xl:col-span-1">
+        <div className="2xl:col-span-1">
           <AlertsFeed floor={floor} />
         </div>
       </div>
