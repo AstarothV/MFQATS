@@ -1,4 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr';
+import { viewerFetch } from '@/lib/viewer';
 
 const PFX = 'sb_';
 
@@ -87,6 +88,7 @@ export function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: viewerFetch }, // view-only survey accounts: changes get a clear message
       cookies: {
         getAll: () => (canUseCookies() ? fromCookies() : fromStorage()),
         setAll(cookiesToSet) {

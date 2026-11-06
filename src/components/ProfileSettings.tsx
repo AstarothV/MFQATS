@@ -5,6 +5,7 @@ import { Camera, Check, Loader2, Mail, Trash2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import MfaSettings from '@/components/MfaSettings';
+import { isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 import AvatarCropper from '@/components/AvatarCropper';
 
 const PHONE = /^[+\d][\d\s-]{6,19}$/; // e.g. 0917 123 4567 or +63 917 123 4567
@@ -128,6 +129,7 @@ export default function ProfileSettings() {
   }
 
   const pendingEmail = (user as any)?.new_email as string | undefined;
+  const viewer = isViewer(user);
 
   return (
     <div className="space-y-6">
@@ -195,8 +197,11 @@ export default function ProfileSettings() {
             </div>
           </form>
 
+          {viewer && (
+            <p className="card-dark p-6 text-sm text-muted-foreground">{VIEW_ONLY_MESSAGE} The sign-in email and two-step sign-in can only be changed on a normal account.</p>
+          )}
           {/* sign-in email */}
-          <form onSubmit={changeEmail} className="card-dark space-y-4 p-6">
+          {!viewer && <form onSubmit={changeEmail} className="card-dark space-y-4 p-6">
             <div>
               <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><Mail size={16} className="text-primary dark:text-accent" /> Email</h2>
               <p className="mt-1 text-sm text-muted-foreground">You sign in with <span className="font-semibold text-foreground">{user?.email}</span>.{pendingEmail ? ` Waiting for you to confirm ${pendingEmail}.` : ''}</p>
@@ -211,12 +216,14 @@ export default function ProfileSettings() {
               </button>
               <Note msg={emailMsg} />
             </div>
-          </form>
+          </form>}
 
           {/* two-step sign-in */}
-          <section className="card-dark p-6">
-            <MfaSettings />
-          </section>
+          {!viewer && (
+            <section className="card-dark p-6">
+              <MfaSettings />
+            </section>
+          )}
         </div>
       </div>
     </div>

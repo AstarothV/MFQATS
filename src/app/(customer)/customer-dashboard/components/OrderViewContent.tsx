@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { watchOrders } from '@/lib/staffAssignment';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataUserId } from '@/lib/viewer';
 import StatusBadge from '@/components/ui/StatusBadge';
 import Link from 'next/link';
 import PhotoGallery from './PhotoGallery';
@@ -85,7 +86,7 @@ export default function OrderViewContent() {
     const { data } = await supabase
       .from('orders')
       .select('*')
-      .eq('customer_id', user.id)
+      .eq('customer_id', dataUserId(user))
       .order('created_at', { ascending: false });
     if (data) {
       setOrders(data);

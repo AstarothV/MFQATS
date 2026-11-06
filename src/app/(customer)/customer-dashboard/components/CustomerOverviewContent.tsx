@@ -5,6 +5,7 @@ import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp,
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataUserId } from '@/lib/viewer';
 import { readPageCache, writePageCache } from '@/lib/pageCache';
 import Link from 'next/link';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -80,7 +81,7 @@ export default function CustomerOverviewContent() {
     const { data } = await supabase
       .from('orders')
       .select('*')
-      .eq('customer_id', user.id)
+      .eq('customer_id', dataUserId(user))
       .order('created_at', { ascending: false });
     if (data) {
       setOrders(data);
@@ -98,7 +99,7 @@ export default function CustomerOverviewContent() {
       .channel('overview_orders')
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'orders',
-        filter: `customer_id=eq.${user.id}`,
+        filter: `customer_id=eq.${dataUserId(user)}`,
       }, (payload) => {
         setOrders(prev => prev.map(o => o.id === payload.new.id ? { ...o, ...payload.new } as Order : o));
         setSelectedOrder(prev => prev?.id === payload.new.id ? { ...prev, ...payload.new } as Order : prev);
