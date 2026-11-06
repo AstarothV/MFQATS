@@ -82,27 +82,6 @@ const deleteCookie = (name: string) => {
   });
 };
 
-const getToken = () =>
-  (canUseCookies() ? fromCookies() : fromStorage()).find((c) => c.name.includes('auth-token'))?.value ?? null;
-
-if (typeof window !== 'undefined' && !(window as any).__sb_patched__) {
-  (window as any).__sb_patched__ = true;
-  const orig = window.fetch.bind(window);
-  window.fetch = (input, init) => {
-    const token = getToken();
-    const url =
-      typeof input === 'string'
-        ? input
-        : input instanceof URL
-        ? input.href
-        : (input as Request).url;
-    if (token && (url.startsWith('/') || url.startsWith(window.location.origin))) {
-      init = { ...(init || {}), headers: { ...(init?.headers || {}), 'x-sb-token': token } };
-    }
-    return orig(input, init);
-  };
-}
-
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -119,10 +98,11 @@ export function createClient() {
           } else {
             cookiesToSet.forEach(({ name, value, options }) => {
               try {
-                value
-                  ? localStorage.setItem(`${PFX}${name}`, value)
-                  : localStorage.removeItem(`${PFX}${name}`);
-              } catch {}
+                if (value) localStorage.setItem(`${PFX}${name}`, value);
+                else localStorage.removeItem(`${PFX}${name}`);
+              } catch {
+                /* storage blocked (private mode): the cookie below still holds the session */
+              }
               if (value) setCookie(name, value, options);
             });
           }

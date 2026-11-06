@@ -35,6 +35,7 @@ const features = [
 export default function LoginPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const recoveryToken = React.useRef<string | null>(null);
   const { signIn, signUp } = useAuth();
   const supabase = createClient();
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
@@ -58,7 +59,15 @@ export default function LoginPageClient() {
     // Check if register tab requested; 'new-password' is where the reset email's link lands
     const tabParam = searchParams?.get('tab');
     if (tabParam === 'register') setTab('register');
-    if (tabParam === 'new-password') setTab('new-password');
+    if (tabParam === 'new-password') {
+      setTab('new-password');
+      // the reset email's one-time token: keep it, and take it out of the address bar
+      const token = new URLSearchParams(window.location.hash.slice(1)).get('token');
+      if (token) {
+        recoveryToken.current = token;
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
     if (tabParam === 'forgot') setTab('forgot');
     if (tabParam === 'mfa') setTab('mfa');
     if (searchParams?.get('link') === 'expired') showMessage('error', 'That email link has expired or was already used. Sign in, or ask for a new one.');
@@ -206,8 +215,14 @@ export default function LoginPageClient() {
     if (password !== String(form.get('confirmNewPassword') || '')) { showMessage('error', 'Passwords do not match'); return; }
     setLoading(true);
     try {
+      // a link from the email: the token signs the person in, once (any browser or phone)
+      if (recoveryToken.current) {
+        const { error } = await supabase.auth.verifyOtp({ token_hash: recoveryToken.current, type: 'recovery' });
+        if (error) throw new Error('This reset link has expired or was already used. Request a new one.');
+        recoveryToken.current = null;
+      }
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('This reset link has expired or was opened in another browser. Request a new one.');
+      if (!user) throw new Error('This reset link has expired or was already used. Request a new one.');
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       await logActivity(supabase, 'password_changed');
@@ -252,8 +267,8 @@ export default function LoginPageClient() {
   async function onForgot(data: ForgotForm) {
     setLoading(true);
     try {
-      // The link comes back to /auth/reset on the address in use (localhost or the tunnel), which must be in
-      // Supabase's Redirect URLs. It has to be opened in this same browser: the one-time code is kept in its cookies.
+      // The link comes back to /auth/reset on the address in use (localhost or the live site), which must be in
+      // Supabase's Redirect URLs. It works in any browser or phone (see /auth/reset).
       const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
         redirectTo: `${window.location.origin}/auth/reset`,
       });
@@ -532,7 +547,7 @@ export default function LoginPageClient() {
                   <p className="mt-1 text-sm text-muted-foreground">Enter your email and we&apos;ll send you a reset link.</p>
                   {searchParams?.get('expired') && (
                     <p role="alert" className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3 text-sm text-foreground">
-                      That reset link has expired or was opened in a different browser. Send a new one, then open it in this browser.
+                      That reset link has expired or was already used. Send a new one.
                     </p>
                   )}
                 </div>
