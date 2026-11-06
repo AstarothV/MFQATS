@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Clock } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataUserId } from '@/lib/viewer';
 
 interface Scan {
   id: string;
@@ -23,7 +24,7 @@ export default function RecentQAFeed() {
   useEffect(() => {
     if (!user) return;
     supabase.from('detection_logs').select('id, overall_result, defect_count, created_at, orders(order_ref, product_name)')
-      .eq('inspector_id', user.id).order('created_at', { ascending: false }).limit(5)
+      .eq('inspector_id', dataUserId(user)).order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => setScans((data ?? []) as unknown as Scan[]));
   }, [supabase, user]);
 

@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Bell, ChevronDown, ChevronRight, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
+import { Bell, ChevronDown, ChevronRight, Eye, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import { notificationLink, readable } from '@/lib/notifications';
+import { dataUserId, isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 
 interface TopbarProps {
   role: 'staff' | 'admin' | 'customer';
@@ -60,7 +61,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
       const { data } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', dataUserId(user))
         .order('created_at', { ascending: false })
         .limit(10);
       if (data) {
@@ -72,7 +73,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
 
     const channel = supabase
       .channel('notifications_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${dataUserId(user)}` }, (payload) => {
         setNotifications((prev) => [payload.new as Notification, ...prev.slice(0, 9)]);
         setUnreadCount((c) => c + 1);
       })
@@ -146,6 +147,11 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
 
         <div className="flex items-center gap-1.5 sm:gap-2">
           <span className={`badge ${roleColor[role]} hidden md:inline-flex`}>{roleLabel[role]}</span>
+          {isViewer(user) && (
+            <span className="badge status-warning inline-flex items-center gap-1" title={VIEW_ONLY_MESSAGE}>
+              <Eye size={12} aria-hidden="true" /> <span className="sr-only sm:not-sr-only">View only</span>
+            </span>
+          )}
 
           {/* Notifications */}
           <div className="relative">

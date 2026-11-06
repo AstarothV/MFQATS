@@ -5,6 +5,7 @@ import { Clock, AlertTriangle, Package, ChevronRight } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataUserId } from '@/lib/viewer';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
 
@@ -30,7 +31,7 @@ export default function AssignedTasksList() {
     if (!user) return;
     const { data, error } = await supabase.from('orders')
       .select('id, order_ref, product_name, customer_name, extended_status, due_date, assigned_at')
-      .eq('assigned_to', user.id).in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
+      .eq('assigned_to', dataUserId(user)).in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
     setSetupNeeded(!!error && /assigned_/.test(error.message));
     if (data) setTasks(data as Task[]);
     setLoading(false);

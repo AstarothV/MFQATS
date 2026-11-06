@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Send, Loader2, CheckCheck, Clock, Package, ChevronDown, User, Shield, Wrench } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { dataUserId } from '@/lib/viewer';
 import { SkeletonRegion, ChatSkeleton } from '@/components/ui/LoadingSkeleton';
 
 interface Message {
@@ -60,7 +61,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
       .from('messages')
       .update({ is_read: true, status: 'read' })
       .eq('order_id', selectedOrderId)
-      .neq('sender_id', user.id);
+      .neq('sender_id', dataUserId(user));
   }, [selectedOrderId, user, supabase]);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function ChatSystem({ userRole, preselectedOrderId }: ChatSystemP
     const fetchOrders = async () => {
       let query = supabase.from('orders').select('id, order_ref, product_name, status');
       if (userRole === 'customer') {
-        query = query.eq('customer_id', user.id);
+        query = query.eq('customer_id', dataUserId(user));
       }
       query = query.order('created_at', { ascending: false }).limit(20);
       const { data } = await query;
