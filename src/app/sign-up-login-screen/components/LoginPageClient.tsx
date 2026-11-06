@@ -14,7 +14,7 @@ import { logActivity } from '@/lib/activity';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
-type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa';
+type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa' | 'confirm' | 'code' | 'code-verify';
 
 type LoginForm = { email: string; password: string; remember: boolean };
 type RegisterForm = { fullName: string; email: string; phone: string; password: string; confirmPassword: string };
@@ -61,6 +61,7 @@ export default function LoginPageClient() {
     if (tabParam === 'new-password') setTab('new-password');
     if (tabParam === 'forgot') setTab('forgot');
     if (tabParam === 'mfa') setTab('mfa');
+    if (searchParams?.get('link') === 'expired') showMessage('error', 'That email link has expired or was already used. Sign in, or ask for a new one.');
   }, [searchParams]);
 
   useEffect(() => {
@@ -83,7 +84,19 @@ export default function LoginPageClient() {
   async function onLogin(data: LoginForm) {
     setLoading(true);
     try {
-      const result = await signIn(data.email, data.password);
+      let result;
+      try {
+        result = await signIn(data.email, data.password);
+      } catch (err: any) {
+        if (/not confirmed/i.test(err?.message ?? '')) {
+          setLoading(false);
+          setPendingEmail(data.email);
+          setTab('confirm');
+          showMessage('error', 'Confirm your email first: open the link we sent you.');
+          return;
+        }
+        throw err;
+      }
       if (!result?.user) throw new Error('Login failed');
 
       // two-step sign-in turned on: the 6-digit code comes next
@@ -131,6 +144,54 @@ export default function LoginPageClient() {
     }
   }
 
+  const linkBack = () => `${window.location.origin}/auth/callback`;
+
+  // email confirmation: send the link again
+  async function resendConfirmation() {
+    if (!pendingEmail || resendCooldown > 0) return;
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: pendingEmail, options: { emailRedirectTo: linkBack() } });
+    setLoading(false);
+    if (error) { showMessage('error', /rate|seconds/i.test(error.message) ? 'Please wait a minute before asking again.' : 'Could not send the email. Try again later.'); return; }
+    setResendCooldown(60);
+    showMessage('success', 'Confirmation email sent again.');
+  }
+
+  // sign in with a code from email: only for accounts that already exist (a code never creates one), and the reply
+  // never says whether an email has an account
+  async function sendCode(email: string) {
+    const to = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { showMessage('error', 'Enter a valid email.'); return; }
+    if (resendCooldown > 0 && to === pendingEmail) return;
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({ email: to, options: { shouldCreateUser: false, emailRedirectTo: linkBack() } });
+    setLoading(false);
+    if (error && /rate|seconds/i.test(error.message)) { showMessage('error', 'Please wait a minute before asking for another code.'); return; }
+    setPendingEmail(to);
+    setResendCooldown(60);
+    setTab('code-verify');
+    showMessage('success', 'If an account uses this email, a code is on its way.');
+  }
+
+  async function onCode(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const token = String(new FormData(e.currentTarget).get('code') || '').replace(/\s/g, '');
+    if (!/^\d{6,10}$/.test(token)) { showMessage('error', 'Enter the code from the email.'); return; }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
+      if (error || !data.user) throw new Error('That code did not work or has expired. Ask for a new one.');
+      // two-step sign-in still applies
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') { setLoading(false); setTab('mfa'); return; }
+      showMessage('success', 'Signed in successfully');
+      await goHome(data.user.id);
+    } catch (err: any) {
+      setLoading(false);
+      showMessage('error', err?.message || 'Could not check the code.');
+    }
+  }
+
   async function cancelMfa() {
     await supabase.auth.signOut();
     setTab('login');
@@ -167,13 +228,19 @@ export default function LoginPageClient() {
     }
     setLoading(true);
     try {
-      await signUp(data.email, data.password, {
+      const created = await signUp(data.email, data.password, {
         fullName: data.fullName,
         role: 'customer',
         phone: data.phone,
       });
-      showMessage('success', 'Account created! Please check your email to verify your account.');
-      setTab('login');
+      if (created?.session && created.user) {
+        showMessage('success', 'Account created.');
+        await goHome(created.user.id);
+        return;
+      }
+      setPendingEmail(data.email);
+      setResendCooldown(60);
+      setTab('confirm');
       reset();
     } catch (error: any) {
       showMessage('error', error?.message || 'Registration failed. Please try again.');
@@ -286,7 +353,7 @@ export default function LoginPageClient() {
         </section>
 
         {/* The form, in a glass card */}
-        <section className="page-enter card-dark mx-auto flex w-full max-w-[480px] flex-col rounded-3xl p-6 lg:min-h-[486px] [@media(max-height:620px)]:lg:min-h-[428px] [@media(max-height:620px)]:py-5">
+        <section className="page-enter card-dark mx-auto flex w-full max-w-[480px] flex-col rounded-3xl p-6 lg:min-h-[486px] [@media(max-height:620px)]:lg:min-h-[436px] [@media(max-height:620px)]:py-5">
           {switcher && (
             <div role="tablist" aria-label="Sign in or register" className="relative mb-5 grid grid-cols-2 rounded-xl bg-muted/70 p-1 [@media(max-height:620px)]:mb-4">
               <span aria-hidden="true" className={`absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-lg bg-primary shadow-[0_6px_16px_-8px_var(--primary)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none ${tab === 'register' ? 'translate-x-full' : ''}`} />
@@ -328,6 +395,75 @@ export default function LoginPageClient() {
                     Sign in
                   </button>
                 </form>
+                <button type="button" onClick={() => setTab('code')} className="mx-auto flex min-h-9 items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                  <Mail size={14} aria-hidden="true" /> Email me a sign-in code instead
+                </button>
+              </div>
+            )}
+
+            {/* Sign in with a code from email: 1) the email, 2) the code */}
+            {tab === 'code' && (
+              <div className="space-y-4">
+                <div>
+                  {back}
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Sign in with a code</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">We&apos;ll email you a 6-digit code. No password needed.</p>
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); void sendCode(String(new FormData(e.currentTarget).get('email') || '')); }} className="space-y-3" noValidate>
+                  {field('Email', Mail,
+                    <input name="email" type="email" autoComplete="email" defaultValue={pendingEmail} className="input-dark w-full pl-10" placeholder="you@example.com" />)}
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
+                    Send code
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {tab === 'code-verify' && (
+              <div className="space-y-4">
+                <div>
+                  <button type="button" onClick={() => setTab('code')} className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                    <ArrowLeft size={14} /> Use a different email
+                  </button>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Enter your code</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">If an account uses <strong className="text-foreground">{pendingEmail}</strong>, a code is on its way. Check spam too.</p>
+                </div>
+                <form onSubmit={onCode} className="space-y-3" noValidate>
+                  {field('Code from the email', ShieldCheck,
+                    <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={10} autoFocus
+                      className="input-dark w-full pl-10 text-lg tracking-[0.4em] tabular-nums" placeholder="000000" />)}
+                  <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
+                    {loading ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                    Sign in
+                  </button>
+                </form>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <button type="button" onClick={() => sendCode(pendingEmail)} disabled={loading || resendCooldown > 0} className="inline-flex min-h-8 items-center font-medium text-primary hover:underline disabled:text-muted-foreground disabled:no-underline dark:text-accent">
+                    {resendCooldown > 0 ? `Send again in ${resendCooldown}s` : 'Send a new code'}
+                  </button>
+                  <button type="button" onClick={() => setTab('login')} className="inline-flex min-h-8 items-center text-muted-foreground hover:text-foreground">Use my password instead</button>
+                </div>
+              </div>
+            )}
+
+            {/* After registering (or signing in before confirming): confirm the email */}
+            {tab === 'confirm' && (
+              <div className="space-y-4 text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary dark:text-accent">
+                  <Mail size={26} aria-hidden="true" />
+                </span>
+                <div>
+                  <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Confirm your email</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    We sent a link to <strong className="text-foreground">{pendingEmail}</strong>. Open it to finish setting up your account, then you&apos;re signed in. Check spam too.
+                  </p>
+                </div>
+                <button type="button" onClick={resendConfirmation} disabled={loading || resendCooldown > 0} className="btn-secondary flex w-full items-center justify-center gap-2 disabled:opacity-60">
+                  {loading ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
+                  {resendCooldown > 0 ? `Send again in ${resendCooldown}s` : 'Send the email again'}
+                </button>
+                <button type="button" onClick={() => setTab('login')} className="inline-flex min-h-8 items-center text-sm text-muted-foreground hover:text-foreground">Back to sign in</button>
               </div>
             )}
 
