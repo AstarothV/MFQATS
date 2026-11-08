@@ -3,11 +3,14 @@ import React, { useEffect, useState } from 'react';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import OrderReviewPanel from './OrderReviewPanel';
+import FurnitureFilter from '@/components/ui/FurnitureFilter';
+import { furnitureOf } from '@/lib/furniture';
 
 export interface FloorOrder {
   id: string;
   order_ref: string;
   product_name: string;
+  product_category?: string | null;
   status: string;
   staff: string | null;
   enteredAt: string | null; // when it entered its current stage
@@ -27,6 +30,8 @@ export function stageTime(o: FloorOrder, now = Date.now()) {
 export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null }) {
   const [now, setNow] = useState(() => Date.now());
   const [open, setOpen] = useState<FloorOrder | null>(null);
+  const [kind, setKind] = useState('All');
+  const shown = (floor ?? []).filter((o) => kind === 'All' || furnitureOf(o) === kind);
   // a notification link (?order=<id>) opens that order's panel once the orders have loaded
   const linked = React.useRef(false);
   useEffect(() => {
@@ -53,13 +58,14 @@ export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null 
         <span className="text-xs text-muted-foreground">{floor ? `${floor.length} order${floor.length === 1 ? '' : 's'}` : ''}</span>
       </div>
 
+      {floor && floor.length > 0 && <div className="mb-3"><FurnitureFilter items={floor} value={kind} onChange={setKind} /></div>}
       {floor === null ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : floor.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No orders in progress. Approved orders appear here.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3">
-          {floor.map((o) => {
+          {shown.map((o) => {
             const { spent, over } = stageTime(o, now);
             const failed = o.lastScan?.result === 'fail';
             const pct = spent !== null && o.expectedHours ? Math.min(100, (spent / o.expectedHours) * 100) : 0;
@@ -69,7 +75,7 @@ export default function WorkstationGrid({ floor }: { floor: FloorOrder[] | null 
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-foreground">{o.order_ref}</p>
-                    <p className="truncate text-xs text-muted-foreground">{o.product_name}</p>
+                    <p className="truncate text-xs text-muted-foreground">{o.product_name} · {furnitureOf(o)}</p>
                   </div>
                   <StatusBadge variant={statusVariant(o.status)} label={statusLabel(o.status)} />
                 </div>

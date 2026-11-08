@@ -6,6 +6,8 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
+import FurnitureFilter from '@/components/ui/FurnitureFilter';
+import { furnitureOf } from '@/lib/furniture';
 
 import { peso } from '@/lib/money';
 import { deleteOrder } from '@/lib/orderMedia';
@@ -34,6 +36,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   // filters in four groups (a group shows all its statuses; the dropdown narrows it to one)
   const [filterGroup, setFilterGroup] = useState<keyof typeof STATUS_GROUPS>('All');
   const [filterStatus, setFilterStatus] = useState('All');
+  const [filterFurniture, setFilterFurniture] = useState('All');
   const [updating, setUpdating] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -90,9 +93,10 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         order.customer_name?.toLowerCase().includes(search.toLowerCase());
       const st = order.extended_status || 'pending';
       const matchStatus = filterStatus !== 'All' ? st === filterStatus : filterGroup === 'All' || (STATUS_GROUPS[filterGroup] as readonly string[]).includes(st);
-      return matchSearch && matchStatus;
+      const matchFurniture = filterFurniture === 'All' || furnitureOf(order) === filterFurniture;
+      return matchSearch && matchStatus && matchFurniture;
     });
-  }, [orders, search, filterStatus, filterGroup]);
+  }, [orders, search, filterStatus, filterGroup, filterFurniture]);
 
   const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0];
 
@@ -190,13 +194,14 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
           </label>
         )}
       </div>
+      <FurnitureFilter items={orders} value={filterFurniture} onChange={setFilterFurniture} />
 
       {loading ? (
         <SkeletonRegion label="Loading orders"><SplitContentSkeleton /></SkeletonRegion>
       ) : (
         <div className="space-y-4">
           {/* Orders List: full width, so every column fits without scrolling sideways */}
-          <section className="card-dark rounded-3xl border border-border p-6">
+          <section className="card-dark rounded-3xl border border-border p-4 sm:p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-5">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">Active orders</h2>
@@ -218,12 +223,13 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                 <table className="min-w-full text-left text-sm">
                   <thead className="border-b border-border text-xs uppercase tracking-[0.2em] text-muted-foreground">
                     <tr>
-                      <th className="px-4 py-3">Order</th>
-                      <th className="px-4 py-3">Customer</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Staff</th>
-                      <th className="px-4 py-3">Due</th>
-                      <th className="px-4 py-3">Value</th>
+                      <th className="px-3 py-3 sm:px-4">Order</th>
+                      <th className="px-3 py-3 sm:px-4">Furniture</th>
+                      <th className="hidden px-4 py-3 sm:table-cell">Customer</th>
+                      <th className="hidden px-4 py-3 sm:table-cell">Status</th>
+                      <th className="hidden px-4 py-3 lg:table-cell">Staff</th>
+                      <th className="hidden px-4 py-3 xl:table-cell">Due</th>
+                      <th className="hidden px-4 py-3 sm:table-cell">Value</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -236,19 +242,29 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                         }}
                         className={`cursor-pointer transition-colors hover:bg-muted/50 ${selectedOrderId === order.id ? 'bg-primary/10' : ''}`}
                       >
-                        <td className="px-4 py-4 font-semibold text-foreground whitespace-nowrap">{order.order_ref}</td>
-                        <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
-                        <td className="px-4 py-4">
+                        <td className="px-3 py-4 font-semibold text-foreground whitespace-nowrap sm:px-4">
+                          {order.order_ref}
+                          {/* phones: the status sits under the order (its own column shows from tablet size) */}
+                          <span className="mt-1 block font-normal sm:hidden">
+                            <StatusBadge variant={statusVariant(order.extended_status || order.status)} label={statusLabel(order.extended_status || order.status)} />
+                          </span>
+                        </td>
+                        <td className="px-3 py-4 sm:px-4">
+                          <span className="block max-w-[7.5rem] truncate text-foreground sm:max-w-[14rem]" title={order.product_name}>{order.product_name}</span>
+                          <span className="block text-xs text-muted-foreground">{furnitureOf(order)}</span>
+                        </td>
+                        <td className="hidden px-4 py-4 text-muted-foreground sm:table-cell">{order.customer_name}</td>
+                        <td className="hidden px-4 py-4 sm:table-cell">
                           <StatusBadge
                             variant={statusVariant(order.extended_status || order.status)}
                             label={statusLabel(order.extended_status || order.status)}
                           />
                         </td>
-                        <td className="px-4 py-4 text-muted-foreground">
+                        <td className="hidden px-4 py-4 text-muted-foreground lg:table-cell">
                           {order.staff?.full_name || (isActive(order.extended_status) ? <span className="text-warning">Not assigned</span> : '—')}
                         </td>
-                        <td className="px-4 py-4 text-muted-foreground whitespace-nowrap">{order.due_date || '—'}</td>
-                        <td className="px-4 py-4 font-semibold text-foreground">{peso(order.amount)}</td>
+                        <td className="hidden px-4 py-4 text-muted-foreground whitespace-nowrap xl:table-cell">{order.due_date || '—'}</td>
+                        <td className="hidden px-4 py-4 font-semibold text-foreground sm:table-cell">{peso(order.amount)}</td>
                       </tr>
                     ))}
                   </tbody>

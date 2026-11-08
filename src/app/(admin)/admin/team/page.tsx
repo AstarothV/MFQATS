@@ -7,6 +7,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, assignOrder, fetchStaff, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
+import { byFurniture } from '@/lib/furniture';
 
 interface ActiveOrder {
   id: string;
@@ -40,7 +41,7 @@ export default function TeamManagementPage() {
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('orders')
-      .select('id, order_ref, customer_name, product_name, extended_status, assigned_to, due_date')
+      .select('id, order_ref, customer_name, product_name, product_category, extended_status, assigned_to, due_date')
       .in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
     setSetupNeeded(!!error && /assigned_to/.test(error.message));
     if (data) setOrders(data as ActiveOrder[]);
@@ -140,10 +141,14 @@ export default function TeamManagementPage() {
                 <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Order</span>
                 <select id="team-order" className="input-dark w-full" value={selectedOrder} onChange={(e) => setSelectedOrder(e.target.value)} disabled={orders.length === 0}>
                   <option value="">{orders.length === 0 ? 'No approved orders' : 'Choose order'}</option>
-                  {[...unassigned, ...orders.filter((o) => o.assigned_to)].map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.order_ref} · {o.customer_name} · {o.product_name}{o.assigned_to ? ` (now ${staffById.get(o.assigned_to)?.full_name ?? 'assigned'})` : ''}
-                    </option>
+                  {byFurniture([...unassigned, ...orders.filter((o) => o.assigned_to)]).map(([kind, list]) => (
+                    <optgroup key={kind} label={`${kind} (${list.length})`}>
+                      {list.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.order_ref} · {o.customer_name} · {o.product_name}{o.assigned_to ? ` (now ${staffById.get(o.assigned_to)?.full_name ?? 'assigned'})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </label>

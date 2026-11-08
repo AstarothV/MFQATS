@@ -8,11 +8,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
+import { byFurniture } from '@/lib/furniture';
 
 interface Task {
   id: string;
   order_ref: string;
   product_name: string;
+  product_category: string | null;
   customer_name: string;
   extended_status: string;
   due_date: string | null;
@@ -30,7 +32,7 @@ export default function AssignedTasksList() {
   const load = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase.from('orders')
-      .select('id, order_ref, product_name, customer_name, extended_status, due_date, assigned_at')
+      .select('id, order_ref, product_name, product_category, customer_name, extended_status, due_date, assigned_at')
       .eq('assigned_to', dataUserId(user)).in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
     setSetupNeeded(!!error && /assigned_/.test(error.message));
     if (data) setTasks(data as Task[]);
@@ -59,8 +61,11 @@ export default function AssignedTasksList() {
           <p className="text-sm text-muted-foreground">No orders are assigned to you right now. The admin assigns them in Order Management or Team.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {tasks.map((t) => {
+        <div className="space-y-5">
+          {byFurniture(tasks).map(([kind, list]) => (
+          <section key={kind} className="space-y-3" aria-label={kind}>
+          <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{kind} <span className="font-normal">· {list.length}</span></h4>
+          {list.map((t) => {
             const overdue = !!t.due_date && t.due_date < today;
             return (
               <div key={t.id} className="rounded-xl border border-border bg-muted/20 p-4">
@@ -92,6 +97,8 @@ export default function AssignedTasksList() {
               </div>
             );
           })}
+          </section>
+          ))}
         </div>
       )}
     </div>

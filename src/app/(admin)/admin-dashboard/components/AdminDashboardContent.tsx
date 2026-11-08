@@ -48,19 +48,20 @@ export default function AdminDashboardContent() {
         // ponytail: every order is loaded for the totals; switch the sums to a SQL view if orders reach the thousands
         supabase.from('orders').select('*').order('created_at', { ascending: false }),
         supabase.from('user_profiles').select('*').eq('is_active', true),
-        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(5),
+        supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20),
         supabase.from('inventory').select('*').eq('is_active', true),
         fetchInspectionCounts(supabase),
       ]);
       setOrders(ordersRes.data || []);
       setUsers(usersRes.data || []);
-      setNotifications(notifRes.data || []);
+      const alerts = (notifRes.data || []).filter((n: any) => !n.archived_at).slice(0, 5); // archived ones stay out
+      setNotifications(alerts);
       setInventory(inventoryRes.data || []);
       setInspections(counts);
       writePageCache(user?.id, 'admin-dashboard', {
         orders: ordersRes.data || [],
         users: usersRes.data || [],
-        notifications: notifRes.data || [],
+        notifications: alerts,
         inventory: inventoryRes.data || [],
         inspections: [counts],
       });

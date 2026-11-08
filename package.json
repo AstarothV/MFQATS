@@ -13,7 +13,8 @@
     "serve": "next start",
     "type-check": "tsc --noEmit",
     "check:viewer": "node scripts/check-viewer.js",
-    "check:inside-parts": "node scripts/check-inside-parts.js"
+    "check:inside-parts": "node scripts/check-inside-parts.js",
+    "check:furniture": "node scripts/check-furniture.js"
   },
   "dependencies": {
     "@google/model-viewer": "4.1.0",

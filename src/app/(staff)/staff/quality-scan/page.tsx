@@ -18,6 +18,8 @@ import Model3DPanel from './Model3DPanel';
 import ModelDefectsView from './ModelDefectsView';
 import { PhotoSlots, PhotoThumbs, useCloseUpsFor, usePartSet, usePhotoSet, VIEWS } from './PhotoSet';
 import { insideCaption, PART_KINDS, partOfCaption, suggestedParts } from './insideParts';
+import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
+import { dataUserId } from '@/lib/viewer';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 // The Detection History table's columns: not the photo or the detections, which made the list several MB.
@@ -872,13 +874,9 @@ export default function QualityScanPage() {
 
         {/* Order bar */}
         <div className="card-dark flex flex-wrap items-center gap-3 p-3 sm:p-4">
-          <label htmlFor="qs-order" className="text-sm text-muted-foreground">Order</label>
-          <select id="qs-order" value={selectedOrderId} onChange={(e) => chooseOrder(e.target.value)} className="input-dark min-w-0 flex-1 basis-60 sm:max-w-md">
-            <option value="">No order (practice scan)</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>{o.order_ref} — {o.product_name} ({statusLabel(o.extended_status)}){o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}</option>
-            ))}
-          </select>
+          <FurnitureOrderPicker label="Order" selectId="qs-order" empty="No order (practice scan)" orders={orders} value={selectedOrderId} onChange={chooseOrder}
+            me={user ? dataUserId(user) : undefined}
+            orderLabel={(o) => `${o.order_ref} — ${o.product_name} (${statusLabel(o.extended_status)})${o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}`} />
           {selectedOrder && (
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               Order is at <StatusBadge variant={orderStep === null ? 'neutral' : 'warning'} label={statusLabel(selectedOrder.extended_status)} />
