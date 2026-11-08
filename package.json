@@ -12,7 +12,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css,md,json}\"",
     "serve": "next start",
     "type-check": "tsc --noEmit",
-    "check:viewer": "node scripts/check-viewer.js"
+    "check:viewer": "node scripts/check-viewer.js",
+    "check:inside-parts": "node scripts/check-inside-parts.js"
   },
   "dependencies": {
     "@google/model-viewer": "4.1.0",

@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, Loader2, Lock, ChevronRight, AlertTriangle } from
 import StatusBadge from '@/components/ui/StatusBadge';
 import { PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { VIEWS } from '@/app/(staff)/staff/quality-scan/PhotoSet';
+import { partOfCaption, suggestedParts } from '@/app/(staff)/staff/quality-scan/insideParts';
 import type { WorkFacts, WorkOrder } from './StaffDashboardContent';
 
 interface Item { label: string; done: boolean; required: boolean }
@@ -18,6 +19,8 @@ const duration = (ms: number) => {
 // the database still checks every move (a saved scan before Results, a passed scan before delivery).
 function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; items: Item[]; next: string | null; action: string } {
   const count = (kind: string) => VIEWS.filter((v) => f.captions.includes(`${v} ${kind}`)).length;
+  const inside = suggestedParts(o.product_name); // a cabinet, shelf unit or dresser: its inside is photographed too
+  const insideTaken = f.captions.filter((c) => partOfCaption(c)?.closeUp === false).length;
   const since = f.history.filter((h) => h.status === o.extended_status).at(-1)?.entered_at;
   const scanHere = !!f.scan && (!since || f.scan.at >= since);
   const passed = f.scan?.result === 'pass' || f.scan?.review === 'approved'; // an admin approved a false alarm
@@ -29,6 +32,7 @@ function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; ite
     case 'upload': return { title: 'Upload checklist', next: 'reconstruction_3d', action: 'Submit: go to 3D Reconstruction', items: [
       { label: 'Front photo taken', done: f.captions.includes('Front photo'), required: true },
       { label: `Every side photographed (${count('photo')} of ${VIEWS.length})`, done: count('photo') === VIEWS.length, required: false },
+      ...(inside.length ? [{ label: `Inside parts photographed (${insideTaken} of ${inside.length})`, done: insideTaken >= inside.length, required: false }] : []),
     ] };
     case 'reconstruction_3d': return { title: '3D Reconstruction checklist', next: 'detect_defects', action: 'Submit: go to Detect Defects', items: [
       { label: 'Upload photos taken', done: count('photo') > 0, required: true },

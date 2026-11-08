@@ -229,6 +229,7 @@ export default function PhotoGallery({ orderId }: PhotoGalleryProps) {
                     {formatStage(photo.stage_name)}
                   </span>
                 )}
+                {photo.caption && <p className="truncate text-xs font-semibold text-white">{photo.caption}</p>}
                 <p className="text-[10px] text-white/70 flex items-center gap-1">
                   <Calendar size={9} />
                   {formatDate(photo.created_at)}

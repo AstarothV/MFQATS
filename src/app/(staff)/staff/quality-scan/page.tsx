@@ -5,7 +5,7 @@ import AppLayout from '@/components/AppLayout';
 import { SkeletonRegion, TableSkeleton } from '@/components/ui/LoadingSkeleton';
 import {
   Camera, Upload, Play, Pause, RotateCcw, Save, CheckCircle2, AlertTriangle, X, Loader2, Target, Activity, ArrowRight,
-  Maximize2, Minimize2, Flashlight, FlashlightOff, ChevronLeft, ChevronRight, Check, Images, Info, Send,
+  Maximize2, Minimize2, Flashlight, FlashlightOff, ChevronLeft, ChevronRight, Check, Images, Info, Send, Plus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
@@ -16,7 +16,8 @@ import OrderChat from '@/components/OrderChat';
 import { shrink } from './serverApi';
 import Model3DPanel from './Model3DPanel';
 import ModelDefectsView from './ModelDefectsView';
-import { PhotoSlots, PhotoThumbs, usePhotoSet, VIEWS } from './PhotoSet';
+import { PhotoSlots, PhotoThumbs, useCloseUpsFor, usePartSet, usePhotoSet, VIEWS } from './PhotoSet';
+import { insideCaption, PART_KINDS, partOfCaption, suggestedParts } from './insideParts';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 // The Detection History table's columns: not the photo or the detections, which made the list several MB.
@@ -110,6 +111,10 @@ export default function QualityScanPage() {
   const inFlightRef = useRef(false);
   const photoSet = usePhotoSet();
   const closeUps = usePhotoSet(); // Detect Defects: a nearer photo of each side's surface, for the scan only
+  const parts = usePartSet(); // Upload: the inside parts of a cabinet, shelf unit or dresser (scanned, not used for 3D)
+  const partCloseUps = useCloseUpsFor(parts.labels); // Detect Defects: a nearer photo of each inside part, for the scan
+  const [partScans, setPartScans] = useState<Record<string, SideScan>>({}); // by part name
+  const [scannedPart, setScannedPart] = useState<string | null>(null);
 
   const [step, setStep] = useState(0);
   // where the defect scan's picture comes from: the live camera, one of the side photos, or a new file
@@ -156,7 +161,7 @@ export default function QualityScanPage() {
     const fetchData = async () => {
       if (!user) return;
       const ordersQuery = (withStaff: boolean) => supabase.from('orders')
-        .select(`id, order_ref, product_name, extended_status, status, queue_position${withStaff ? ', assigned_to' : ''}`)
+        .select(`id, order_ref, product_name, product_category, extended_status, status, queue_position${withStaff ? ', assigned_to' : ''}`)
         .order('created_at', { ascending: false }).limit(50);
       const [ordersRes, { data: logsData }] = await Promise.all([
         ordersQuery(true),
@@ -232,8 +237,33 @@ export default function QualityScanPage() {
         }
       });
     }
+    for (const [set, closeUp] of [[parts, false], [partCloseUps, true]] as const) {
+      set.labels.forEach((part, i) => {
+        const caption = insideCaption(part, closeUp);
+        const file = set.photos[i];
+        if (file === (sharedPhotos.current.get(caption) ?? null)) return;
+        if (file) {
+          sharedPhotos.current.set(caption, file);
+          added = true;
+          shrink(file)
+            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [part, 'Inside', ...(closeUp ? ['Close-up'] : [])], image }))
+            .catch(notShared);
+        } else {
+          sharedPhotos.current.delete(caption);
+          removeOrderPhoto(supabase, selectedOrderId, caption).catch(notShared);
+        }
+      });
+    }
+    // a part taken off the list: its photos leave the customer's gallery too
+    for (const caption of [...sharedPhotos.current.keys()]) {
+      const part = partOfCaption(caption)?.part;
+      if (part !== undefined && !parts.labels.includes(part)) {
+        sharedPhotos.current.delete(caption);
+        removeOrderPhoto(supabase, selectedOrderId, caption).catch(notShared);
+      }
+    }
     if (added) advance('confirmed', 'upload');
-  }, [selectedOrderId, photoSet.photos, closeUps.photos]);
+  }, [selectedOrderId, photoSet.photos, closeUps.photos, parts.labels, parts.photos, partCloseUps.photos]);
 
   // After a reload (or coming back to an order) its saved photos and 3D model are put back, so the work carries on.
   // Only empty slots are filled: photos taken before choosing the order stay.
@@ -245,6 +275,13 @@ export default function QualityScanPage() {
     loadOrderMedia(supabase, selectedOrderId).then(({ photos, model }) => {
       if (stale) return;
       for (const { caption, file } of photos) {
+        const inside = partOfCaption(caption);
+        if (inside) {
+          sharedPhotos.current.set(caption, file); // already saved: not uploaded again
+          if (inside.closeUp) { parts.put(inside.part, null); partCloseUps.put(inside.part, file); }
+          else parts.put(inside.part, file);
+          continue;
+        }
         const [view, kind] = caption.split(' ');
         const slot = VIEWS.indexOf(view as (typeof VIEWS)[number]);
         const set = kind === 'photo' ? photoSet : kind === 'close-up' ? closeUps : null;
@@ -294,10 +331,14 @@ export default function QualityScanPage() {
       VIEWS.forEach((_, i) => { photoSet.setSlot(i, null); closeUps.setSlot(i, null); });
       clearScan();
       setSideScans(VIEWS.map(() => null));
+      parts.clear();
+      partCloseUps.clear();
+      setPartScans({});
     }
     setSelectedOrderId(id);
     window.history.replaceState(null, '', id ? `?order=${id}` : window.location.pathname); // a reload opens it again
     const order = orders.find((o) => o.id === id);
+    parts.suggest(order ? suggestedParts(order.product_name, order.product_category) : []);
     const at = order ? STEP_OF[order.extended_status] : undefined;
     if (at !== undefined) goTo(at);
     loadSaved(id);
@@ -415,7 +456,7 @@ export default function QualityScanPage() {
   }
 
   // side: the side photo this picture is, so its scan also fills that side in Results
-  async function analyzeImage(imageData: string, side?: { slot: number; file: File }) {
+  async function analyzeImage(imageData: string, side?: { slot: number; file: File; part?: string }) {
     setAnalyzing(true);
     setDetections([]);
     setResult(null);
@@ -427,7 +468,9 @@ export default function QualityScanPage() {
       setResult(res.overall_result);
       if (side) {
         const scan: SideScan = { file: side.file, image: imageData, detections: res.detections, result: res.overall_result };
-        setSideScans((prev) => prev.map((s, i) => (i === side.slot ? scan : s)));
+        const { part } = side;
+        if (part) setPartScans((prev) => ({ ...prev, [part]: scan }));
+        else setSideScans((prev) => prev.map((s, i) => (i === side.slot ? scan : s)));
       }
     } catch (err) {
       handleDetectError(err);
@@ -443,6 +486,7 @@ export default function QualityScanPage() {
     try {
       const imageData = await shrink(file);
       setScannedSlot(slot);
+      setScannedPart(null);
       setCapturedImage(null);
       setUploadedImage(imageData);
       analyzeImage(imageData, { slot, file });
@@ -451,23 +495,42 @@ export default function QualityScanPage() {
     }
   }
 
-  // Scan every side's photo, one after another; each fills its side in Results.
+  // Scan one inside part's photo.
+  async function scanPart(slot: number) {
+    const file = partScanSet.photos[slot];
+    if (!file) return;
+    try {
+      const imageData = await shrink(file);
+      setScannedSlot(null);
+      setScannedPart(parts.labels[slot]);
+      setCapturedImage(null);
+      setUploadedImage(imageData);
+      analyzeImage(imageData, { slot, file, part: parts.labels[slot] });
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'That photo could not be opened.');
+    }
+  }
+
+  // Scan every photo, one after another: the sides, then the inside parts; each fills its tile in Results.
   async function scanAllSides() {
-    const slots = scanSet.photos.map((f, i) => (f ? i : -1)).filter((i) => i >= 0);
-    if (!slots.length) return;
+    const jobs = [
+      ...scanSet.photos.flatMap((file, slot) => (file ? [{ file, slot, part: '' }] : [])),
+      ...partScanSet.photos.flatMap((file, slot) => (file ? [{ file, slot, part: parts.labels[slot] }] : [])),
+    ];
+    if (!jobs.length) return;
     setSaved(false);
     try {
-      for (let n = 0; n < slots.length; n++) {
+      for (let n = 0; n < jobs.length; n++) {
         setScanAllAt(n);
-        const slot = slots[n];
-        const file = scanSet.photos[slot]!;
+        const { file, slot, part } = jobs[n];
         const image = await shrink(file);
         const res = await detectDefects(image);
         setBackendOffline(false);
         const scan: SideScan = { file, image, detections: res.detections, result: res.overall_result };
-        setSideScans((prev) => prev.map((s, i) => (i === slot ? scan : s)));
+        if (part) setPartScans((prev) => ({ ...prev, [part]: scan }));
+        else setSideScans((prev) => prev.map((s, i) => (i === slot ? scan : s)));
       }
-      showToast('success', `Scanned ${slots.length} side${slots.length === 1 ? '' : 's'}. See them in Results.`);
+      showToast('success', `Scanned ${jobs.length} photo${jobs.length === 1 ? '' : 's'}. See them in Results.`);
     } catch (err) {
       handleDetectError(err);
     } finally {
@@ -479,6 +542,7 @@ export default function QualityScanPage() {
     setCapturedImage(null);
     setUploadedImage(null);
     setScannedSlot(null);
+    setScannedPart(null);
     setDetections([]);
     setResult(null);
     setNotes('');
@@ -549,6 +613,7 @@ export default function QualityScanPage() {
   function redoScan() {
     clearScan();
     setSideScans(VIEWS.map(() => null));
+    setPartScans({});
     showToast('success', 'Scans cleared. Scan the fixed piece again.');
   }
 
@@ -569,7 +634,7 @@ export default function QualityScanPage() {
       setOrders((prev) => prev.map((o) => (o.id === selectedOrder.id ? { ...o, extended_status: to } : o)));
       showToast('success', `${selectedOrder.order_ref} moved to ${statusLabel(to)}`);
       if (STEP_OF[to] !== undefined) goTo(STEP_OF[to]);
-      if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); VIEWS.forEach((_, i) => closeUps.setSlot(i, null)); } // sent back for rework: the next inspection starts fresh
+      if (to === 'upload') { clearScan(); setSideScans(VIEWS.map(() => null)); setPartScans({}); VIEWS.forEach((_, i) => closeUps.setSlot(i, null)); partCloseUps.clear(); } // sent back for rework: the next inspection starts fresh
     } catch (err: any) {
       showToast('error', err?.message || 'Could not move the order');
     } finally {
@@ -598,7 +663,8 @@ export default function QualityScanPage() {
     if (!user) return;
     setSaving(true);
     try {
-      const { error } = await supabase.from('detection_logs').insert({
+      const insideParts = partSides.flatMap((s, i) => (s ? [parts.labels[i]] : []));
+      const scanRow = {
         order_id: selectedOrderId || null,
         inspector_id: user.id,
         scan_mode: extra && !sides.some(Boolean) && source === 'live' ? 'live_camera' : 'image_upload',
@@ -608,8 +674,9 @@ export default function QualityScanPage() {
         confidence_avg: inspectionConfidence,
         defect_count: allDetections.length,
         notes,
-      });
-
+      };
+      let { error } = await supabase.from('detection_logs').insert(insideParts.length ? { ...scanRow, inside_parts: insideParts } : scanRow);
+      if (error && /inside_parts/.test(error.message)) ({ error } = await supabase.from('detection_logs').insert(scanRow)); // before migration 023
       if (error) throw error;
 
       // Save real defects to the defects table. Low-severity findings (live knots, resin...) are natural wood
@@ -619,7 +686,7 @@ export default function QualityScanPage() {
         const defectInserts = realDefects.map((d) => ({
           order_id: selectedOrderId,
           defect_type: d.class_name,
-          description: `${formatLabel(d.class_name)}${(VIEWS as readonly string[]).includes(d.side) ? ` on the ${d.side.toLowerCase()}` : ''} detected with ${d.confidence_score}% confidence`,
+          description: `${formatLabel(d.class_name)}${[...VIEWS, ...parts.labels].includes(d.side) ? ` on the ${d.side.toLowerCase()}` : ''} detected with ${d.confidence_score}% confidence`,
           severity: d.severity,
           confidence_score: d.confidence_score,
           bounding_box: d.bounding_box,
@@ -666,12 +733,22 @@ export default function QualityScanPage() {
     photos: closeUps.photos.map((f, i) => f ?? photoSet.photos[i]),
     previews: closeUps.previews.map((p, i) => p ?? photoSet.previews[i]),
   };
-  const scanCount = scanSet.photos.filter(Boolean).length;
+  // each inside part is scanned from its close-up, else its Upload photo
+  const partScanSet = {
+    ...parts,
+    photos: parts.photos.map((f, i) => partCloseUps.photos[i] ?? f),
+    previews: parts.previews.map((p, i) => partCloseUps.previews[i] ?? p),
+  };
+  const partPhotoCount = parts.photos.filter(Boolean).length; // taken in Upload
+  const partCount = partScanSet.photos.filter(Boolean).length; // ready to scan
+  const scanCount = scanSet.photos.filter(Boolean).length + partCount; // every photo to scan: sides and inside parts
   const sides = sideScans.map((s, i) => (s && s.file === scanSet.photos[i] ? s : null));
+  const partSides = parts.labels.map((part, i) => { const s = partScans[part]; return s && s.file === partScanSet.photos[i] ? s : null; });
   const extra = source !== 'photos' && (result === 'pass' || result === 'fail')
     ? { label: source === 'live' ? 'Camera' : 'New photo', image: capturedImage || uploadedImage || '', detections, result } : null;
   const inspected = [
     ...sides.flatMap((s, i) => (s ? [{ label: VIEWS[i] as string, image: s.image, detections: s.detections, result: s.result }] : [])),
+    ...partSides.flatMap((s, i) => (s ? [{ label: parts.labels[i], image: s.image, detections: s.detections, result: s.result }] : [])),
     ...(extra ? [extra] : []),
   ];
   const allDetections = inspected.flatMap((s) => s.detections.map((d) => ({ ...d, side: s.label })));
@@ -681,6 +758,7 @@ export default function QualityScanPage() {
   const failing = allDetections.filter((d) => d.severity !== 'low');
   const sideTiles: SideTile[] = [
     ...VIEWS.map((v, i) => ({ label: v as string, image: sides[i]?.image ?? scanSet.previews[i], detections: sides[i]?.detections ?? null })),
+    ...parts.labels.map((part, i) => ({ label: part, image: partSides[i]?.image ?? partScanSet.previews[i], detections: partSides[i]?.detections ?? null })),
     ...(extra ? [{ label: extra.label, image: extra.image, detections: extra.detections }] : []),
   ];
   // defect pins for the 3D model: each defect's photo position, on the side it was found
@@ -689,12 +767,12 @@ export default function QualityScanPage() {
     w: d.bounding_box.width, h: d.bounding_box.height,
     label: formatLabel(d.class_name), severity: d.severity,
   })) : []));
-  const scannedSides = sides.filter(Boolean).length;
+  const scannedSides = sides.filter(Boolean).length + partSides.filter(Boolean).length;
   const allScanned = scanCount > 0 && scannedSides === scanCount;
   const stepNotes = [
-    `${photoCount} of ${VIEWS.length} photos`,
+    `${photoCount} of ${VIEWS.length} photos${parts.labels.length ? ` + ${partPhotoCount} of ${parts.labels.length} inside` : ''}`,
     '3D model of the piece',
-    analyzing || scanAllAt !== null ? 'Scanning…' : failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : allScanned ? 'No failing defects' : scannedSides ? `${scannedSides} of ${scanCount} sides scanned` : 'Scan every side',
+    analyzing || scanAllAt !== null ? 'Scanning…' : failing.length ? `${failing.length} defect${failing.length === 1 ? '' : 's'} found` : allScanned ? 'No failing defects' : scannedSides ? `${scannedSides} of ${scanCount} photos scanned` : 'Scan every photo',
     saved ? 'Saved' : inspectionResult ? 'Not saved yet' : savedInfo.scan ? `Last saved: ${savedInfo.scan}` : 'Pass or fail',
     savedInfo.review === 'requested' ? 'Waiting for admin' : savedInfo.review === 'approved' ? 'Approved' : 'Admin approval',
   ];
@@ -710,8 +788,8 @@ export default function QualityScanPage() {
   const scanAllButton = (
     <button onClick={scanAllSides} disabled={scanAllAt !== null || analyzing} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm disabled:opacity-60">
       {scanAllAt !== null
-        ? <><Loader2 size={14} className="animate-spin" /> Scanning side {scanAllAt + 1} of {scanCount}…</>
-        : <><Images size={14} /> Scan all sides</>}
+        ? <><Loader2 size={14} className="animate-spin" /> Scanning photo {scanAllAt + 1} of {scanCount}…</>
+        : <><Images size={14} /> {parts.labels.length ? 'Scan all photos' : 'Scan all sides'}</>}
     </button>
   );
 
@@ -891,9 +969,28 @@ export default function QualityScanPage() {
         <section hidden={step !== 0} className="tab-in card-dark space-y-4 p-5">
           {stepHead(0, 'Take the inspection photos once. They are used for the 3D model and can be scanned for defects. The customer sees them in OrderView as soon as you add them.')}
           <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${(photoCount / VIEWS.length) * 100}%` }} />
+            <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${((photoCount + partPhotoCount) / (VIEWS.length + parts.labels.length)) * 100}%` }} />
           </div>
           <PhotoSlots set={photoSet} />
+          {/* cabinets, shelf units and dressers: the six views cannot show the inside, the shelves or the drawers */}
+          <div className="space-y-3 rounded-2xl border border-border bg-muted/30 p-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Inside parts{parts.labels.length ? ` · ${partPhotoCount} of ${parts.labels.length}` : ''}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {parts.labels.length
+                  ? 'This piece has an inside. Open the doors and pull out the drawers, then take one photo of each part. Use the phone\'s flashlight for dark corners. These are scanned for defects too; the 3D model uses only the six sides.'
+                  : 'Doors, shelves or drawers on this piece? Add each one here so its inside is checked too.'}
+              </p>
+            </div>
+            {parts.labels.length > 0 && <PhotoSlots set={parts} name="inside photo" grid="sm:grid-cols-3 xl:grid-cols-6" onRemoveSlot={(i) => { partCloseUps.drop(parts.labels[i]); parts.remove(i); }} />}
+            <div className="flex flex-wrap gap-2">
+              {PART_KINDS.map((kind) => (
+                <button key={kind} type="button" onClick={() => parts.add(kind)} className="btn-secondary flex items-center gap-1.5 text-xs">
+                  <Plus size={14} aria-hidden="true" /> {kind}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-3">
             {[
               ['Whole piece in view', 'Same distance and height for every side.'],
@@ -929,6 +1026,16 @@ export default function QualityScanPage() {
             </div>
             <PhotoSlots set={closeUps} name="close-up" />
           </div>
+
+          {parts.labels.length > 0 && (
+            <div className="card-dark space-y-3 p-5">
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Close-up of each inside part</h3>
+                <p className="text-sm text-muted-foreground mt-1">Go close to each inside surface (the shelf top and front edge, the drawer box, the cabinet walls), with the flashlight on, so small defects show. A part without a close-up is scanned from its Upload photo.</p>
+              </div>
+              <PhotoSlots set={partCloseUps} name="inside close-up" grid="sm:grid-cols-3 xl:grid-cols-6" />
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
             {/* Camera / photo view */}
@@ -1106,6 +1213,7 @@ export default function QualityScanPage() {
                   scanCount ? (
                     <>
                       <PhotoThumbs set={scanSet} selected={scannedSlot} onPick={scanPhoto} />
+                      {partCount > 0 && <PhotoThumbs set={partScanSet} selected={scannedPart === null ? null : parts.labels.indexOf(scannedPart)} onPick={scanPart} />}
                       {scanAllButton}
                     </>
                   ) : (
@@ -1161,7 +1269,7 @@ export default function QualityScanPage() {
               <p className="text-foreground">
                 <span className="font-semibold">{scanMark === 'fail' ? 'Defects found.' : 'Every side is clear.'}</span>{' '}
                 {scanMark === 'fail' && inspected.length
-                  ? `${failing.length} defect${failing.length === 1 ? '' : 's'} fail${failing.length === 1 ? 's' : ''} this piece${allScanned ? '' : `, with ${scannedSides} of ${scanCount} sides scanned so far`}.`
+                  ? `${failing.length} defect${failing.length === 1 ? '' : 's'} fail${failing.length === 1 ? 's' : ''} this piece${allScanned ? '' : `, with ${scannedSides} of ${scanCount} photos scanned so far`}.`
                   : scanMark === 'fail' ? 'The saved scan failed this piece.' : 'No failing defects.'}
                 {' '}{allScanned || !inspected.length ? 'Ready for Results.' : 'Scan the rest, then go to Results.'}
               </p>
@@ -1222,17 +1330,17 @@ export default function QualityScanPage() {
                   <p className="text-xs text-muted-foreground">{inspectionResult ? `${failing.length} failing, ${allDetections.length - failing.length} natural wood · ${inspected.length} picture${inspected.length === 1 ? '' : 's'}` : 'Scan in Detect Defects'}</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-muted/40 p-3">
-                  <p className="text-xs text-muted-foreground">Sides scanned</p>
-                  <p className="text-xl font-bold text-foreground tabular-nums">{sides.filter(Boolean).length} of {scanCount}</p>
-                  <p className="text-xs text-muted-foreground">{scanCount === 0 ? 'No photos yet' : sides.filter(Boolean).length < scanCount ? 'Scan all sides to check every photo' : 'Every side checked'}</p>
+                  <p className="text-xs text-muted-foreground">Photos scanned</p>
+                  <p className="text-xl font-bold text-foreground tabular-nums">{scannedSides} of {scanCount}</p>
+                  <p className="text-xs text-muted-foreground">{scanCount === 0 ? 'No photos yet' : scannedSides < scanCount ? 'Scan all of them to check every photo' : 'Every photo checked'}</p>
                 </div>
           </div>
 
           <div className="space-y-3">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-foreground">Defects by side</p>
-                <p className="text-xs text-muted-foreground">Each side's photo with what YOLOv12 found on it. Tap a side to see it larger.</p>
+                <p className="text-sm font-semibold text-foreground">Defects by side{parts.labels.length ? ' and inside part' : ''}</p>
+                <p className="text-xs text-muted-foreground">Each photo with what YOLOv12 found on it. Tap one to see it larger.</p>
               </div>
               {scanCount > 0 && <div className="w-full sm:w-auto">{scanAllButton}</div>}
             </div>
