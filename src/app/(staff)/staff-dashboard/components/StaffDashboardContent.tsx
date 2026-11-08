@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
+import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
+import { dataUserId } from '@/lib/viewer';
 
 export interface WorkOrder {
   id: string;
@@ -138,17 +140,9 @@ export default function StaffDashboardContent() {
           <h1 className="page-title">Workshop View</h1>
           <p className="page-subtitle">{today}</p>
         </div>
-        <label className="flex w-full min-w-0 items-center gap-2 text-sm text-muted-foreground sm:w-auto">
-          Working on
-          <select value={selectedId} onChange={(e) => pick(e.target.value)} disabled={!orders.length} className="input-dark min-w-0 flex-1 sm:w-80">
-            {!orders.length && <option value="">No orders in progress</option>}
-            {orders.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.order_ref} — {o.product_name} ({statusLabel(o.extended_status)}){o.assigned_to === user?.id ? ' · yours' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FurnitureOrderPicker label="Working on" orders={orders} value={selectedId} onChange={pick} autoPick
+          me={user ? dataUserId(user) : undefined}
+          orderLabel={(o) => `${o.order_ref} — ${o.product_name} (${statusLabel(o.extended_status)})${o.assigned_to === user?.id ? ' · yours' : ''}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

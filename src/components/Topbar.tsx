@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
-import { Bell, ChevronDown, ChevronRight, Eye, Menu, X, LogOut, User, Moon, SunMedium } from 'lucide-react';
+import { Archive, ArchiveRestore, Bell, ChevronDown, ChevronRight, Eye, Menu, X, LogOut, User, Moon, SunMedium, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { applyTheme, savedTheme } from '@/lib/theme';
@@ -30,6 +30,7 @@ interface Notification {
   created_at: string;
   entity_type?: string | null;
   entity_id?: string | null;
+  archived_at?: string | null; // archived: kept, out of the inbox (migration 024)
 }
 
 export default function Topbar({ role, onMenuToggle }: TopbarProps) {
@@ -40,7 +41,11 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifTab, setNotifTab] = useState<'inbox' | 'archived'>('inbox');
+  const inbox = notifications.filter((n) => !n.archived_at);
+  const archived = notifications.filter((n) => n.archived_at);
+  const shownNotifs = notifTab === 'inbox' ? inbox : archived;
+  const unreadCount = inbox.filter((n) => !n.is_read).length;
   const [loggingOut, setLoggingOut] = useState(false);
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'User';
@@ -63,19 +68,15 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
         .select('*')
         .eq('user_id', dataUserId(user))
         .order('created_at', { ascending: false })
-        .limit(10);
-      if (data) {
-        setNotifications(data);
-        setUnreadCount(data.filter((n: Notification) => !n.is_read).length);
-      }
+        .limit(40);
+      if (data) setNotifications(data);
     };
     fetchNotifications();
 
     const channel = supabase
       .channel('notifications_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${dataUserId(user)}` }, (payload) => {
-        setNotifications((prev) => [payload.new as Notification, ...prev.slice(0, 9)]);
-        setUnreadCount((c) => c + 1);
+        setNotifications((prev) => [payload.new as Notification, ...prev.slice(0, 39)]);
       })
       .subscribe();
 
@@ -103,7 +104,6 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     const to = notificationLink(n, role);
     if (!n.is_read) {
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
-      setUnreadCount((c) => Math.max(0, c - 1));
       void supabase.from('notifications').update({ is_read: true }).eq('id', n.id);
     }
     if (!to) return;
@@ -117,16 +117,29 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     if (!user) return;
     await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-    setUnreadCount(0);
   }
 
-  // removes every notification of this account (asks first: it cannot be undone)
+  // Archive keeps a notification (the Archived tab) but takes it out of the inbox; Restore brings it back.
+  async function setArchived(n: Notification, on: boolean) {
+    const patch = on ? { archived_at: new Date().toISOString(), is_read: true } : { archived_at: null };
+    const { error } = await supabase.from('notifications').update(patch).eq('id', n.id);
+    if (error) { window.alert(/archived_at/.test(error.message) ? 'Archiving needs the latest database update (migration 024).' : error.message); return; }
+    setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, ...patch } : x)));
+  }
+
+  async function removeNotification(n: Notification) {
+    const { error } = await supabase.from('notifications').delete().eq('id', n.id);
+    if (error) { window.alert(error.message || 'Could not delete the notification.'); return; }
+    setNotifications((prev) => prev.filter((x) => x.id !== n.id));
+  }
+
+  // deletes every notification in the tab you are on (asks first: it cannot be undone)
   async function clearAll() {
-    if (!user || !window.confirm('Clear all your notifications? This cannot be undone.')) return;
-    const { error } = await supabase.from('notifications').delete().eq('user_id', user.id);
+    const ids = shownNotifs.map((n) => n.id);
+    if (!user || !ids.length || !window.confirm(`Delete all ${ids.length} ${notifTab === 'inbox' ? '' : 'archived '}notification${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    const { error } = await supabase.from('notifications').delete().in('id', ids);
     if (error) { window.alert(error.message || 'Could not clear the notifications.'); return; }
-    setNotifications([]);
-    setUnreadCount(0);
+    setNotifications((prev) => prev.filter((x) => !ids.includes(x.id)));
   }
 
   const notifTypeColor: Record<string, string> = {
@@ -188,7 +201,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                         Mark all read
                       </button>
                     )}
-                    {notifications.length > 0 && (
+                    {shownNotifs.length > 0 && (
                       <button type="button" onClick={clearAll} className="text-xs font-medium text-muted-foreground hover:text-danger">
                         Clear all
                       </button>
@@ -198,28 +211,50 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                     </button>
                   </div>
                 </div>
+                <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="tablist" aria-label="Notification lists">
+                  {(['inbox', 'archived'] as const).map((t) => (
+                    <button key={t} type="button" role="tab" aria-selected={notifTab === t} onClick={() => setNotifTab(t)}
+                      className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors ${notifTab === t ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                      {t === 'inbox' ? 'Inbox' : 'Archived'} <span className="font-normal opacity-70">{t === 'inbox' ? inbox.length : archived.length}</span>
+                    </button>
+                  ))}
+                </div>
                 <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">No notifications</p>
+                  {shownNotifs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {notifTab === 'inbox' ? 'No notifications' : 'Nothing archived. Archive a notification to keep it here.'}
+                    </p>
                   ) : (
-                    notifications.map((notif) => {
+                    shownNotifs.map((notif) => {
                       const link = notificationLink(notif, role);
+                      const isArchived = !!notif.archived_at;
                       return (
-                        <button
-                          type="button"
-                          key={notif.id}
-                          onClick={() => openNotification(notif)}
-                          className={`group w-full rounded-xl border p-3 text-left transition-colors ${notif.is_read ? 'border-border bg-background' : 'border-primary/20 bg-primary/5'} ${link ? 'hover:border-primary/40 hover:bg-primary/10' : 'cursor-default'}`}
-                        >
-                          <span className="flex items-start justify-between gap-2">
-                            <span className={`text-xs font-semibold ${notifTypeColor[notif.notification_type] || 'text-foreground'}`}>{notif.title}</span>
-                            {link && <ChevronRight size={14} className="mt-px shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
-                          </span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">{readable(notif.message)}</span>
-                          <span className="mt-1 block text-2xs text-muted-foreground/60">
-                            {new Date(notif.created_at).toLocaleDateString()}
-                          </span>
-                        </button>
+                        <div key={notif.id}
+                          className={`rounded-xl border transition-colors ${notif.is_read ? 'border-border bg-background' : 'border-primary/20 bg-primary/5'} ${link ? 'hover:border-primary/40' : ''}`}>
+                          <button type="button" onClick={() => openNotification(notif)}
+                            className={`group block w-full rounded-t-xl px-3 pt-3 text-left ${link ? '' : 'cursor-default'}`}>
+                            <span className="flex items-start justify-between gap-2">
+                              <span className={`text-xs font-semibold ${notifTypeColor[notif.notification_type] || 'text-foreground'}`}>{notif.title}</span>
+                              {link && <ChevronRight size={14} className="mt-px shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">{readable(notif.message)}</span>
+                          </button>
+                          <div className="flex items-center justify-between gap-2 pb-1 pl-3 pr-1">
+                            <span className="text-2xs text-muted-foreground/60">{new Date(notif.created_at).toLocaleDateString()}</span>
+                            <span className="flex items-center">
+                              <button type="button" onClick={() => setArchived(notif, !isArchived)}
+                                aria-label={`${isArchived ? 'Restore' : 'Archive'}: ${notif.title}`} title={isArchived ? 'Move back to the inbox' : 'Archive'}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                                {isArchived ? <ArchiveRestore size={14} aria-hidden="true" /> : <Archive size={14} aria-hidden="true" />}
+                              </button>
+                              <button type="button" onClick={() => removeNotification(notif)}
+                                aria-label={`Delete: ${notif.title}`} title="Delete"
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger">
+                                <Trash2 size={14} aria-hidden="true" />
+                              </button>
+                            </span>
+                          </div>
+                        </div>
                       );
                     })
                   )}
