@@ -120,6 +120,15 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
     setUnreadCount(0);
   }
 
+  // removes every notification of this account (asks first: it cannot be undone)
+  async function clearAll() {
+    if (!user || !window.confirm('Clear all your notifications? This cannot be undone.')) return;
+    const { error } = await supabase.from('notifications').delete().eq('user_id', user.id);
+    if (error) { window.alert(error.message || 'Could not clear the notifications.'); return; }
+    setNotifications([]);
+    setUnreadCount(0);
+  }
+
   const notifTypeColor: Record<string, string> = {
     info: 'text-info',
     warning: 'text-warning',
@@ -177,6 +186,11 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
                     {unreadCount > 0 && (
                       <button type="button" onClick={markAllRead} className="text-xs text-accent hover:text-primary font-medium">
                         Mark all read
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <button type="button" onClick={clearAll} className="text-xs font-medium text-muted-foreground hover:text-danger">
+                        Clear all
                       </button>
                     )}
                     <button type="button" onClick={() => setNotifOpen(false)} className="text-muted-foreground hover:text-foreground" title="Close notifications" aria-label="Close notifications">

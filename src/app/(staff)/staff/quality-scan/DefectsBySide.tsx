@@ -101,7 +101,7 @@ export default function DefectsBySide({ tiles }: { tiles: SideTile[] }) {
             </>
           );
           return t.image && t.detections ? (
-            <button key={t.label} type="button" onClick={() => setOpen(i)} aria-label={`Show the ${t.label.toLowerCase()} side larger`}
+            <button key={t.label} type="button" onClick={() => setOpen(i)} aria-label={`Show the ${t.label.toLowerCase()} photo larger`}
               className="space-y-2 rounded-2xl border border-border bg-muted/40 p-2.5 text-left transition-colors hover:border-primary">
               {body}
             </button>
@@ -113,7 +113,7 @@ export default function DefectsBySide({ tiles }: { tiles: SideTile[] }) {
 
       {shown && shown.image && shown.detections && createPortal(
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(null)}>
-          <div role="dialog" aria-modal="true" aria-label={`${shown.label} side`} onClick={(e) => e.stopPropagation()}
+          <div role="dialog" aria-modal="true" aria-label={shown.label} onClick={(e) => e.stopPropagation()}
             className="max-h-full w-full max-w-3xl space-y-3 overflow-y-auto rounded-3xl border border-border bg-card p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-semibold text-foreground">{shown.label}</h3>
@@ -123,7 +123,7 @@ export default function DefectsBySide({ tiles }: { tiles: SideTile[] }) {
               <PhotoWithBoxes image={shown.image} detections={shown.detections} label={shown.label} />
             </div>
             {shown.detections.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nothing found on this side.</p>
+              <p className="text-sm text-muted-foreground">Nothing found here.</p>
             ) : (
               <ul className="space-y-2">
                 {shown.detections.map((d) => (

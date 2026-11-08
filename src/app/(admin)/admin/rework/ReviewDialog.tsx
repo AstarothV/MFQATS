@@ -8,6 +8,7 @@ import { mediaLinks } from '@/lib/orderMedia';
 import DefectsBySide, { formatLabel, type Detection, type SideTile } from '@/app/(staff)/staff/quality-scan/DefectsBySide';
 import ModelDefectsView, { type Pin } from '@/app/(staff)/staff/quality-scan/ModelDefectsView';
 import { VIEWS } from '@/app/(staff)/staff/quality-scan/PhotoSet';
+import { partOfCaption } from '@/app/(staff)/staff/quality-scan/insideParts';
 import type { Review } from './ScanReviews';
 
 type SideDetection = Detection & { side?: string };
@@ -20,7 +21,7 @@ export default function ReviewDialog({ review, position, total, busy, note, onNo
   onDecide: (status: 'approved' | 'rejected') => void;
 }) {
   const supabase = createClient();
-  const [media, setMedia] = useState<{ photos: Record<string, string>; model: string | null } | null>(null);
+  const [media, setMedia] = useState<{ photos: Record<string, string>; parts: string[]; model: string | null } | null>(null);
 
   // the side photos (a close-up where there is one, as the scan used) and the 3D model saved for the order
   useEffect(() => {
@@ -38,8 +39,17 @@ export default function ReviewDialog({ review, position, total, busy, note, onNo
       for (const kind of ['photo', 'close-up']) { // close-ups last, so they win
         for (const r of own) if (r.caption.endsWith(` ${kind}`) && links[r.image_url]) photos[r.caption.split(' ')[0]] = links[r.image_url];
       }
-      if (!stale) setMedia({ photos, model: modelPath ? links[modelPath] ?? null : null });
-    })().catch(() => !stale && setMedia({ photos: {}, model: null }));
+      const parts: string[] = []; // inside parts of a cabinet, shelf unit or dresser; a close-up wins, as the scan used it
+      for (const closeUp of [false, true]) {
+        for (const r of own) {
+          const inside = partOfCaption(r.caption);
+          if (!inside || inside.closeUp !== closeUp || !links[r.image_url]) continue;
+          photos[inside.part] = links[r.image_url];
+          if (!parts.includes(inside.part)) parts.push(inside.part);
+        }
+      }
+      if (!stale) setMedia({ photos, parts, model: modelPath ? links[modelPath] ?? null : null });
+    })().catch(() => !stale && setMedia({ photos: {}, parts: [], model: null }));
     return () => { stale = true; };
   }, [review.order_id, supabase]);
 
@@ -57,7 +67,7 @@ export default function ReviewDialog({ review, position, total, busy, note, onNo
 
   const dets = (review.detections ?? []) as SideDetection[];
   const failing = dets.filter((d) => d.severity !== 'low');
-  const tiles: SideTile[] = VIEWS.map((v) => ({
+  const tiles: SideTile[] = [...VIEWS, ...(media?.parts ?? [])].map((v) => ({
     label: v,
     image: media?.photos[v] ?? null,
     detections: dets.some((d) => d.side === v) || media?.photos[v] ? dets.filter((d) => d.side === v) : null,
