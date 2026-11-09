@@ -13,17 +13,17 @@ const CABINET = 'Interior, Shelf 1, Door back';
 const SHELVES = 'Shelf 1, Shelf 2';
 const NONE = '';
 const cases = [
-  [['TONSTAD Cabinet', 'Cabinets'], CABINET],
-  [['RÅDMANSÖ Cabinet', 'Cabinets'], CABINET],
-  [['STOCKHOLM 2025 Sideboard', 'Cabinets'], CABINET],
-  [['KALLAX Shelving Unit', 'Storage'], SHELVES],
-  [['BILLY / OXBERG Bookcase', 'Storage'], SHELVES],
+  [['Oak Sliding-Door Cabinet', 'Cabinets'], CABINET],
+  [['Mid-Century Cabinet', 'Cabinets'], CABINET],
+  [['Oak Sideboard', 'Cabinets'], CABINET],
+  [['Cube Shelving Unit', 'Storage'], SHELVES],
+  [['Glass-Door Bookcase', 'Storage'], SHELVES],
   [['Walnut Bookshelf Unit', 'furniture'], SHELVES],
   [['Oak Chest of Drawers', 'furniture'], 'Drawer 1, Drawer 2'],
   [['Oak Dining Table', 'furniture'], NONE],
-  [['LISABO Chair', 'Chairs'], NONE],
-  [['TONSTAD Bed Frame', 'Beds'], NONE],
-  [['MITTZON Desk', 'Office Furniture'], NONE],
+  [['Ash Dining Chair', 'Chairs'], NONE],
+  [['Oak Queen Bed Frame', 'Beds'], NONE],
+  [['Walnut and Steel Desk', 'Office Furniture'], NONE],
   [[null, undefined], NONE],
 ];
 let bad = 0;

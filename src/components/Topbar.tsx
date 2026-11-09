@@ -161,7 +161,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
           >
             <Menu size={18} />
           </button>
-          <Link href="/" className="flex items-center gap-2">
+          <Link href={role === 'admin' ? '/admin-dashboard' : role === 'staff' ? '/staff-dashboard' : '/customer-dashboard'} className="flex items-center gap-2" aria-label="MVCA WoodWorks: your home page">
             <AppLogo size={32} />
             <span className="hidden text-base font-semibold text-foreground sm:block">MVCA WoodWorks</span>
           </Link>

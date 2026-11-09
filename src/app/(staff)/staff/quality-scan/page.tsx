@@ -20,6 +20,7 @@ import { PhotoSlots, PhotoThumbs, useCloseUpsFor, usePartSet, usePhotoSet, VIEWS
 import { insideCaption, PART_KINDS, partOfCaption, suggestedParts } from './insideParts';
 import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
 import { dataUserId } from '@/lib/viewer';
+import { captionFor, furnitureLabel, pieceCaption, piecesOf } from '@/lib/pieces';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 // The Detection History table's columns: not the photo or the detections, which made the list several MB.
@@ -117,6 +118,9 @@ export default function QualityScanPage() {
   const partCloseUps = useCloseUpsFor(parts.labels); // Detect Defects: a nearer photo of each inside part, for the scan
   const [partScans, setPartScans] = useState<Record<string, SideScan>>({}); // by part name
   const [scannedPart, setScannedPart] = useState<string | null>(null);
+  // orders with several pieces (a set of chairs...): the piece being inspected, and each piece's latest saved result
+  const [piece, setPiece] = useState('');
+  const [pieceResults, setPieceResults] = useState<Record<string, 'pass' | 'fail'>>({});
 
   const [step, setStep] = useState(0);
   // where the defect scan's picture comes from: the live camera, one of the side photos, or a new file
@@ -163,7 +167,7 @@ export default function QualityScanPage() {
     const fetchData = async () => {
       if (!user) return;
       const ordersQuery = (withStaff: boolean) => supabase.from('orders')
-        .select(`id, order_ref, product_name, product_category, extended_status, status, queue_position${withStaff ? ', assigned_to' : ''}`)
+        .select(withStaff ? '*' : 'id, order_ref, product_name, product_category, extended_status, status, queue_position')
         .order('created_at', { ascending: false }).limit(50);
       const [ordersRes, { data: logsData }] = await Promise.all([
         ordersQuery(true),
@@ -188,11 +192,21 @@ export default function QualityScanPage() {
   }, [orders]);
 
   const selectedOrder = orders.find((o) => o.id === selectedOrderId);
+  const orderPieces = piecesOf(selectedOrder);
   const orderStep: number | null = selectedOrder ? (STEP_OF[selectedOrder.extended_status] ?? null) : null;
 
-  async function loadSaved(orderId: string) {
-    if (!orderId) { setSavedInfo({ scan: null }); return; }
-    const latest = (cols: string) => supabase.from('detection_logs').select(cols).eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  async function loadSaved(orderId: string, forPiece = piece) {
+    if (!orderId) { setSavedInfo({ scan: null }); setPieceResults({}); return; }
+    if (forPiece) {
+      const { data: all } = await supabase.from('detection_logs').select('piece, overall_result, review_status').eq('order_id', orderId).order('created_at', { ascending: false });
+      const results: Record<string, 'pass' | 'fail'> = {};
+      for (const r of (all ?? []) as any[]) if (r.piece && !results[r.piece]) results[r.piece] = r.overall_result === 'pass' || r.review_status === 'approved' ? 'pass' : 'fail';
+      setPieceResults(results);
+    } else setPieceResults({});
+    const latest = (cols: string) => {
+      const q = supabase.from('detection_logs').select(cols).eq('order_id', orderId);
+      return (forPiece ? q.eq('piece', forPiece) : q).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    };
     let { data, error } = await latest('id, overall_result, review_status, review_note');
     if (error) ({ data } = await latest('id, overall_result')); // before migration 015 there is no review yet
     const scan = data as any;
@@ -224,14 +238,14 @@ export default function QualityScanPage() {
     let added = false;
     for (const [set, kind] of [[photoSet, 'photo'], [closeUps, 'close-up']] as const) {
       VIEWS.forEach((view, i) => {
-        const caption = `${view} ${kind}`;
+        const caption = pieceCaption(piece, `${view} ${kind}`);
         const file = set.photos[i];
         if (file === (sharedPhotos.current.get(caption) ?? null)) return;
         if (file) {
           sharedPhotos.current.set(caption, file);
           added = true;
           shrink(file)
-            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [view, kind === 'photo' ? 'Upload' : 'Close-up'], image }))
+            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [...(piece ? [piece] : []), view, kind === 'photo' ? 'Upload' : 'Close-up'], image }))
             .catch(notShared);
         } else {
           sharedPhotos.current.delete(caption);
@@ -241,14 +255,14 @@ export default function QualityScanPage() {
     }
     for (const [set, closeUp] of [[parts, false], [partCloseUps, true]] as const) {
       set.labels.forEach((part, i) => {
-        const caption = insideCaption(part, closeUp);
+        const caption = pieceCaption(piece, insideCaption(part, closeUp));
         const file = set.photos[i];
         if (file === (sharedPhotos.current.get(caption) ?? null)) return;
         if (file) {
           sharedPhotos.current.set(caption, file);
           added = true;
           shrink(file)
-            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [part, 'Inside', ...(closeUp ? ['Close-up'] : [])], image }))
+            .then((image) => saveOrderPhoto(supabase, { orderId: selectedOrderId, inspectorId: user.id, caption, tags: [...(piece ? [piece] : []), part, 'Inside', ...(closeUp ? ['Close-up'] : [])], image }))
             .catch(notShared);
         } else {
           sharedPhotos.current.delete(caption);
@@ -258,14 +272,14 @@ export default function QualityScanPage() {
     }
     // a part taken off the list: its photos leave the customer's gallery too
     for (const caption of [...sharedPhotos.current.keys()]) {
-      const part = partOfCaption(caption)?.part;
+      const part = partOfCaption(captionFor(piece, caption) ?? '')?.part;
       if (part !== undefined && !parts.labels.includes(part)) {
         sharedPhotos.current.delete(caption);
         removeOrderPhoto(supabase, selectedOrderId, caption).catch(notShared);
       }
     }
     if (added) advance('confirmed', 'upload');
-  }, [selectedOrderId, photoSet.photos, closeUps.photos, parts.labels, parts.photos, partCloseUps.photos]);
+  }, [selectedOrderId, piece, photoSet.photos, closeUps.photos, parts.labels, parts.photos, partCloseUps.photos]);
 
   // After a reload (or coming back to an order) its saved photos and 3D model are put back, so the work carries on.
   // Only empty slots are filled: photos taken before choosing the order stay.
@@ -277,14 +291,16 @@ export default function QualityScanPage() {
     loadOrderMedia(supabase, selectedOrderId).then(({ photos, model }) => {
       if (stale) return;
       for (const { caption, file } of photos) {
-        const inside = partOfCaption(caption);
+        const own = captionFor(piece, caption); // another piece's photo: not this one's
+        if (own === null) continue;
+        const inside = partOfCaption(own);
         if (inside) {
           sharedPhotos.current.set(caption, file); // already saved: not uploaded again
           if (inside.closeUp) { parts.put(inside.part, null); partCloseUps.put(inside.part, file); }
           else parts.put(inside.part, file);
           continue;
         }
-        const [view, kind] = caption.split(' ');
+        const [view, kind] = own.split(' ');
         const slot = VIEWS.indexOf(view as (typeof VIEWS)[number]);
         const set = kind === 'photo' ? photoSet : kind === 'close-up' ? closeUps : null;
         if (slot < 0 || !set || set.photos[slot]) continue;
@@ -294,7 +310,7 @@ export default function QualityScanPage() {
       if (model) setSavedModel(URL.createObjectURL(model));
     }).catch(() => {}); // nothing saved, or offline: start with empty slots
     return () => { stale = true; };
-  }, [selectedOrderId]);
+  }, [selectedOrderId, piece]);
 
   // The finished model goes to the customer's 3D Preview.
   function modelBuilt(url: string | null) {
@@ -324,26 +340,40 @@ export default function QualityScanPage() {
     if (savedInfo.review !== 'requested' || !selectedOrderId) return;
     const t = setInterval(() => loadSaved(selectedOrderId), 10000);
     return () => clearInterval(t);
-  }, [savedInfo.review, selectedOrderId]);
+  }, [savedInfo.review, selectedOrderId, piece]);
 
   // Choosing an order opens the step it is at, and loads what was already saved for it.
+  // photos and scans on screen belong to one order (one piece of it): cleared before showing another
+  function clearWork() {
+    sharedPhotos.current.clear();
+    VIEWS.forEach((_, i) => { photoSet.setSlot(i, null); closeUps.setSlot(i, null); });
+    clearScan();
+    setSideScans(VIEWS.map(() => null));
+    parts.clear();
+    partCloseUps.clear();
+    setPartScans({});
+  }
+
   function chooseOrder(id: string) {
-    if (selectedOrderId && id !== selectedOrderId) { // another piece: this one's photos and scans are not its
-      sharedPhotos.current.clear();
-      VIEWS.forEach((_, i) => { photoSet.setSlot(i, null); closeUps.setSlot(i, null); });
-      clearScan();
-      setSideScans(VIEWS.map(() => null));
-      parts.clear();
-      partCloseUps.clear();
-      setPartScans({});
-    }
-    setSelectedOrderId(id);
-    window.history.replaceState(null, '', id ? `?order=${id}` : window.location.pathname); // a reload opens it again
     const order = orders.find((o) => o.id === id);
+    const firstPiece = piecesOf(order)[0] ?? '';
+    if ((selectedOrderId && id !== selectedOrderId) || firstPiece !== piece) clearWork(); // another order: its own work
+    setSelectedOrderId(id);
+    setPiece(firstPiece);
+    window.history.replaceState(null, '', id ? `?order=${id}` : window.location.pathname); // a reload opens it again
     parts.suggest(order ? suggestedParts(order.product_name, order.product_category) : []);
     const at = order ? STEP_OF[order.extended_status] : undefined;
     if (at !== undefined) goTo(at);
-    loadSaved(id);
+    loadSaved(id, firstPiece);
+  }
+
+  // another piece of the same order (Chair 2 of 4): its own photos and scan
+  function choosePiece(p: string) {
+    if (p === piece) return;
+    clearWork();
+    setPiece(p);
+    parts.suggest(selectedOrder ? suggestedParts(selectedOrder.product_name, selectedOrder.product_category) : []);
+    loadSaved(selectedOrderId, p);
   }
 
   function goTo(i: number) {
@@ -677,8 +707,9 @@ export default function QualityScanPage() {
         defect_count: allDetections.length,
         notes,
       };
-      let { error } = await supabase.from('detection_logs').insert(insideParts.length ? { ...scanRow, inside_parts: insideParts } : scanRow);
-      if (error && /inside_parts/.test(error.message)) ({ error } = await supabase.from('detection_logs').insert(scanRow)); // before migration 023
+      const extras = { ...(insideParts.length ? { inside_parts: insideParts } : {}), ...(piece ? { piece } : {}) };
+      let { error } = await supabase.from('detection_logs').insert({ ...scanRow, ...extras });
+      if (error && /inside_parts|piece/.test(error.message)) ({ error } = await supabase.from('detection_logs').insert(scanRow)); // before migrations 023 / 026
       if (error) throw error;
 
       // Save real defects to the defects table. Low-severity findings (live knots, resin...) are natural wood
@@ -688,7 +719,7 @@ export default function QualityScanPage() {
         const defectInserts = realDefects.map((d) => ({
           order_id: selectedOrderId,
           defect_type: d.class_name,
-          description: `${formatLabel(d.class_name)}${[...VIEWS, ...parts.labels].includes(d.side) ? ` on the ${d.side.toLowerCase()}` : ''} detected with ${d.confidence_score}% confidence`,
+          description: `${formatLabel(d.class_name)}${piece ? ` on ${piece}` : ''}${[...VIEWS, ...parts.labels].includes(d.side) ? `${piece ? ',' : ' on the'} ${d.side.toLowerCase()}` : ''} detected with ${d.confidence_score}% confidence`,
           severity: d.severity,
           confidence_score: d.confidence_score,
           bounding_box: d.bounding_box,
@@ -801,6 +832,9 @@ export default function QualityScanPage() {
     const key = PROCESS_STAGES[i].key;
     const to = NEXT_STAGE[key];
     if (!to) return null;
+    if (key === 'detect_defects' && orderPieces.length && Object.keys(pieceResults).length < orderPieces.length) {
+      return <p className="text-xs text-muted-foreground">Save a scan for every piece in Results to finish Detect Defects ({Object.keys(pieceResults).length} of {orderPieces.length} saved).</p>;
+    }
     if (key === 'detect_defects' && !saved && savedInfo.scan === null) {
       return <p className="text-xs text-muted-foreground">Save a scan in Results to finish Detect Defects.</p>;
     }
@@ -876,7 +910,7 @@ export default function QualityScanPage() {
         <div className="card-dark flex flex-wrap items-center gap-3 p-3 sm:p-4">
           <FurnitureOrderPicker label="Order" selectId="qs-order" empty="No order (practice scan)" orders={orders} value={selectedOrderId} onChange={chooseOrder}
             me={user ? dataUserId(user) : undefined}
-            orderLabel={(o) => `${o.order_ref} — ${o.product_name} (${statusLabel(o.extended_status)})${o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}`} />
+            orderLabel={(o) => `${o.order_ref} — ${furnitureLabel(o as any)} (${statusLabel(o.extended_status)})${o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}`} />
           {selectedOrder && (
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               Order is at <StatusBadge variant={orderStep === null ? 'neutral' : 'warning'} label={statusLabel(selectedOrder.extended_status)} />
@@ -887,6 +921,33 @@ export default function QualityScanPage() {
             <Activity size={15} /> {showHistory ? 'Hide History' : 'Detection History'}
           </button>
         </div>
+
+        {/* a set of chairs (or several items): each piece is inspected on its own */}
+        {orderPieces.length > 0 && (
+          <div className="card-dark space-y-3 p-3 sm:p-4">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <p className="text-sm font-semibold text-foreground">Inspecting <span className="text-primary dark:text-accent">{piece}</span></p>
+              <p className="text-xs text-muted-foreground">
+                {orderPieces.filter((p) => pieceResults[p] === 'pass').length} of {orderPieces.length} passed · each piece has its own photos and scan
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Pieces of this order">
+              {orderPieces.map((p) => {
+                const r = pieceResults[p];
+                return (
+                  <button key={p} type="button" onClick={() => choosePiece(p)} aria-pressed={piece === p}
+                    aria-label={`${p}: ${r === 'pass' ? 'passed' : r === 'fail' ? 'failed' : 'not scanned yet'}`}
+                    className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-sm transition-colors ${piece === p ? 'border-primary bg-primary/10 font-semibold text-foreground' : 'border-border text-foreground/80 hover:bg-muted'}`}>
+                    {r === 'pass' ? <Check size={14} className="text-success" aria-hidden="true" />
+                      : r === 'fail' ? <X size={14} className="text-danger" aria-hidden="true" />
+                      : <span className="h-2 w-2 rounded-full bg-muted-foreground/40" aria-hidden="true" />}
+                    {p.replace(/ of \d+$/, '')}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Detection History */}
         {showHistory && (
@@ -1007,7 +1068,14 @@ export default function QualityScanPage() {
         <section hidden={step !== 1} className="tab-in space-y-4">
           <div className="card-dark space-y-4 p-5">
             {stepHead(1, 'Build a 3D model of the whole piece from the Upload photos, with its size from the order. The customer sees the finished model in OrderView.')}
-            <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
+            {orderPieces.length > 0 && piece !== orderPieces[0] ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-4">
+                <p className="text-sm text-muted-foreground">The 3D model is made once for this order, from {orderPieces[0]}: the pieces of a set are the same model.</p>
+                <button onClick={() => choosePiece(orderPieces[0])} className="btn-secondary text-sm">Go to {orderPieces[0]}</button>
+              </div>
+            ) : (
+              <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
+            )}
           </div>
         </section>
 
@@ -1256,6 +1324,8 @@ export default function QualityScanPage() {
                 <p className="text-sm text-muted-foreground">No 3D model yet. Build it in step 2, then the defects appear on it here.</p>
                 <button onClick={() => goTo(1)} className="btn-secondary flex items-center gap-2 text-sm"><ChevronLeft size={15} /> Go to 3D Reconstruction</button>
               </div>
+            ) : orderPieces.length > 0 && piece !== orderPieces[0] ? (
+              <p className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">The 3D model is of {orderPieces[0]}, so its defects show there. This piece&apos;s defects are in Results.</p>
             ) : step === 2 ? (
               <ModelDefectsView modelUrl={model3dUrl} pins={pins} />
             ) : null}

@@ -9,6 +9,8 @@ import { dataUserId } from '@/lib/viewer';
 import { readPageCache, writePageCache } from '@/lib/pageCache';
 import Link from 'next/link';
 import StatusBadge from '@/components/ui/StatusBadge';
+import CancelOrderButton from '@/components/CancelOrderButton';
+import { furnitureLabel } from '@/lib/pieces';
 import { CustomerOverviewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
@@ -75,6 +77,7 @@ export default function CustomerOverviewContent() {
     return () => clearInterval(t);
   }, []);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [page, setPage] = useState(0); // Your orders: 5 per page
 
   const fetchOrders = useCallback(async () => {
     if (!user) return;
@@ -139,6 +142,10 @@ export default function CustomerOverviewContent() {
   const activeStatus = selectedOrder?.extended_status || selectedOrder?.status || 'pending';
   const stageIdx = getStageIndex(activeStatus);
   const completionPct = selectedOrder?.completion_pct || 0;
+  const PER_PAGE = 5;
+  const pages = Math.max(1, Math.ceil(orders.length / PER_PAGE));
+  const at = Math.min(page, pages - 1);
+  const pageOrders = orders.slice(at * PER_PAGE, at * PER_PAGE + PER_PAGE);
 
   return (
     <div className="space-y-6">
@@ -175,18 +182,23 @@ export default function CustomerOverviewContent() {
                   <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={28} aria-hidden="true" /></div>
                     <div>
-                      <h2 className="text-lg font-bold text-foreground">{selectedOrder.product_name}</h2>
+                      <h2 className="text-lg font-bold text-foreground">
+                        {furnitureLabel(selectedOrder as any)}
+                      </h2>
                       <p className="text-sm text-muted-foreground">Order #{selectedOrder.order_ref}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Placed {new Date(selectedOrder.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                  <StatusBadge
-                    variant={statusVariant(activeStatus)}
-                    label={statusLabel(activeStatus)}
-                    dot
-                  />
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <StatusBadge
+                      variant={statusVariant(activeStatus)}
+                      label={statusLabel(activeStatus)}
+                      dot
+                    />
+                    <CancelOrderButton order={selectedOrder} onCancelled={fetchOrders} />
+                  </div>
                 </div>
 
                 {/* Progress Bar */}
@@ -249,7 +261,7 @@ export default function CustomerOverviewContent() {
           {/* Orders List */}
           <div className="xl:w-[38%] space-y-2">
             <h2 className="px-1 mb-3 text-base font-semibold text-foreground">Your orders</h2>
-            {orders.map((order) => {
+            {pageOrders.map((order) => {
               const isSelected = selectedOrder?.id === order.id;
               const st = order.extended_status || order.status;
               return (
@@ -269,7 +281,7 @@ export default function CustomerOverviewContent() {
                         <Armchair size={18} aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground truncate">{order.product_name}</p>
+                        <p className="text-sm font-semibold text-foreground truncate">{furnitureLabel(order as any)}</p>
                         <p className="text-xs text-muted-foreground">#{order.order_ref}</p>
                       </div>
                     </div>
@@ -295,6 +307,15 @@ export default function CustomerOverviewContent() {
                 </button>
               );
             })}
+            {pages > 1 && (
+              <nav aria-label="Pages of your orders" className="flex items-center justify-between gap-2 px-1 pt-1">
+                <button type="button" onClick={() => setPage(at - 1)} disabled={at === 0} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Previous</button>
+                <span className="text-xs text-muted-foreground">
+                  {at * PER_PAGE + 1}–{Math.min(orders.length, (at + 1) * PER_PAGE)} of {orders.length}
+                </span>
+                <button type="button" onClick={() => setPage(at + 1)} disabled={at >= pages - 1} className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-40">Next</button>
+              </nav>
+            )}
           </div>
 
           {/* Detail Panel */}

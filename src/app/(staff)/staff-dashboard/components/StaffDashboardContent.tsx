@@ -11,6 +11,7 @@ import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
 import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
 import { dataUserId } from '@/lib/viewer';
+import { furnitureLabel } from '@/lib/pieces';
 
 export interface WorkOrder {
   id: string;
@@ -21,6 +22,7 @@ export interface WorkOrder {
   model_3d_path: string | null;
   paused_at?: string | null; // the stage timer is paused (migration 014)
   paused_seconds?: number;
+  pieces?: string[]; // a set of chairs...: each piece is inspected on its own (migration 026)
 }
 
 /** What has really been done on the order, read from the database; the checklist ticks itself from it. */
@@ -28,6 +30,7 @@ export interface WorkFacts {
   history: { status: string; entered_at: string; left_at: string | null }[];
   captions: string[]; // saved photos, e.g. "Front photo", "Top close-up"
   scan: { result: string; at: string; review: string | null } | null; // the latest saved scan, and its admin review
+  pieceScans: Record<string, { result: string; at: string; review: string | null }>; // the latest saved scan of each piece
 }
 
 const PICK_KEY = 'mfqats-workshop-order';
@@ -47,17 +50,21 @@ export default function StaffDashboardContent() {
 
   const loadFacts = useCallback(async (orderId: string) => {
     if (!orderId) { setFacts(null); return; }
-    const [history, images, scan] = await Promise.all([
+    const [history, images, scan, perPiece] = await Promise.all([
       supabase.from('order_stage_history').select('status, entered_at, left_at').eq('order_id', orderId).order('entered_at'),
       supabase.from('inspection_images').select('caption').eq('order_id', orderId),
       supabase.from('detection_logs').select('overall_result, created_at, review_status').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle()
         .then((r) => (r.error ? supabase.from('detection_logs').select('overall_result, created_at').eq('order_id', orderId).order('created_at', { ascending: false }).limit(1).maybeSingle() : r)),
+      supabase.from('detection_logs').select('piece, overall_result, created_at, review_status').eq('order_id', orderId).not('piece', 'is', null).order('created_at', { ascending: false }),
     ]);
+    const pieceScans: WorkFacts['pieceScans'] = {};
+    for (const r of (perPiece.data ?? []) as any[]) if (!pieceScans[r.piece]) pieceScans[r.piece] = { result: r.overall_result, at: r.created_at, review: r.review_status ?? null };
     if (selectedRef.current !== orderId) return; // another order was picked meanwhile
     setFacts({
       history: history.data ?? [],
       captions: (images.data ?? []).map((r) => r.caption),
       scan: scan.data ? { result: scan.data.overall_result, at: scan.data.created_at, review: (scan.data as any).review_status ?? null } : null,
+      pieceScans,
     });
   }, [supabase]);
 
@@ -142,7 +149,7 @@ export default function StaffDashboardContent() {
         </div>
         <FurnitureOrderPicker label="Working on" orders={orders} value={selectedId} onChange={pick} autoPick
           me={user ? dataUserId(user) : undefined}
-          orderLabel={(o) => `${o.order_ref} — ${o.product_name} (${statusLabel(o.extended_status)})${o.assigned_to === user?.id ? ' · yours' : ''}`} />
+          orderLabel={(o) => `${o.order_ref} — ${furnitureLabel(o as any)} (${statusLabel(o.extended_status)})${o.assigned_to === user?.id ? ' · yours' : ''}`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

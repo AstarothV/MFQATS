@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, assignOrder, fetchStaff, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
 import { byFurniture } from '@/lib/furniture';
+import { furnitureLabel } from '@/lib/pieces';
 
 interface ActiveOrder {
   id: string;
@@ -41,7 +42,7 @@ export default function TeamManagementPage() {
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('orders')
-      .select('id, order_ref, customer_name, product_name, product_category, extended_status, assigned_to, due_date')
+      .select('*')
       .in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
     setSetupNeeded(!!error && /assigned_to/.test(error.message));
     if (data) setOrders(data as ActiveOrder[]);
@@ -145,7 +146,7 @@ export default function TeamManagementPage() {
                     <optgroup key={kind} label={`${kind} (${list.length})`}>
                       {list.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {o.order_ref} · {o.customer_name} · {o.product_name}{o.assigned_to ? ` (now ${staffById.get(o.assigned_to)?.full_name ?? 'assigned'})` : ''}
+                          {o.order_ref} · {o.customer_name} · {furnitureLabel(o)}{o.assigned_to ? ` (now ${staffById.get(o.assigned_to)?.full_name ?? 'assigned'})` : ''}
                         </option>
                       ))}
                     </optgroup>
@@ -177,7 +178,7 @@ export default function TeamManagementPage() {
                   {unassigned.map((o) => (
                     <button key={o.id} type="button" onClick={() => setSelectedOrder(o.id)}
                       className={`rounded-full border px-3 py-1 text-xs transition-colors ${selectedOrder === o.id ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-background text-muted-foreground hover:text-foreground'}`}>
-                      {o.order_ref} · {o.customer_name} · {o.product_name}
+                      {o.order_ref} · {o.customer_name} · {furnitureLabel(o)}
                     </button>
                   ))}
                 </div>
@@ -198,7 +199,7 @@ export default function TeamManagementPage() {
                   <div key={o.id} className="rounded-2xl border border-border bg-background p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-foreground">{o.order_ref} · {o.product_name}</p>
+                        <p className="text-sm font-semibold text-foreground">{o.order_ref} · {furnitureLabel(o)}</p>
                         <p className="text-xs text-muted-foreground mt-1">{o.customer_name}</p>
                       </div>
                       <StatusBadge variant={statusVariant(o.extended_status)} label={statusLabel(o.extended_status)} />
@@ -260,7 +261,7 @@ export default function TeamManagementPage() {
                       <td className="px-4 py-4 text-muted-foreground">
                         {theirs.length === 0 ? 'Available for a new order' : (
                           <ul className="space-y-1">
-                            {theirs.map((o) => <li key={o.id}><span className="font-semibold text-foreground">{o.order_ref}</span> · {o.product_name} · {statusLabel(o.extended_status)}</li>)}
+                            {theirs.map((o) => <li key={o.id}><span className="font-semibold text-foreground">{o.order_ref}</span> · {furnitureLabel(o)} · {statusLabel(o.extended_status)}</li>)}
                           </ul>
                         )}
                       </td>

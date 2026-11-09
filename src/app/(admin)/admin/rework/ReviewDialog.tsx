@@ -9,6 +9,7 @@ import DefectsBySide, { formatLabel, type Detection, type SideTile } from '@/app
 import ModelDefectsView, { type Pin } from '@/app/(staff)/staff/quality-scan/ModelDefectsView';
 import { VIEWS } from '@/app/(staff)/staff/quality-scan/PhotoSet';
 import { partOfCaption } from '@/app/(staff)/staff/quality-scan/insideParts';
+import { captionFor } from '@/lib/pieces';
 import type { Review } from './ScanReviews';
 
 type SideDetection = Detection & { side?: string };
@@ -32,7 +33,11 @@ export default function ReviewDialog({ review, position, total, busy, note, onNo
         supabase.from('inspection_images').select('caption, image_url').eq('order_id', review.order_id),
         supabase.from('orders').select('model_3d_path').eq('id', review.order_id).single(),
       ]);
-      const own = (rows ?? []).filter((r) => r.image_url && !r.image_url.startsWith('http'));
+      // the photos of the piece this scan was for (a set of chairs...), named without the piece
+      const own = (rows ?? []).flatMap((r) => {
+        const caption = captionFor(review.piece ?? '', r.caption);
+        return caption !== null && r.image_url && !r.image_url.startsWith('http') ? [{ ...r, caption }] : [];
+      });
       const modelPath: string | null = order?.model_3d_path ?? null;
       const links = await mediaLinks(supabase, [...own.map((r) => r.image_url), ...(modelPath ? [modelPath] : [])]);
       const photos: Record<string, string> = {};

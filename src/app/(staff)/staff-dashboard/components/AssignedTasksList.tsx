@@ -9,12 +9,14 @@ import { dataUserId } from '@/lib/viewer';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
 import { byFurniture } from '@/lib/furniture';
+import { furnitureLabel } from '@/lib/pieces';
 
 interface Task {
   id: string;
   order_ref: string;
   product_name: string;
   product_category: string | null;
+  pieces?: string[];
   customer_name: string;
   extended_status: string;
   due_date: string | null;
@@ -32,7 +34,7 @@ export default function AssignedTasksList() {
   const load = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase.from('orders')
-      .select('id, order_ref, product_name, product_category, customer_name, extended_status, due_date, assigned_at')
+      .select('*') // all columns: the pieces of a set come along, and nothing breaks before a migration adds one
       .eq('assigned_to', dataUserId(user)).in('extended_status', ACTIVE_STATUSES).order('due_date', { ascending: true });
     setSetupNeeded(!!error && /assigned_/.test(error.message));
     if (data) setTasks(data as Task[]);
@@ -80,7 +82,7 @@ export default function AssignedTasksList() {
                         <span className="text-sm font-semibold text-foreground">{t.order_ref}</span>
                         <StatusBadge variant={statusVariant(t.extended_status)} label={statusLabel(t.extended_status)} />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{t.product_name} · {t.customer_name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 truncate">{furnitureLabel(t)} · {t.customer_name}</p>
                       <div className="flex items-center gap-3 mt-1.5 text-xs">
                         <span className={`flex items-center gap-1 ${overdue ? 'text-warning' : 'text-muted-foreground'}`}>
                           {overdue ? <AlertTriangle size={10} /> : <Clock size={10} />}

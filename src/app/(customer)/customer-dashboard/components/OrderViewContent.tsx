@@ -9,6 +9,8 @@ import { watchOrders } from '@/lib/staffAssignment';
 import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
 import StatusBadge from '@/components/ui/StatusBadge';
+import CancelOrderButton from '@/components/CancelOrderButton';
+import { furnitureLabel } from '@/lib/pieces';
 import Link from 'next/link';
 import PhotoGallery from './PhotoGallery';
 import ProductDetail3D from './ProductDetail3D';
@@ -81,6 +83,9 @@ export default function OrderViewContent() {
   const [logsLoading, setLogsLoading] = useState<Record<string, boolean>>({});
   const [showOrderList, setShowOrderList] = useState(false);
 
+  // Live updates refresh the list several times a minute; the order you are reading stays open. A notification link
+  // (?order=<id>) opens that order once, on the first load; with no choice yet, the newest one.
+  const firstLoad = React.useRef(true);
   const fetchOrders = useCallback(async () => {
     if (!user) return;
     const { data } = await supabase
@@ -90,13 +95,13 @@ export default function OrderViewContent() {
       .order('created_at', { ascending: false });
     if (data) {
       setOrders(data);
-      // a notification link (?order=<id>) opens that order; otherwise the newest one
-      const wanted = new URLSearchParams(window.location.search).get('order');
-      if (wanted && data.some((o: any) => o.id === wanted)) setSelectedOrderId(wanted);
-      else if (!selectedOrderId && data.length > 0) setSelectedOrderId(data[0].id);
+      const wanted = firstLoad.current ? new URLSearchParams(window.location.search).get('order') : null;
+      firstLoad.current = false;
+      const has = (id: string | null) => !!id && data.some((o: any) => o.id === id);
+      setSelectedOrderId((cur) => (has(wanted) ? wanted : has(cur) ? cur : data[0]?.id ?? null));
     }
     setLoading(false);
-  }, [user, supabase, selectedOrderId]);
+  }, [user, supabase]);
 
   useEffect(() => {
     fetchOrders();
@@ -164,11 +169,12 @@ export default function OrderViewContent() {
           <h1 className="page-title">Order History</h1>
           {selectedOrder && (
             <p className="page-subtitle">
-              Latest: #{selectedOrder.order_ref} · {selectedOrder.product_name}
+              Showing #{selectedOrder.order_ref} · {furnitureLabel(selectedOrder as any)}
             </p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {selectedOrder && <CancelOrderButton order={selectedOrder} onCancelled={fetchOrders} />}
           {selectedOrder && (
             <div className="flex items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:border-purple-500/30 dark:bg-purple-500/15 dark:text-purple-200">
               <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" />
@@ -195,7 +201,7 @@ export default function OrderViewContent() {
               <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={16} aria-hidden="true" /></div>
               <div className="min-w-0">
                 <p className="font-semibold text-foreground truncate">
-                  {selectedOrder?.product_name || 'Select an order'}
+                  {furnitureLabel(selectedOrder as any) || 'Select an order'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   #{selectedOrder?.order_ref} · {orders.length} order{orders.length !== 1 ? 's' : ''}
@@ -231,7 +237,7 @@ export default function OrderViewContent() {
                     >
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={16} aria-hidden="true" /></div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">{order.product_name}</p>
+                        <p className="text-xs font-semibold text-foreground truncate">{furnitureLabel(order as any)}</p>
                         <p className="text-[10px] text-muted-foreground">#{order.order_ref}</p>
                       </div>
                       <StatusBadge variant={statusVariant(orderSt)} label={statusLabel(orderSt)} />

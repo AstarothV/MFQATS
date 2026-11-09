@@ -16,8 +16,8 @@ const cases = [
   [{ product_name: 'Cherry Bed Frame', product_category: 'furniture' }, 'Beds'],
   [{ product_name: 'Maple Study Desk', product_category: 'furniture' }, 'Office Furniture'],
   [{ product_name: 'Oak Bedside Table', product_category: null }, 'Tables'],
-  [{ product_name: 'BILLY / OXBERG Bookcase', product_category: 'Storage' }, 'Storage'],
-  [{ product_name: 'TONSTAD Cabinet', product_category: 'Cabinets' }, 'Cabinets'],
+  [{ product_name: 'Glass-Door Bookcase', product_category: 'Storage' }, 'Storage'],
+  [{ product_name: 'Oak Sliding-Door Cabinet', product_category: 'Cabinets' }, 'Cabinets'],
   [{ product_name: 'Something odd', product_category: 'furniture' }, 'Other'],
   [null, 'Other'],
 ];
