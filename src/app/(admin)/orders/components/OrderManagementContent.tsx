@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 import FurnitureFilter from '@/components/ui/FurnitureFilter';
+import CancelRequestReview from './CancelRequestReview';
 import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
 
@@ -249,6 +250,9 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                           <span className="mt-1 block font-normal sm:hidden">
                             <StatusBadge variant={statusVariant(order.extended_status || order.status)} label={statusLabel(order.extended_status || order.status)} />
                           </span>
+                          {order.cancel_requested_at && order.extended_status === 'pending' && (
+                            <span className="mt-1 block text-xs font-semibold text-warning">Cancel requested</span>
+                          )}
                         </td>
                         <td className="px-3 py-4 sm:px-4">
                           <span className="block max-w-[7.5rem] truncate text-foreground sm:max-w-[14rem]" title={furnitureLabel(order)}>{furnitureLabel(order)}</span>
@@ -289,6 +293,10 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                       label={statusLabel(activeOrder.extended_status || activeOrder.status)}
                     />
                   </div>
+                  {activeOrder.cancel_requested_at && activeOrder.extended_status === 'pending' && (
+                    <CancelRequestReview order={activeOrder} isAdmin={isAdmin}
+                      onDone={(msg) => { showToast('success', msg); fetchOrders(); }} onError={(msg) => showToast('error', msg)} />
+                  )}
                   <div className="space-y-3 text-sm text-muted-foreground">
                     <div className="flex justify-between gap-4">
                       <span>Customer</span>
