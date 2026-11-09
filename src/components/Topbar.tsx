@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import { notificationLink, readable } from '@/lib/notifications';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { dataUserId, isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 
 interface TopbarProps {
@@ -42,6 +43,8 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>('light');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notifTab, setNotifTab] = useState<'inbox' | 'archived'>('inbox');
+  const [notifError, setNotifError] = useState('');
+  const [confirm, confirmBox] = useConfirm();
   const inbox = notifications.filter((n) => !n.archived_at);
   const archived = notifications.filter((n) => n.archived_at);
   const shownNotifs = notifTab === 'inbox' ? inbox : archived;
@@ -123,22 +126,27 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   async function setArchived(n: Notification, on: boolean) {
     const patch = on ? { archived_at: new Date().toISOString(), is_read: true } : { archived_at: null };
     const { error } = await supabase.from('notifications').update(patch).eq('id', n.id);
-    if (error) { window.alert(/archived_at/.test(error.message) ? 'Archiving needs the latest database update (migration 024).' : error.message); return; }
+    if (error) { setNotifError(/archived_at/.test(error.message) ? 'Archiving needs the latest database update (migration 024).' : error.message); return; }
+    setNotifError('');
     setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, ...patch } : x)));
   }
 
   async function removeNotification(n: Notification) {
     const { error } = await supabase.from('notifications').delete().eq('id', n.id);
-    if (error) { window.alert(error.message || 'Could not delete the notification.'); return; }
+    if (error) { setNotifError(error.message || 'Could not delete the notification.'); return; }
+    setNotifError('');
     setNotifications((prev) => prev.filter((x) => x.id !== n.id));
   }
 
   // deletes every notification in the tab you are on (asks first: it cannot be undone)
   async function clearAll() {
     const ids = shownNotifs.map((n) => n.id);
-    if (!user || !ids.length || !window.confirm(`Delete all ${ids.length} ${notifTab === 'inbox' ? '' : 'archived '}notification${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+    if (!user || !ids.length) return;
+    const what = `${ids.length} ${notifTab === 'inbox' ? '' : 'archived '}notification${ids.length === 1 ? '' : 's'}`;
+    if (!(await confirm({ title: `Clear ${what}?`, message: 'They are deleted for good. This cannot be undone.', confirmLabel: 'Clear all', cancelLabel: 'Keep them', danger: true }))) return;
     const { error } = await supabase.from('notifications').delete().in('id', ids);
-    if (error) { window.alert(error.message || 'Could not clear the notifications.'); return; }
+    if (error) { setNotifError(error.message || 'Could not clear the notifications.'); return; }
+    setNotifError('');
     setNotifications((prev) => prev.filter((x) => !ids.includes(x.id)));
   }
 
@@ -191,8 +199,10 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
               )}
             </button>
 
+            {confirmBox}
             {notifOpen && (
               <div className="glass-menu fixed inset-x-3 top-[72px] z-50 p-4 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-80">
+                {notifError && <p role="alert" className="mb-3 rounded-xl border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{notifError}</p>}
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-foreground">Notifications</p>
                   <div className="flex items-center gap-2">

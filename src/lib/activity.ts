@@ -16,7 +16,7 @@ export async function logActivity(supabase: SupabaseClient, action: Activity, de
 // "Opened the system" is recorded once per browser tab session, not on every page.
 const ACCESS_KEY = 'mfqats-access-logged';
 export function markAccessLogged(userId: string) {
-  try { sessionStorage.setItem(ACCESS_KEY, userId); } catch {}
+  try { sessionStorage.setItem(ACCESS_KEY, userId); } catch { /* storage blocked: logged again next time */ }
 }
 export function accessAlreadyLogged(userId: string) {
   try { return sessionStorage.getItem(ACCESS_KEY) === userId; } catch { return true; }

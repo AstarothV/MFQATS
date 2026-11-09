@@ -207,8 +207,9 @@ export default function QualityScanPage() {
       const q = supabase.from('detection_logs').select(cols).eq('order_id', orderId);
       return (forPiece ? q.eq('piece', forPiece) : q).order('created_at', { ascending: false }).limit(1).maybeSingle();
     };
-    let { data, error } = await latest('id, overall_result, review_status, review_note');
-    if (error) ({ data } = await latest('id, overall_result')); // before migration 015 there is no review yet
+    const first = await latest('id, overall_result, review_status, review_note');
+    let { data } = first;
+    if (first.error) ({ data } = await latest('id, overall_result')); // before migration 015 there is no review yet
     const scan = data as any;
     const review = (scan?.review_status ?? null) as Saved['review'];
     setSavedInfo({
@@ -1088,7 +1089,7 @@ export default function QualityScanPage() {
           <div className="card-dark space-y-3 p-5">
             <div>
               <h3 className="text-base font-semibold text-foreground">Close-up of each side</h3>
-              <p className="text-sm text-muted-foreground mt-1">Go nearer than the Upload photos, with that side's whole surface filling the frame, so small defects show and land in the right place on the 3D model. A side without a close-up is scanned from its Upload photo.</p>
+              <p className="text-sm text-muted-foreground mt-1">Go nearer than the Upload photos, with that side&apos;s whole surface filling the frame, so small defects show and land in the right place on the 3D model. A side without a close-up is scanned from its Upload photo.</p>
             </div>
             <PhotoSlots set={closeUps} name="close-up" />
           </div>
@@ -1154,7 +1155,7 @@ export default function QualityScanPage() {
                       </div>
                       {source === 'photos' ? (
                         scanCount ? (
-                          <p className="text-muted-foreground text-sm">Pick a side's photo to scan it.</p>
+                          <p className="text-muted-foreground text-sm">Pick a side&apos;s photo to scan it.</p>
                         ) : (
                           <>
                             <p className="text-muted-foreground text-sm">No photos yet. Add close-ups above, or take the photos in step 1.</p>

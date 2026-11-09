@@ -115,30 +115,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw error;
-      
-      // Immediately set user and session state
-      if (data?.user) {
-        markAccessLogged(data.user.id); // the sign-in below already counts as opening the system
-        logActivity(supabase, 'user_login', { email });
-        setUser(data.user);
-        setSession(data.session);
-        setLoading(false);
-        
-        // Fetch profile in background
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await fetchProfile(data.user.id);
-      }
-      
-      return data;
-    } catch (error) {
-      throw error;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    // Immediately set user and session state
+    if (data?.user) {
+      markAccessLogged(data.user.id); // the sign-in below already counts as opening the system
+      logActivity(supabase, 'user_login', { email });
+      setUser(data.user);
+      setSession(data.session);
+      setLoading(false);
+      await fetchProfile(data.user.id);
     }
+    return data;
   };
 
   const signOut = async () => {

@@ -8,6 +8,7 @@ import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVari
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 import FurnitureFilter from '@/components/ui/FurnitureFilter';
 import CancelRequestReview from './CancelRequestReview';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
 
@@ -41,6 +42,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   const [filterFurniture, setFilterFurniture] = useState('All');
   const [updating, setUpdating] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [confirm, confirmBox] = useConfirm();
 
   function showToast(type: 'success' | 'error', message: string) {
     setToast({ type, message });
@@ -58,8 +60,9 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     const query = (staffJoin: boolean) => supabase.from('orders')
       .select(`*, customer:customer_id(full_name, email, phone)${staffJoin ? ', staff:assigned_to(full_name)' : ''}`)
       .order('created_at', { ascending: false }).limit(50);
-    let { data, error } = await query(true);
-    if (error) ({ data } = await query(false)); // the staff column is not in the database yet (migration not run)
+    const first = await query(true);
+    let { data } = first;
+    if (first.error) ({ data } = await query(false)); // the staff column is not in the database yet (migration not run)
     const rows = (data || null) as any[] | null;
     if (rows) {
       setOrders(rows);
@@ -118,7 +121,11 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
 
   // Only cancelled orders, only admins (the database checks both too). Its scans, photos and history go with it.
   async function removeOrder(order: any) {
-    if (!window.confirm(`Delete ${order.order_ref} for good? Its scans, photos and history are deleted too. This cannot be undone.`)) return;
+    if (!(await confirm({
+      title: `Delete ${order.order_ref}?`,
+      message: 'Its scans, photos, history and notifications are deleted too, for the customer as well. This cannot be undone.',
+      confirmLabel: 'Delete order', cancelLabel: 'Keep it', danger: true,
+    }))) return;
     setUpdating(true);
     try {
       await deleteOrder(supabase, order.id);
@@ -162,6 +169,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
 
   return (
     <div className="space-y-6">
+      {confirmBox}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
           {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}

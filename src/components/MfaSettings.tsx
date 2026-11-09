@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Loader2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 type Factor = { id: string; status: string };
 
@@ -15,6 +16,7 @@ export default function MfaSettings() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [askFirst, confirmBox] = useConfirm();
 
   async function load() {
     const { data, error } = await supabase.auth.mfa.listFactors();
@@ -52,7 +54,7 @@ export default function MfaSettings() {
   }
 
   async function turnOff() {
-    if (!verified || !window.confirm('Turn off two-step sign-in? Signing in will only need your password.')) return;
+    if (!verified || !(await askFirst({ title: 'Turn off two-step sign-in?', message: 'Signing in will only need your password.', confirmLabel: 'Turn it off', cancelLabel: 'Keep it on', danger: true }))) return;
     setBusy(true); setMsg(null);
     const { error } = await supabase.auth.mfa.unenroll({ factorId: verified.id });
     setBusy(false);
@@ -63,6 +65,7 @@ export default function MfaSettings() {
 
   return (
     <div className="space-y-3">
+      {confirmBox}
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="flex items-center gap-1.5 text-sm font-semibold text-foreground"><ShieldCheck size={15} className="text-primary dark:text-accent" /> Two-step sign-in</p>

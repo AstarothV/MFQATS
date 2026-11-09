@@ -312,7 +312,7 @@ export default function LandingPage() {
                 to create pieces that last generations.
               </p>
               <p className="text-muted-foreground mb-6">
-                We've integrated automated quality assurance, real-time production tracking, and 
+                We&apos;ve integrated automated quality assurance, real-time production tracking, and 
                 3D surface inspection to give our customers complete transparency and confidence 
                 in every purchase.
               </p>
@@ -515,7 +515,7 @@ export default function LandingPage() {
                 <Star key={i} size={14} className="text-warning fill-warning" />
                 )}
                 </div>
-                <p className="text-sm text-muted-foreground mb-4 italic">"{t.text}"</p>
+                <p className="text-sm text-muted-foreground mb-4 italic">&ldquo;{t.text}&rdquo;</p>
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center">
                     {t.avatar}
@@ -538,7 +538,7 @@ export default function LandingPage() {
             <div data-reveal="left">
               <h2 className="text-3xl font-bold text-foreground mb-4">Get In Touch</h2>
               <p className="text-muted-foreground mb-8">
-                Have questions about our products or want to discuss a custom order? We'd love to hear from you.
+                Have questions about our products or want to discuss a custom order? We&apos;d love to hear from you.
               </p>
               <div className="space-y-4">
                 {[
