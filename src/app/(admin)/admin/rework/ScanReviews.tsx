@@ -14,6 +14,7 @@ export interface Review {
   created_at: string;
   review_requested_at: string | null;
   orders: { order_ref: string; product_name: string } | null;
+  piece?: string | null; // a set of chairs...: which piece this scan was for (migration 026)
 }
 
 // Failed scans the staff think are false alarms. The admin looks at the photo and the detections and decides:
@@ -29,7 +30,7 @@ export default function ScanReviews({ onDecided }: { onDecided: () => void }) {
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('detection_logs')
-      .select('id, order_id, image_url, detections, notes, created_at, review_requested_at, orders(order_ref, product_name)')
+      .select('*, orders(order_ref, product_name)')
       .eq('review_status', 'requested').order('review_requested_at');
     setSetupNeeded(!!error && /review_/.test(error.message));
     setReviews(error ? [] : ((data ?? []) as unknown as Review[]));
@@ -88,7 +89,7 @@ export default function ScanReviews({ onDecided }: { onDecided: () => void }) {
             </button>
             <div className="space-y-3 text-sm">
               <div>
-                <p className="font-semibold text-foreground">{r.orders?.order_ref} · {r.orders?.product_name}</p>
+                <p className="font-semibold text-foreground">{r.orders?.order_ref} · {r.orders?.product_name}{r.piece ? ` · ${r.piece}` : ''}</p>
                 <p className="text-xs text-muted-foreground">
                   Scanned {new Date(r.created_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                   {r.review_requested_at && ` · review asked ${new Date(r.review_requested_at).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`}

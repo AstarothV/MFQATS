@@ -7,13 +7,14 @@ import ProductionChartsRow from './ProductionChartsRow';
 import AlertsFeed from './AlertsFeed';
 import StageTimelinePanel from './StageTimelinePanel';
 import { createClient } from '@/lib/supabase/client';
+import { furnitureLabel } from '@/lib/pieces';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
 
 // The orders being worked on now, with their staff, time in the current stage, the PERT expected time and the last scan.
 async function loadFloor(): Promise<FloorOrder[]> {
   const supabase = createClient();
   const [orders, current, pert, scans] = await Promise.all([
-    supabase.from('orders').select('id, order_ref, product_name, product_category, extended_status, staff:assigned_to(full_name)')
+    supabase.from('orders').select('*, staff:assigned_to(full_name)')
       .in('extended_status', ACTIVE_STATUSES).order('created_at'),
     supabase.from('order_stage_history').select('order_id, entered_at').is('left_at', null),
     supabase.rpc('stage_timeline_stats'),
@@ -24,7 +25,7 @@ async function loadFloor(): Promise<FloorOrder[]> {
   const lastScan = new Map<string, { result: string; at: string }>();
   for (const s of scans.data ?? []) if (s.order_id && !lastScan.has(s.order_id)) lastScan.set(s.order_id, { result: s.overall_result, at: s.created_at });
   return (orders.data ?? []).map((o: any) => ({
-    id: o.id, order_ref: o.order_ref, product_name: o.product_name, product_category: o.product_category, status: o.extended_status,
+    id: o.id, order_ref: o.order_ref, product_name: furnitureLabel(o), product_category: o.product_category, status: o.extended_status,
     staff: o.staff?.full_name ?? null,
     enteredAt: since.get(o.id) ?? null,
     expectedHours: expected.get(o.extended_status) ?? null,

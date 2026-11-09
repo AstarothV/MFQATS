@@ -8,6 +8,7 @@ import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVari
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 import FurnitureFilter from '@/components/ui/FurnitureFilter';
 import { furnitureOf } from '@/lib/furniture';
+import { furnitureLabel } from '@/lib/pieces';
 
 import { peso } from '@/lib/money';
 import { deleteOrder } from '@/lib/orderMedia';
@@ -250,7 +251,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                           </span>
                         </td>
                         <td className="px-3 py-4 sm:px-4">
-                          <span className="block max-w-[7.5rem] truncate text-foreground sm:max-w-[14rem]" title={order.product_name}>{order.product_name}</span>
+                          <span className="block max-w-[7.5rem] truncate text-foreground sm:max-w-[14rem]" title={furnitureLabel(order)}>{furnitureLabel(order)}</span>
                           <span className="block text-xs text-muted-foreground">{furnitureOf(order)}</span>
                         </td>
                         <td className="hidden px-4 py-4 text-muted-foreground sm:table-cell">{order.customer_name}</td>
@@ -295,8 +296,14 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     </div>
                     <div className="flex justify-between gap-4">
                       <span>Product</span>
-                      <span className="text-foreground font-semibold">{activeOrder.product_name}</span>
+                      <span className="text-foreground font-semibold">{furnitureLabel(activeOrder)}</span>
                     </div>
+                    {activeOrder.pieces?.length > 0 && (
+                      <div className="flex justify-between gap-4">
+                        <span>Pieces</span>
+                        <span className="text-right font-semibold text-foreground">{activeOrder.pieces.length}, each inspected on its own</span>
+                      </div>
+                    )}
                     <div className="flex justify-between gap-4">
                       <span>Order value</span>
                       <span className="text-foreground font-semibold">{peso(activeOrder.amount)}</span>

@@ -5,6 +5,7 @@ import StatusBadge from '@/components/ui/StatusBadge';
 import { PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { VIEWS } from '@/app/(staff)/staff/quality-scan/PhotoSet';
 import { partOfCaption, suggestedParts } from '@/app/(staff)/staff/quality-scan/insideParts';
+import { plainCaption } from '@/lib/pieces';
 import type { WorkFacts, WorkOrder } from './StaffDashboardContent';
 
 interface Item { label: string; done: boolean; required: boolean }
@@ -18,38 +19,47 @@ const duration = (ms: number) => {
 // the same for everyone and updates as the work is done in Quality Scan. Submit moves the order to the next stage;
 // the database still checks every move (a saved scan before Results, a passed scan before delivery).
 function checklist(o: WorkOrder, f: WorkFacts, me: string): { title: string; items: Item[]; next: string | null; action: string } {
-  const count = (kind: string) => VIEWS.filter((v) => f.captions.includes(`${v} ${kind}`)).length;
+  // a set of chairs (or several items): every piece is photographed and scanned on its own
+  const pieces = o.pieces ?? [];
+  const n = Math.max(1, pieces.length);
+  const plain = f.captions.map(plainCaption);
+  const count = (kind: string) => plain.filter((c) => VIEWS.some((v) => c === `${v} ${kind}`)).length;
+  const sides = VIEWS.length * n;
   const inside = suggestedParts(o.product_name); // a cabinet, shelf unit or dresser: its inside is photographed too
-  const insideTaken = f.captions.filter((c) => partOfCaption(c)?.closeUp === false).length;
+  const insideTaken = plain.filter((c) => partOfCaption(c)?.closeUp === false).length;
   const since = f.history.filter((h) => h.status === o.extended_status).at(-1)?.entered_at;
-  const scanHere = !!f.scan && (!since || f.scan.at >= since);
-  const passed = f.scan?.result === 'pass' || f.scan?.review === 'approved'; // an admin approved a false alarm
+  const fresh = (s: { at: string } | null | undefined) => !!s && (!since || s.at >= since);
+  const ok = (s: { result: string; review: string | null } | null | undefined) => s?.result === 'pass' || s?.review === 'approved'; // an admin approved a false alarm
+  const scanHere = pieces.length ? pieces.every((p) => fresh(f.pieceScans[p])) : fresh(f.scan);
+  const passed = pieces.length ? pieces.every((p) => ok(f.pieceScans[p])) : ok(f.scan);
+  const savedAll = pieces.length ? pieces.every((p) => f.pieceScans[p]) : !!f.scan;
+  const of = pieces.length ? ` of ${pieces.length} pieces` : '';
   switch (o.extended_status) {
     case 'confirmed': return { title: 'Before starting', next: 'upload', action: 'Start Production', items: [
       { label: 'Order approved by the admin', done: true, required: true },
       { label: 'Assigned to you', done: o.assigned_to === me, required: false },
     ] };
     case 'upload': return { title: 'Upload checklist', next: 'reconstruction_3d', action: 'Submit: go to 3D Reconstruction', items: [
-      { label: 'Front photo taken', done: f.captions.includes('Front photo'), required: true },
-      { label: `Every side photographed (${count('photo')} of ${VIEWS.length})`, done: count('photo') === VIEWS.length, required: false },
-      ...(inside.length ? [{ label: `Inside parts photographed (${insideTaken} of ${inside.length})`, done: insideTaken >= inside.length, required: false }] : []),
+      { label: 'Front photo taken', done: plain.includes('Front photo'), required: true },
+      { label: `Every side${of ? ' of every piece' : ''} photographed (${count('photo')} of ${sides})`, done: count('photo') >= sides, required: false },
+      ...(inside.length ? [{ label: `Inside parts photographed (${insideTaken} of ${inside.length * n})`, done: insideTaken >= inside.length * n, required: false }] : []),
     ] };
     case 'reconstruction_3d': return { title: '3D Reconstruction checklist', next: 'detect_defects', action: 'Submit: go to Detect Defects', items: [
       { label: 'Upload photos taken', done: count('photo') > 0, required: true },
       { label: '3D model built and saved', done: !!o.model_3d_path, required: true },
     ] };
     case 'detect_defects': return { title: 'Detect Defects checklist', next: 'results', action: 'Submit: go to Results', items: [
-      { label: `Close-ups of the sides (${count('close-up')} of ${VIEWS.length})`, done: count('close-up') === VIEWS.length, required: false },
-      { label: 'Every side scanned and the scan saved', done: scanHere, required: true },
+      { label: `Close-ups of the sides (${count('close-up')} of ${sides})`, done: count('close-up') >= sides, required: false },
+      { label: pieces.length ? `Every piece scanned and its scan saved (${pieces.filter((p) => fresh(f.pieceScans[p])).length}${of})` : 'Every side scanned and the scan saved', done: scanHere, required: true },
     ] };
     case 'results': return { title: 'Results checklist', next: 'recommendation', action: 'Submit: go to Recommendation', items: [
-      { label: 'Scan saved', done: !!f.scan, required: true },
-      { label: f.scan ? `Result: ${passed ? 'passed' : 'failed, needs rework'}` : 'Result', done: passed, required: false },
+      { label: pieces.length ? `Scan saved for every piece (${pieces.filter((p) => f.pieceScans[p]).length}${of})` : 'Scan saved', done: savedAll, required: true },
+      { label: f.scan ? `Result: ${passed ? 'passed' : pieces.length ? 'not every piece passed, needs rework' : 'failed, needs rework'}` : 'Result', done: passed, required: false },
     ] };
     case 'recommendation': return f.scan?.review === 'requested'
       ? { title: 'Re-check / Finishing', next: null, action: '', items: [{ label: 'Waiting for the admin to review the failed scan (a possible false alarm)', done: false, required: true }] }
       : passed
-      ? { title: 'Re-check / Finishing', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: 'Latest saved scan passed', done: true, required: true }] }
+      ? { title: 'Re-check / Finishing', next: 'delivered', action: 'Finish and release for delivery', items: [{ label: pieces.length ? 'Every piece passed' : 'Latest saved scan passed', done: true, required: true }] }
       : { title: 'Re-check / Finishing', next: 'upload', action: 'Send back for rework', items: [{ label: 'Latest saved scan failed: fix the piece, then inspect it again', done: false, required: false }] };
     default: return { title: 'Checklist', next: null, action: '', items: [] };
   }

@@ -11,6 +11,7 @@ import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleto
 
 import { peso } from '@/lib/money';
 import PhotoSlider from '@/components/ui/PhotoSlider';
+import { CHAIR_SETS } from '@/lib/pieces';
 interface Product {
   id: string;
   product_ref: string;
@@ -56,6 +57,18 @@ export default function CustomerShopContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [triedOrder, setTriedOrder] = useState(false); // Place Order was pressed: show what is missing
+  // product details: how many. Chairs: a set of 4 / 6, or Custom quantity; other furniture: a quantity
+  const [chairSet, setChairSet] = useState<'custom' | (typeof CHAIR_SETS)[number]>('custom');
+  const [customQty, setCustomQty] = useState(1);
+  useEffect(() => { setChairSet('custom'); setCustomQty(1); }, [selectedProduct?.id]);
+  // the product details close with Escape
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedProduct(null); };
+    document.addEventListener('keydown', esc);
+    return () => document.removeEventListener('keydown', esc);
+  }, [selectedProduct]);
   const [deliveryForm, setDeliveryForm] = useState({
     address: '', city: '', phone: profile?.phone || '', notes: ''
   });
@@ -102,15 +115,16 @@ export default function CustomerShopContent() {
     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
   }
 
-  function addToCart(product: Product) {
+  function addToCart(product: Product, count = 1) {
     setCart(prev => {
       const existing = prev.find(i => i.product.id === product.id);
       if (existing) {
-        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i.product.id === product.id ? { ...i, quantity: Math.min(99, i.quantity + count) } : i);
       }
-      return [...prev, { product, quantity: 1, customization: '' }];
+      return [...prev, { product, quantity: count, customization: '' }];
     });
-    showToast('success', `${product.name} added to cart`);
+    const set = product.category === 'Chairs' && (CHAIR_SETS as readonly number[]).includes(count);
+    showToast('success', `${count > 1 ? `${count} × ` : ''}${product.name}${set ? ` (set of ${count})` : ''} added to cart`);
   }
 
   function removeFromCart(productId: string) {
@@ -128,8 +142,9 @@ export default function CustomerShopContent() {
 
   async function placeOrder() {
     if (!user || cart.length === 0) return;
-    if (!deliveryForm.address || !deliveryForm.city) {
-      showToast('error', 'Please fill in delivery address and city');
+    setTriedOrder(true);
+    if (!deliveryForm.address.trim() || !deliveryForm.city.trim()) {
+      showToast('error', 'Add your street address and city to place the order.');
       return;
     }
     setOrderLoading(true);
@@ -137,7 +152,7 @@ export default function CustomerShopContent() {
       const orderRef = `ORD-${Date.now().toString().slice(-6)}`;
       const firstItem = cart[0];
 
-      const { data: orderData, error } = await supabase.from('orders').insert({
+      const order = {
         order_ref: orderRef,
         customer_id: user.id,
         customer_name: profile?.full_name || user.email,
@@ -155,8 +170,10 @@ export default function CustomerShopContent() {
         customization_notes: cart.map(i => i.customization).filter(Boolean).join('; '),
         notes: deliveryForm.notes,
         due_date: new Date(Date.now() + (firstItem.product.estimated_production_days || 14) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      }).select().single();
-
+      };
+      const items = cart.map(i => ({ product_id: i.product.id, name: i.product.name, category: i.product.category, quantity: i.quantity }));
+      let { data: orderData, error } = await supabase.from('orders').insert({ ...order, items }).select().single();
+      if (error && /items/.test(error.message)) ({ data: orderData, error } = await supabase.from('orders').insert(order).select().single()); // before migration 026
       if (error) throw error;
 
       // Clear cart items
@@ -166,7 +183,8 @@ export default function CustomerShopContent() {
       await supabase.from('notifications').insert({
         user_id: user.id,
         title: 'Order Placed Successfully',
-        message: `Your order ${orderRef} has been placed. We will confirm it shortly.`,
+        // says what was ordered: "Ash Dining Chair × 4", or "Ash Dining Chair + 1 more" for several items
+        message: `Your order ${orderRef} (${cart.length === 1 ? `${firstItem.product.name}${firstItem.quantity > 1 ? ` × ${firstItem.quantity}` : ''}` : `${firstItem.product.name} + ${cart.length - 1} more`}) has been placed. We will confirm it shortly.`,
         notification_type: 'success',
         entity_type: 'orders',
         entity_id: orderData?.id,
@@ -181,6 +199,22 @@ export default function CustomerShopContent() {
       setOrderLoading(false);
     }
   }
+
+  // the message box, on every step of the shop (it used to show only on the product list, so Checkout failed silently)
+  const toastEl = toast && createPortal(
+    <div role="alert" className={`fixed left-4 right-4 top-4 z-[70] flex items-center gap-2 sm:left-auto px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
+      {toast.type === 'success' ? <CheckCircle2 size={15} /> : <X size={15} />}
+      {toast.message}
+    </div>
+  , document.body);
+
+  // how many: type it, or use - and +
+  const qtyInput = (productId: string, qty: number, size: string) => (
+    <input type="number" inputMode="numeric" min={1} max={99} value={qty} aria-label="Quantity"
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) updateQuantity(productId, Math.min(99, n)); }}
+      className={`input-dark px-1 py-0 text-center font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${size}`} />
+  );
 
   const getAvailabilityVariant = (a: string) =>
     a === 'available' ? 'ok' : a === 'limited' ? 'warning' : a === 'out_of_stock' ? 'danger' : 'neutral';
@@ -213,8 +247,10 @@ export default function CustomerShopContent() {
   }
 
   if (step === 'checkout') {
+    const missing = (v: string) => triedOrder && !v.trim();
     return (
       <div className="space-y-6">
+        {toastEl}
         <div className="flex items-center gap-3">
           <button type="button" onClick={() => setStep('cart')} className="btn-ghost p-2">←</button>
           <div>
@@ -232,15 +268,19 @@ export default function CustomerShopContent() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
                   Street Address *
-                  <input value={deliveryForm.address} onChange={e => setDeliveryForm(f => ({ ...f, address: e.target.value }))} className="input-dark w-full mt-1" placeholder="123 Main Street" />
+                  <input value={deliveryForm.address} onChange={e => setDeliveryForm(f => ({ ...f, address: e.target.value }))} aria-invalid={missing(deliveryForm.address)}
+                    className={`input-dark w-full mt-1 ${missing(deliveryForm.address) ? 'border-danger' : ''}`} placeholder="e.g. 12 Rizal Street, Brgy. San Isidro" />
+                  {missing(deliveryForm.address) && <span className="block text-xs text-danger">Enter your street address.</span>}
                 </label>
                 <label className="space-y-1 text-sm text-muted-foreground">
                   City *
-                  <input value={deliveryForm.city} onChange={e => setDeliveryForm(f => ({ ...f, city: e.target.value }))} className="input-dark w-full mt-1" placeholder="Manila" />
+                  <input value={deliveryForm.city} onChange={e => setDeliveryForm(f => ({ ...f, city: e.target.value }))} aria-invalid={missing(deliveryForm.city)}
+                    className={`input-dark w-full mt-1 ${missing(deliveryForm.city) ? 'border-danger' : ''}`} placeholder="e.g. Quezon City" />
+                  {missing(deliveryForm.city) && <span className="block text-xs text-danger">Enter your city.</span>}
                 </label>
                 <label className="space-y-1 text-sm text-muted-foreground">
                   Phone Number
-                  <input value={deliveryForm.phone} onChange={e => setDeliveryForm(f => ({ ...f, phone: e.target.value }))} className="input-dark w-full mt-1" placeholder="+63 912 345 6789" />
+                  <input value={deliveryForm.phone} onChange={e => setDeliveryForm(f => ({ ...f, phone: e.target.value }))} className="input-dark w-full mt-1" placeholder="e.g. 0917 123 4567" />
                 </label>
                 <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
                   Special Instructions
@@ -283,6 +323,7 @@ export default function CustomerShopContent() {
   if (step === 'cart') {
     return (
       <div className="space-y-6">
+        {toastEl}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setStep('browse')} className="btn-ghost p-2">←</button>
@@ -321,7 +362,10 @@ export default function CustomerShopContent() {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="font-semibold text-foreground">{item.product.name}</h3>
-                          <p className="text-xs text-muted-foreground">{item.product.category} · {item.product.material_type}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {item.product.category} · {item.product.material_type}
+                            {item.product.category === 'Chairs' && item.quantity > 1 && <span className="ml-1.5 rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary dark:text-accent">{[4, 6].includes(item.quantity) ? `Set of ${item.quantity}` : `${item.quantity} chairs`}</span>}
+                          </p>
                         </div>
                         <button type="button" onClick={() => removeFromCart(item.product.id)} className="text-muted-foreground hover:text-danger transition-colors">
                           <X size={16} />
@@ -332,7 +376,7 @@ export default function CustomerShopContent() {
                           <button type="button" onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Minus size={12} />
                           </button>
-                          <span className="text-sm font-semibold text-foreground w-6 text-center">{item.quantity}</span>
+                          {qtyInput(item.product.id, item.quantity, 'h-8 w-12 text-sm')}
                           <button type="button" onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Plus size={12} />
                           </button>
@@ -378,12 +422,7 @@ export default function CustomerShopContent() {
 
   return (
     <div className="space-y-6">
-      {toast && createPortal(
-        <div className={`fixed top-4 right-4 z-[70] flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
-          {toast.type === 'success' ? <CheckCircle2 size={15} /> : <X size={15} />}
-          {toast.message}
-        </div>
-      , document.body)}
+      {toastEl}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -475,7 +514,7 @@ export default function CustomerShopContent() {
                         <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) - 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Minus size={14} />
                         </button>
-                        <span className="flex-1 text-center font-semibold text-foreground">{cartItem?.quantity}</span>
+                        {qtyInput(product.id, cartItem?.quantity || 1, 'h-9 w-14 flex-1')}
                         <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) + 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Plus size={14} />
                         </button>
@@ -549,16 +588,57 @@ export default function CustomerShopContent() {
                     </div>
                   ))}
                 </div>
-                <button
-                  type="button"
-                  disabled={selectedProduct.availability === 'out_of_stock'}
-                  onClick={() => addToCart(selectedProduct)}
-                  className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  <ShoppingCart size={16} />
-                  {selectedProduct.availability === 'out_of_stock' ? 'Out of Stock'
-                    : cart.some(i => i.product.id === selectedProduct.id) ? 'Add another' : 'Add to Cart'}
-                </button>
+                {(() => {
+                  const isChair = selectedProduct.category === 'Chairs';
+                  const count = isChair && chairSet !== 'custom' ? chairSet : customQty;
+                  const unit = isChair ? 'chair' : 'piece';
+                  // custom quantity: type it, or use - and + (1 to 99)
+                  const custom = (
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => setCustomQty(Math.max(1, customQty - 1))} aria-label="One less"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-border transition-colors hover:bg-muted"><Minus size={14} /></button>
+                      <input type="number" inputMode="numeric" min={1} max={99} value={customQty} aria-label={`How many ${unit}s`}
+                        onFocus={(e) => e.currentTarget.select()}
+                        onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) setCustomQty(Math.min(99, n)); }}
+                        className="input-dark h-10 w-16 px-1 py-0 text-center font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+                      <button type="button" onClick={() => setCustomQty(Math.min(99, customQty + 1))} aria-label="One more"
+                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-border transition-colors hover:bg-muted"><Plus size={14} /></button>
+                      <span className="ml-auto text-right text-sm font-semibold text-foreground">{peso(selectedProduct.price * customQty)}</span>
+                    </div>
+                  );
+                  return (
+                    <>
+                      <fieldset className="space-y-2">
+                        <legend className="mb-2 text-sm font-semibold text-foreground">How many</legend>
+                        {isChair && (
+                          <div className="grid grid-cols-3 gap-2">
+                            {(['custom', ...CHAIR_SETS] as const).map((o) => (
+                              <button key={o} type="button" onClick={() => setChairSet(o)} aria-pressed={chairSet === o}
+                                className={`rounded-xl border px-2 py-2.5 text-center transition-colors ${chairSet === o ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted'}`}>
+                                <span className="block text-sm font-semibold text-foreground">{o === 'custom' ? 'Custom quantity' : `Set of ${o}`}</span>
+                                <span className="block text-xs text-muted-foreground">{o === 'custom' ? `${peso(selectedProduct.price)} each` : peso(selectedProduct.price * o)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {(!isChair || chairSet === 'custom') && custom}
+                        {count > 1 && <p className="text-xs text-muted-foreground">{count} matching {unit}s, priced per {unit}. Each {unit} is inspected on its own.</p>}
+                      </fieldset>
+                      <button
+                        type="button"
+                        disabled={selectedProduct.availability === 'out_of_stock'}
+                        onClick={() => { addToCart(selectedProduct, count); setSelectedProduct(null); }}
+                        className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <ShoppingCart size={16} />
+                        {selectedProduct.availability === 'out_of_stock' ? 'Out of Stock'
+                          : isChair && chairSet !== 'custom' ? `Add set of ${count} to cart`
+                          : count > 1 ? `Add ${count} to cart`
+                          : cart.some(i => i.product.id === selectedProduct.id) ? 'Add another' : 'Add to Cart'}
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
