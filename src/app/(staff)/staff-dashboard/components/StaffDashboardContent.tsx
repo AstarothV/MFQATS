@@ -77,7 +77,7 @@ export default function StaffDashboardContent() {
     setOrders(list);
     // keep the order picked before (also after a reload); else the first one assigned to this staff member
     let pick = selectedRef.current;
-    if (!pick) { try { pick = localStorage.getItem(PICK_KEY) ?? ''; } catch {} }
+    if (!pick) { try { pick = localStorage.getItem(PICK_KEY) ?? ''; } catch { /* storage blocked: start with the first order */ } }
     if (!list.some((o) => o.id === pick)) pick = list[0]?.id ?? '';
     setSelectedId(pick);
     selectedRef.current = pick;
@@ -97,7 +97,7 @@ export default function StaffDashboardContent() {
     selectedRef.current = id;
     setFacts(null);
     setMessage(null);
-    try { localStorage.setItem(PICK_KEY, id); } catch {}
+    try { localStorage.setItem(PICK_KEY, id); } catch { /* storage blocked: the choice is just not remembered */ }
     loadFacts(id);
   }
 

@@ -40,6 +40,7 @@ export async function saveOrderModel(supabase: SupabaseClient, orderId: string, 
 /** Deletes a cancelled order (admins only; the database refuses anyone else) and then its files in storage. */
 export async function deleteOrder(supabase: SupabaseClient, orderId: string) {
   const { data, error } = await supabase.from('orders').delete().eq('id', orderId).select('id');
+  if (error?.code === '23503') throw new Error('Something still linked to this order stops the delete. Run the latest database update (migration 030), then try again.');
   if (error) throw error;
   if (!data?.length) throw new Error('The order was not deleted. Only an admin can delete it, and only once it is cancelled.');
   const { data: files } = await supabase.storage.from(BUCKET).list(orderId);
