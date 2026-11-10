@@ -14,6 +14,10 @@ import { logActivity } from '@/lib/activity';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
+// Supabase returns an empty error ('{}') when the email service does not answer in time.
+const said = (error: any, fallback: string) =>
+  error?.message && error.message !== '{}' ? error.message : error?.message === '{}' ? 'The email service did not answer. Please try again in a minute.' : fallback;
+
 type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa' | 'confirm' | 'code' | 'code-verify';
 
 type LoginForm = { email: string; password: string; remember: boolean };
@@ -119,7 +123,7 @@ export default function LoginPageClient() {
       await goHome(result.user.id);
     } catch (error: any) {
       setLoading(false);
-      showMessage('error', error?.message || 'Invalid credentials. Please try again.');
+      showMessage('error', said(error, 'Invalid credentials. Please try again.'));
     }
   }
 
@@ -149,7 +153,7 @@ export default function LoginPageClient() {
       await goHome(user.id);
     } catch (error: any) {
       setLoading(false);
-      showMessage('error', error?.message || 'Could not check the code.');
+      showMessage('error', said(error, 'Could not check the code.'));
     }
   }
 
@@ -230,7 +234,7 @@ export default function LoginPageClient() {
       showMessage('success', 'Password changed.');
       router.push(roleRedirect[profileData?.role || 'staff'] || '/staff-dashboard');
     } catch (error: any) {
-      showMessage('error', error?.message || 'Could not change the password.');
+      showMessage('error', said(error, 'Could not change the password.'));
     } finally {
       setLoading(false);
     }
@@ -258,7 +262,7 @@ export default function LoginPageClient() {
       setTab('confirm');
       reset();
     } catch (error: any) {
-      showMessage('error', error?.message || 'Registration failed. Please try again.');
+      showMessage('error', said(error, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -278,7 +282,7 @@ export default function LoginPageClient() {
       setResendCooldown(60);
       setTab('reset');
     } catch (error: any) {
-      showMessage('error', error?.message || 'Unable to send reset email.');
+      showMessage('error', said(error, 'Unable to send reset email.'));
     } finally {
       setLoading(false);
     }
