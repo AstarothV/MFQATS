@@ -36,6 +36,7 @@ const PUBLIC_PATHS = [
   '/favicon.ico',
   '/assets',
   '/landing',
+  '/api/order-email', // called by the database; the route checks its own secret
 ];
 
 export async function middleware(request: NextRequest) {
