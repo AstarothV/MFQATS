@@ -20,7 +20,7 @@ import { PhotoSlots, PhotoThumbs, useCloseUpsFor, usePartSet, usePhotoSet, VIEWS
 import { insideCaption, PART_KINDS, partOfCaption, suggestedParts } from './insideParts';
 import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
 import { dataUserId } from '@/lib/viewer';
-import { captionFor, furnitureLabel, pieceCaption, piecesOf } from '@/lib/pieces';
+import { captionFor, pieceCaption, piecesOf } from '@/lib/pieces';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 // The Detection History table's columns: not the photo or the detections, which made the list several MB.
@@ -910,8 +910,7 @@ export default function QualityScanPage() {
         {/* Order bar */}
         <div className="card-dark flex flex-wrap items-center gap-3 p-3 sm:p-4">
           <FurnitureOrderPicker label="Order" selectId="qs-order" empty="No order (practice scan)" orders={orders} value={selectedOrderId} onChange={chooseOrder}
-            me={user ? dataUserId(user) : undefined}
-            orderLabel={(o) => `${o.order_ref} — ${furnitureLabel(o as any)} (${statusLabel(o.extended_status)})${o.assigned_to && o.assigned_to === user?.id ? ' · assigned to you' : ''}`} />
+            me={user ? dataUserId(user) : undefined} />
           {selectedOrder && (
             <span className="flex items-center gap-2 text-sm text-muted-foreground">
               Order is at <StatusBadge variant={orderStep === null ? 'neutral' : 'warning'} label={statusLabel(selectedOrder.extended_status)} />

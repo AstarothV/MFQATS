@@ -5,6 +5,7 @@ import { OrderViewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkelet
 import { Package, Search, ChevronDown, ChevronUp, Loader2, Clock, CheckCircle2, Truck, AlertCircle, TrendingUp, Eye, X, FileText, Image, Box, MessageSquare, Armchair, ShoppingBag } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
+import { byStage, stageDot, STAGE_HINT } from '@/lib/orderGroups';
 import { watchOrders } from '@/lib/staffAssignment';
 import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
@@ -225,23 +226,38 @@ export default function OrderViewContent() {
                   />
                 </div>
               </div>
-              <div className="max-h-64 overflow-y-auto">
-                {filteredOrders.map(order => {
+              <div className="max-h-80 overflow-y-auto pb-1">
+                {filteredOrders.length === 0 && <p className="px-3 py-4 text-center text-xs text-muted-foreground">No order matches your search.</p>}
+                {byStage(filteredOrders, (o) => o.extended_status || o.status).map(({ order, heading }) => {
                   const orderSt = order.extended_status || order.status;
                   const isSelected = order.id === selectedOrderId;
+                  const done = orderSt === 'delivered';
                   return (
-                    <button
-                      key={order.id}
-                      onClick={() => handleSelectOrder(order.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10' : ''}`}
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0 text-muted-foreground"><Armchair size={16} aria-hidden="true" /></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold text-foreground truncate">{furnitureLabel(order as any)}</p>
-                        <p className="text-[10px] text-muted-foreground">#{order.order_ref}</p>
-                      </div>
-                      <StatusBadge variant={statusVariant(orderSt)} label={statusLabel(orderSt)} />
-                    </button>
+                    <React.Fragment key={order.id}>
+                      {heading && (
+                        <p className={`flex items-center gap-2 px-3 pb-1 pt-3 text-2xs font-semibold uppercase tracking-wider ${done ? 'text-success' : 'text-muted-foreground'}`}>
+                          <span className={`h-2 w-2 rounded-full ${stageDot(orderSt)}`} aria-hidden="true" />
+                          {statusLabel(orderSt)}
+                          {STAGE_HINT[orderSt] && <span className="font-normal normal-case tracking-normal">· {STAGE_HINT[orderSt]}</span>}
+                          <span className="ml-auto font-normal">{filteredOrders.filter((o) => (o.extended_status || o.status) === orderSt).length}</span>
+                        </p>
+                      )}
+                      <button
+                        onClick={() => handleSelectOrder(order.id)}
+                        aria-current={isSelected || undefined}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors ${isSelected ? 'bg-primary/10' : ''}`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${done ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                          {done ? <CheckCircle2 size={16} aria-hidden="true" /> : <Armchair size={16} aria-hidden="true" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-foreground truncate">{furnitureLabel(order as any)}</p>
+                          <p className="text-[10px] text-muted-foreground">#{order.order_ref}</p>
+                        </div>
+                        {orderSt === 'cancelled' && <StatusBadge variant={statusVariant(orderSt)} label={statusLabel(orderSt)} />}
+                        {isSelected && <CheckCircle2 size={14} className="shrink-0 text-primary dark:text-accent" aria-label="Showing" />}
+                      </button>
+                    </React.Fragment>
                   );
                 })}
               </div>

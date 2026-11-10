@@ -9,6 +9,8 @@ import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleto
 
 import { peso } from '@/lib/money';
 import PhotoSlider from '@/components/ui/PhotoSlider';
+import WorkshopModelPicker from './WorkshopModelPicker';
+import { removeUnusedProductModels } from '@/lib/productModels';
 interface Product {
   id: string;
   product_ref: string;
@@ -195,6 +197,7 @@ export default function CatalogContent() {
     try {
       const { error } = await supabase.from('products').update(parseForm()).eq('id', selectedProduct.id);
       if (error) throw error;
+      removeUnusedProductModels(supabase, selectedProduct.id, form.model_3d_url.trim()).catch(() => {}); // copies it no longer uses
       showToast('success', 'Product updated successfully');
       setModal(null);
       fetchProducts();
@@ -434,6 +437,8 @@ export default function CatalogContent() {
                 3D Model URL
                 <input value={form.model_3d_url} onChange={e => setForm(f => ({ ...f, model_3d_url: e.target.value }))} className="input-dark w-full mt-1" placeholder="https://example.com/model.glb" />
               </label>
+              <WorkshopModelPicker productId={modal === 'edit' ? selectedProduct?.id : undefined} value={form.model_3d_url.trim()}
+                onChange={(url) => setForm(f => ({ ...f, model_3d_url: url }))} />
               <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
                 Specifications (key: value, one per line)
                 <textarea value={form.specifications} onChange={e => setForm(f => ({ ...f, specifications: e.target.value }))} className="input-dark w-full mt-1 min-h-[80px] resize-none" placeholder="Seats: 6-8 persons&#10;Finish: Natural Satin&#10;Warranty: 2 years" />

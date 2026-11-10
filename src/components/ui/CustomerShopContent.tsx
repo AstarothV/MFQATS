@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Heart, ShoppingCart, Star, CheckCircle2, X, Loader2, Package, Minus, Plus, ArrowRight, MapPin, Phone } from 'lucide-react';
+import { Search, Heart, ShoppingCart, Star, CheckCircle2, X, Loader2, Package, Minus, Plus, ArrowRight, MapPin, Phone, Box, Image as ImageIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import StatusBadge from '@/components/ui/StatusBadge';
@@ -23,6 +23,7 @@ interface Product {
   review_count: number;
   availability: string;
   images: string[];
+  model_3d_url?: string | null;
   description: string;
   specifications: Record<string, string>;
   material_type: string;
@@ -61,7 +62,10 @@ export default function CustomerShopContent() {
   // product details: how many. Chairs: a set of 4 / 6, or Custom quantity; other furniture: a quantity
   const [chairSet, setChairSet] = useState<'custom' | (typeof CHAIR_SETS)[number]>('custom');
   const [customQty, setCustomQty] = useState(1);
+  const [view3d, setView3d] = useState(false); // product details: photos or the 3D model
   useEffect(() => { setChairSet('custom'); setCustomQty(1); }, [selectedProduct?.id]);
+  useEffect(() => { if (selectedProduct?.model_3d_url) import('@google/model-viewer'); }, [selectedProduct?.model_3d_url]);
+  const openProduct = (p: Product, in3d = false) => { setView3d(in3d); setSelectedProduct(p); };
   // the product details close with Escape
   useEffect(() => {
     if (!selectedProduct) return;
@@ -469,7 +473,13 @@ export default function CustomerShopContent() {
             return (
               <div key={product.id} className="flex h-full flex-col rounded-3xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-lg transition duration-200">
                 <div className="relative">
-                  <PhotoSlider images={product.images} alt={product.name} className="h-56" onOpen={() => setSelectedProduct(product)} />
+                  <PhotoSlider images={product.images} alt={product.name} className="h-56" onOpen={() => openProduct(product)} />
+                  {product.model_3d_url && (
+                    <button type="button" onClick={() => openProduct(product, true)} aria-label={`See ${product.name} in 3D`}
+                      className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm transition-colors hover:bg-black/75">
+                      <Box size={13} aria-hidden="true" /> 3D
+                    </button>
+                  )}
                   <button onClick={() => toggleFavorite(product.id)} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-sm hover:bg-white transition-colors">
                     <Heart size={16} className={favorites.includes(product.id) ? 'text-danger fill-danger' : 'text-muted-foreground'} />
                   </button>
@@ -481,7 +491,7 @@ export default function CustomerShopContent() {
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-foreground text-lg">
-                        <button type="button" onClick={() => setSelectedProduct(product)} className="text-left hover:text-primary transition-colors">{product.name}</button>
+                        <button type="button" onClick={() => openProduct(product)} className="text-left hover:text-primary transition-colors">{product.name}</button>
                       </h3>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide">{product.category}</p>
                     </div>
@@ -553,8 +563,29 @@ export default function CustomerShopContent() {
               <button type="button" aria-label="Close" onClick={() => setSelectedProduct(null)} className="btn-ghost p-2"><X size={18} /></button>
             </div>
             <div className="grid gap-5 md:grid-cols-2">
-              <div className="overflow-hidden rounded-2xl">
-                <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-72 md:h-80" thumbs zoom />
+              <div className="space-y-2">
+                <div className="overflow-hidden rounded-2xl">
+                  {view3d && selectedProduct.model_3d_url ? (
+                    <model-viewer src={selectedProduct.model_3d_url} alt={`3D model of the ${selectedProduct.name}. Drag to turn it.`}
+                      camera-controls auto-rotate shadow-intensity="1" environment-image="neutral" exposure="1.2"
+                      style={{ width: '100%', height: 320, background: '#0b0b0f' }} />
+                  ) : (
+                    <PhotoSlider images={selectedProduct.images} alt={selectedProduct.name} className="h-72 md:h-80" thumbs zoom />
+                  )}
+                </div>
+                {selectedProduct.model_3d_url && (
+                  <div role="group" aria-label="View" className="grid grid-cols-2 gap-1 rounded-xl border border-border bg-muted p-1">
+                    {([[false, 'Photos', ImageIcon], [true, '3D view', Box]] as const).map(([is3d, name, Icon]) => (
+                      <button key={name} type="button" aria-pressed={view3d === is3d} onClick={() => setView3d(is3d)}
+                        className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-colors ${view3d === is3d ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
+                        <Icon size={15} aria-hidden="true" /> {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {view3d && selectedProduct.model_3d_url && (
+                  <p className="text-xs text-muted-foreground">Built by our workshop from photos of a finished piece. Drag to turn it; colours and size may look slightly different from the real one.</p>
+                )}
               </div>
               <div className="space-y-4 text-sm">
                 <div className="flex items-baseline gap-2">
