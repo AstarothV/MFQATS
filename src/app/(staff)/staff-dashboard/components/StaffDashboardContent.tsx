@@ -11,7 +11,6 @@ import { moveOrderStage, statusLabel } from '@/lib/orders';
 import { ACTIVE_STATUSES, watchOrders } from '@/lib/staffAssignment';
 import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
 import { dataUserId } from '@/lib/viewer';
-import { furnitureLabel } from '@/lib/pieces';
 
 export interface WorkOrder {
   id: string;
@@ -148,8 +147,7 @@ export default function StaffDashboardContent() {
           <p className="page-subtitle">{today}</p>
         </div>
         <FurnitureOrderPicker label="Working on" orders={orders} value={selectedId} onChange={pick} autoPick
-          me={user ? dataUserId(user) : undefined}
-          orderLabel={(o) => `${o.order_ref} — ${furnitureLabel(o as any)} (${statusLabel(o.extended_status)})${o.assigned_to === user?.id ? ' · yours' : ''}`} />
+          me={user ? dataUserId(user) : undefined} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

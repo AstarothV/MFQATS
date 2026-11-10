@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Package, Clock, CheckCircle2, Truck, Loader2, ChevronRight, TrendingUp, ShoppingBag, MessageSquare, Eye, Upload, Box, FileText, Armchair } from 'lucide-react';
 import { statusLabel, statusVariant } from '@/lib/orders';
+import { stageDot, stageRank, STAGE_HINT } from '@/lib/orderGroups';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
@@ -145,7 +146,10 @@ export default function CustomerOverviewContent() {
   const PER_PAGE = 5;
   const pages = Math.max(1, Math.ceil(orders.length / PER_PAGE));
   const at = Math.min(page, pages - 1);
-  const pageOrders = orders.slice(at * PER_PAGE, at * PER_PAGE + PER_PAGE);
+  const stageOf = (o: Order) => o.extended_status || o.status;
+  const sorted = [...orders].sort((a, b) => stageRank(stageOf(a)) - stageRank(stageOf(b))); // stable: newest first within a stage
+  const pageOrders = sorted.slice(at * PER_PAGE, at * PER_PAGE + PER_PAGE);
+  const inStage = (st: string) => orders.filter((o) => stageOf(o) === st).length;
 
   return (
     <div className="space-y-6">
@@ -261,12 +265,22 @@ export default function CustomerOverviewContent() {
           {/* Orders List */}
           <div className="xl:w-[38%] space-y-2">
             <h2 className="px-1 mb-3 text-base font-semibold text-foreground">Your orders</h2>
-            {pageOrders.map((order) => {
+            {pageOrders.map((order, i) => {
               const isSelected = selectedOrder?.id === order.id;
-              const st = order.extended_status || order.status;
+              const st = stageOf(order);
+              const done = st === 'delivered';
+              const header = i === 0 || stageOf(pageOrders[i - 1]) !== st;
               return (
+                <React.Fragment key={order.id}>
+                {header && (
+                  <p className={`flex items-center gap-2 px-1 ${i === 0 ? 'pt-0' : 'pt-3'} text-xs font-semibold uppercase tracking-wider ${done ? 'text-success' : 'text-muted-foreground'}`}>
+                    <span className={`h-2 w-2 rounded-full ${stageDot(st)}`} aria-hidden="true" />
+                    {statusLabel(st)}
+                    {STAGE_HINT[st] && <span className="font-normal normal-case tracking-normal">· {STAGE_HINT[st]}</span>}
+                    <span className="ml-auto font-normal">{inStage(st)}</span>
+                  </p>
+                )}
                 <button
-                  key={order.id}
                   type="button"
                   onClick={() => setSelectedOrder(order)}
                   className={`w-full text-left rounded-2xl border p-4 transition duration-150 ${
@@ -286,10 +300,13 @@ export default function CustomerOverviewContent() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1 shrink-0">
-                      <StatusBadge variant={statusVariant(st)} label={statusLabel(st)} />
-                      {order.queue_position && (
+                      {done ? (
+                        <span className="flex items-center gap-1 text-xs font-semibold text-success"><CheckCircle2 size={14} aria-hidden="true" /> Done</span>
+                      ) : st === 'cancelled' ? (
+                        <StatusBadge variant={statusVariant(st)} label={statusLabel(st)} />
+                      ) : order.queue_position ? (
                         <span className="text-xs text-muted-foreground">Queue #{order.queue_position}</span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                   <div className="mt-3">
@@ -299,12 +316,13 @@ export default function CustomerOverviewContent() {
                     </div>
                     <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-purple-600 to-violet-500 transition-[width] duration-500"
+                        className={`h-full rounded-full transition-[width] duration-500 ${done ? 'bg-success' : 'bg-gradient-to-r from-purple-600 to-violet-500'}`}
                         style={{ width: `${order.completion_pct || 0}%` }}
                       />
                     </div>
                   </div>
                 </button>
+                </React.Fragment>
               );
             })}
             {pages > 1 && (
