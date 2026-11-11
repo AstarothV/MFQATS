@@ -9,6 +9,7 @@ import {
   User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isRememberedDevice, rememberThisDevice } from '@/lib/rememberDevice';
 import { createClient } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/activity';
 import { applyTheme, savedTheme } from '@/lib/theme';
@@ -52,6 +53,8 @@ export default function LoginPageClient() {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
+  // Remember me: after the 6-digit code, this browser skips the code for 30 days (migration 034)
+  const [rememberDevice, setRememberDevice] = useState(false);
   const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, formState: { errors: regErrors } } = useForm<RegisterForm>();
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
@@ -112,9 +115,10 @@ export default function LoginPageClient() {
       }
       if (!result?.user) throw new Error('Login failed');
 
-      // two-step sign-in turned on: the 6-digit code comes next
+      // two-step sign-in turned on: the 6-digit code comes next, unless this browser is remembered
+      setRememberDevice(data.remember);
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await isRememberedDevice(supabase, result.user.id))) {
         setLoading(false);
         setTab('mfa');
         return;
@@ -149,6 +153,7 @@ export default function LoginPageClient() {
       if (error) throw new Error('That code did not work. Check the time on your phone and try the newest code.');
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Your session ended. Sign in again.');
+      if (rememberDevice) await rememberThisDevice(supabase, user.id);
       showMessage('success', 'Signed in successfully');
       await goHome(user.id);
     } catch (error: any) {
@@ -196,7 +201,7 @@ export default function LoginPageClient() {
       if (error || !data.user) throw new Error('That code did not work or has expired. Ask for a new one.');
       // two-step sign-in still applies
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') { setLoading(false); setTab('mfa'); return; }
+      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await isRememberedDevice(supabase, data.user.id))) { setLoading(false); setTab('mfa'); return; }
       showMessage('success', 'Signed in successfully');
       await goHome(data.user.id);
     } catch (err: any) {
@@ -531,6 +536,10 @@ export default function LoginPageClient() {
                   {field('6-digit code', ShieldCheck,
                     <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus
                       className="input-dark w-full pl-10 text-lg tracking-[0.4em] tabular-nums" placeholder="000000" />)}
+                  <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border-border" />
+                    <span>Remember this device for 30 days <span className="block text-xs">You won&apos;t need a code here again. Don&apos;t use on a shared computer.</span></span>
+                  </label>
                   <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
                     Verify and sign in
