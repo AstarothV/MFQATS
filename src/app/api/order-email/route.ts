@@ -22,8 +22,12 @@ export async function POST(request: Request) {
     await nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user, pass } })
       .sendMail({ from: `"MVCA WoodWorks" <${user}>`, to: body.to, subject: mail.subject, html: mail.html, text: mail.text });
   } catch (e) {
-    console.error('[order-email]', (e as Error).message);
-    return new Response('Could not send', { status: 502 });
+    // Gmail's own reason (e.g. "EAUTH 535 ... Username and Password not accepted", "ETIMEDOUT"), never the password,
+    // so the database's net._http_response shows why without needing Vercel's short-lived logs
+    const err = e as Error & { code?: string; responseCode?: number; response?: string };
+    const reason = [err.code, err.responseCode, (err.response || err.message || '').replace(/\s+/g, ' ')].filter(Boolean).join(' ').slice(0, 300);
+    console.error('[order-email]', reason);
+    return new Response(`Could not send: ${reason}`, { status: 502 });
   }
   return Response.json({ sent: true });
 }
