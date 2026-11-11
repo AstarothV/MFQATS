@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { Check, Loader2, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { forgetRememberedDevices } from '@/lib/rememberDevice';
 
 type Factor = { id: string; status: string };
 
@@ -49,6 +50,7 @@ export default function MfaSettings() {
     setBusy(false);
     if (error) { setMsg({ ok: false, text: 'That code did not work. Try the newest code in the app.' }); return; }
     setSetup(null); setCode('');
+    await forgetAll();
     setMsg({ ok: true, text: 'Two-step sign-in is on.' });
     await load();
   }
@@ -58,9 +60,31 @@ export default function MfaSettings() {
     setBusy(true); setMsg(null);
     const { error } = await supabase.auth.mfa.unenroll({ factorId: verified.id });
     setBusy(false);
-    if (error) { setMsg({ ok: false, text: 'Could not turn it off. Sign out, sign in with your code, then try again.' }); return; }
+    if (error) {
+      setMsg({ ok: false, text: 'Could not turn it off. Press "Forget remembered devices", sign out, sign in with your code, then try again.' });
+      return;
+    }
+    await forgetAll();
     setMsg({ ok: true, text: 'Two-step sign-in is off.' });
     await load();
+  }
+
+  async function forgetAll() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await forgetRememberedDevices(supabase, user.id).catch(() => {}); // before migration 034: nothing to forget
+  }
+
+  async function forget() {
+    if (!(await askFirst({ title: 'Forget remembered devices?', message: 'Every device, this one included, will ask for your 6-digit code at the next sign-in.', confirmLabel: 'Forget them', cancelLabel: 'Cancel' }))) return;
+    setBusy(true); setMsg(null);
+    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      if (user) await forgetRememberedDevices(supabase, user.id);
+      setMsg({ ok: true, text: 'No device is remembered now.' });
+    } catch {
+      setMsg({ ok: false, text: 'Could not forget the devices. Please try again.' });
+    }
+    setBusy(false);
   }
 
   return (
@@ -96,7 +120,10 @@ export default function MfaSettings() {
           </div>
         </form>
       ) : verified ? (
-        <button type="button" onClick={turnOff} disabled={busy} className="btn-secondary w-full text-sm disabled:opacity-50">Turn off two-step sign-in</button>
+        <div className="space-y-2">
+          <button type="button" onClick={forget} disabled={busy} className="btn-secondary w-full text-sm disabled:opacity-50">Forget remembered devices</button>
+          <button type="button" onClick={turnOff} disabled={busy} className="btn-secondary w-full text-sm disabled:opacity-50">Turn off two-step sign-in</button>
+        </div>
       ) : verified === null ? (
         <button type="button" onClick={start} disabled={busy} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm disabled:opacity-50">
           {busy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Set up two-step sign-in

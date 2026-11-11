@@ -139,9 +139,16 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     }
   }
 
+  // the Assigned staff card, scrolled to when an approved order still has nobody
+  const staffCard = useRef<HTMLElement>(null);
+  const goToStaff = () => {
+    setChoosingStaff(true);
+    setTimeout(() => staffCard.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+  };
+
   async function approveOrder(orderId: string) {
     await updateOrderStatus(orderId, 'confirmed');
-    setChoosingStaff(true); // approved: show who can work on it
+    goToStaff(); // approved: show who can work on it
   }
 
   async function setStaffFor(orderId: string, staffId: string | null) {
@@ -305,6 +312,18 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     <CancelRequestReview order={activeOrder} isAdmin={isAdmin}
                       onDone={(msg) => { showToast('success', msg); fetchOrders(); }} onError={(msg) => showToast('error', msg)} />
                   )}
+                  {isActive(activeOrder.extended_status) && !activeOrder.assigned_to && (
+                    <div role="alert" className="mb-5 flex flex-wrap items-start gap-3 rounded-2xl border border-warning/40 bg-warning/10 p-4">
+                      <AlertTriangle size={18} className="mt-0.5 shrink-0 text-warning" aria-hidden="true" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground">Assign a staff member</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">This order is approved, but nobody is working on it yet. It won&apos;t start until someone is assigned.</p>
+                      </div>
+                      <button type="button" onClick={goToStaff} className="btn-primary flex items-center gap-1.5 text-sm">
+                        <UserPlus size={14} aria-hidden="true" /> Assign staff
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-3 text-sm text-muted-foreground">
                     <div className="flex justify-between gap-4">
                       <span>Customer</span>
@@ -347,7 +366,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                 </section>
 
                 {/* Assigned staff */}
-                <section className="card-dark rounded-3xl border border-border p-6">
+                <section ref={staffCard} className={`card-dark scroll-mt-24 rounded-3xl border p-6 ${isActive(activeOrder.extended_status) && !activeOrder.assigned_to ? 'border-warning/60 ring-1 ring-warning/30' : 'border-border'}`}>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-base font-semibold text-foreground">Assigned staff</h3>
                     {activeOrder.assigned_to && isActive(activeOrder.extended_status) && !choosingStaff && (
@@ -373,7 +392,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                   ) : (
                     <p className="text-sm text-muted-foreground">
                       {(activeOrder.extended_status || 'pending') === 'pending' ? 'Approve the order first, then choose who will work on it.'
-                        : isActive(activeOrder.extended_status) ? 'Nobody is working on this order yet.' : 'No staff member was assigned.'}
+                        : isActive(activeOrder.extended_status) ? <span className="font-semibold text-warning">Nobody is working on this order yet. Choose a staff member below.</span> : 'No staff member was assigned.'}
                     </p>
                   )}
                   {isActive(activeOrder.extended_status) && (!activeOrder.assigned_to || choosingStaff) && (

@@ -86,9 +86,10 @@ export async function middleware(request: NextRequest) {
     }
 
     // Two-step sign-in: someone who turned it on but has not entered this session's 6-digit code goes back to the code
-    // step (the database refuses their data until then too: migration 20261106000019).
+    // step (the database refuses their data until then too: migration 20261106000019), unless a remembered browser
+    // vouched for this session (Remember me, migration 034), which the database's mfa_ok() decides.
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && (await supabase.rpc('mfa_ok')).data !== true) {
       const url = request.nextUrl.clone();
       url.pathname = '/sign-up-login-screen';
       url.search = '?tab=mfa';

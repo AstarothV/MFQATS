@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
   const secret = process.env.ORDER_EMAIL_SECRET;
   if (!secret || request.headers.get('x-email-secret') !== secret) return new Response('Forbidden', { status: 403 });
-  const user = process.env.GMAIL_USER, pass = process.env.GMAIL_APP_PASSWORD;
+  // Google shows app passwords as four groups ("abcd efgh ..."), and a pasted value can end in a line break: drop both
+  const user = process.env.GMAIL_USER?.trim(), pass = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
   if (!user || !pass) return new Response('Email is not set up (GMAIL_USER / GMAIL_APP_PASSWORD)', { status: 503 });
 
   const body = await request.json().catch(() => null);
