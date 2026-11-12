@@ -19,6 +19,7 @@ import json
 import math
 import os
 import re
+import struct
 import tempfile
 import threading
 import urllib.error
@@ -255,8 +256,9 @@ async def detect(request: Request):
 #   with colors: TRELLIS (shape + photo texture, ~45 s, uses more of the daily time)
 #   shape only:  Tencent Hunyuan3D-2mv (untextured, slightly sharper shape); also the fallback when colors fail
 # When the online demos fail (time used up, or down), the shape is built by the same Hunyuan model on this computer's
-# GPU (hunyuan_local.py, its own server on LOCAL_3D_URL), which has no daily limit. Colors need a 16 GB+ GPU, so the
-# local fallback is shape only.
+# GPU (hunyuan_local.py, its own server on LOCAL_3D_URL), which has no daily limit. Full colors need a 16 GB+ GPU, so
+# when TRELLIS fails the backup shape is painted in the wood color taken from the photos (paint_glb): every model
+# comes out in color.
 # ponytail: Hunyuan's own texture step ("/generation_all") is broken on its Space as of 2026-10; TRELLIS covers colors.
 HF_SPACE = "tencent/Hunyuan3D-2mv"
 COLOR_SPACE = "trellis-community/TRELLIS"
@@ -317,6 +319,41 @@ def build_online_color(job, photos):
         return Path(result[1]).read_bytes()  # [preview video, textured .glb, same .glb for download]
 
 
+def wood_color(photos):
+    """-> (r, g, b) 0..1 linear: the median color of the middle of the first photo, where the piece usually is."""
+    for data in photos:
+        if data is None:
+            continue
+        try:
+            img = Image.open(io.BytesIO(data)).convert("RGB")
+        except (UnidentifiedImageError, OSError):
+            continue
+        w, h = img.size
+        mid = img.crop((w // 4, h // 4, w * 3 // 4, h * 3 // 4)).resize((32, 32))
+        channels = list(zip(*mid.getdata()))
+        return tuple((sorted(c)[len(c) // 2] / 255) ** 2.2 for c in channels)  # glTF colors are linear
+    return (0.36, 0.22, 0.12)  # ponytail: no readable photo -> a plain wood brown
+
+
+def paint_glb(glb, rgb):
+    """-> the .glb with every surface painted rgb (one color, no picture). A .glb is a JSON chunk, then binary."""
+    length = struct.unpack_from("<I", glb, 12)[0]
+    doc = json.loads(glb[20:20 + length])
+    rest = glb[20 + length:]
+    doc["materials"] = [{"pbrMetallicRoughness": {"baseColorFactor": [*rgb, 1.0], "metallicFactor": 0.0,
+                                                  "roughnessFactor": 0.75}}]
+    for mesh in doc.get("meshes", []):
+        for prim in mesh.get("primitives", []):
+            prim["material"] = 0
+            prim.get("attributes", {}).pop("COLOR_0", None)  # a gray vertex color would darken the paint
+    for key in ("textures", "images", "samplers"):
+        doc.pop(key, None)  # nothing uses them now; their bytes stay unused in the binary chunk
+    text = json.dumps(doc, separators=(",", ":")).encode()
+    text += b" " * (-len(text) % 4)
+    body = struct.pack("<II", len(text), 0x4E4F534A) + text + rest
+    return struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body
+
+
 def build_local(photos):
     """-> .glb bytes from hunyuan_local.py. Raises urllib errors if it is not running or fails."""
     images = [None if p is None else "data:image/jpeg;base64," + base64.b64encode(p).decode() for p in photos[:len(VIEWS)]]
@@ -329,28 +366,43 @@ def build_local(photos):
 def run_ai_job(job, photos, color=False):
     if not color and any(p is not None for p in photos[len(VIEWS):]):
         job["note"] = "Top and bottom photos are used for colored models only; this shape was built from the side photos."
+    paint = False
     if color:
-        try:
-            job["model"] = build_online_color(job, photos)
-            job["colored"], job["status"], job["message"] = True, "done", "Done"
-            return
-        except Exception as e:
-            print(f"[model3d] colors failed, building the shape only: {str(e)[:200]}")
-            sides_only = (" It was built from the four side photos: the backup model has no top or bottom input."
-                          if any(p is not None for p in photos[len(VIEWS):]) else "")
-            job["note"] = ("Colors were not available this time (the free online time may be running low), "
-                           "so this model is the shape only." + sides_only)
-    try:
-        job["model"] = build_online(job, photos)
+        for attempt in (1, 2):  # a busy demo often works on the second try; a used-up quota does not
+            try:
+                job["model"] = build_online_color(job, photos)
+                job["colored"], job["status"], job["message"] = True, "done", "Done"
+                return
+            except Exception as e:
+                print(f"[model3d] colors failed (try {attempt}): {str(e)[:200]}")
+                if "quota" in str(e).lower():
+                    break
+        paint = True
+        sides_only = (" It was built from the four side photos: the backup model has no top or bottom input."
+                      if any(p is not None for p in photos[len(VIEWS):]) else "")
+        job["note"] = ("The detailed colors were not available this time (the free online time may be running low), "
+                       "so the model is painted in the wood color of the photos. Build it again later for the "
+                       "full colors." + sides_only)
+
+    def done(model):
+        if paint:
+            try:
+                model, job["colored"] = paint_glb(model, wood_color(photos)), True
+            except Exception as e:  # an unusual file: keep the shape rather than fail
+                print(f"[model3d] could not paint the model: {str(e)[:200]}")
+                job["note"] = "Colors were not available this time, so this model is the shape only. Build it again later."
+        job["model"] = model
         job["status"], job["message"] = "done", "Done"
+
+    try:
+        done(build_online(job, photos))
         return
     except Exception as e:
         online_error = str(e)
         print(f"[model3d] online demo failed, trying this computer's GPU: {online_error[:200]}")
     job["message"] = "The free online time is used up or unavailable, so this computer is building it (1 to 5 minutes)"
     try:
-        job["model"] = build_local(photos)
-        job["status"], job["message"] = "done", "Done"
+        done(build_local(photos))
     except urllib.error.HTTPError as e:
         try:
             detail = json.loads(e.read()).get("detail")
