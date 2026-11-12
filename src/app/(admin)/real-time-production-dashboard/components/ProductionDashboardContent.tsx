@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import ProductionHeader from './ProductionHeader';
 import KPICardGrid from './KPICardGrid';
 import WorkstationGrid, { type FloorOrder } from './WorkstationGrid';
-import ProductionChartsRow from './ProductionChartsRow';
 import AlertsFeed from './AlertsFeed';
 import StageTimelinePanel from './StageTimelinePanel';
 import { createClient } from '@/lib/supabase/client';
@@ -36,7 +35,7 @@ async function loadFloor(): Promise<FloorOrder[]> {
 export default function ProductionDashboardContent() {
   const [floor, setFloor] = useState<FloorOrder[] | null>(null);
   const [updated, setUpdated] = useState<Date | null>(null);
-  const [round, setRound] = useState(0); // a Refresh reloads the cards and charts too
+  const [round, setRound] = useState(0); // a Refresh reloads the cards and the timeline too
 
   const refresh = useCallback(() => {
     loadFloor().then((f) => { setFloor(f); setUpdated(new Date()); }).catch(() => setFloor([]));
@@ -60,8 +59,6 @@ export default function ProductionDashboardContent() {
       </div>
 
       <StageTimelinePanel key={`s${round}`} />
-
-      <ProductionChartsRow key={`c${round}`} />
     </div>
   );
 }
