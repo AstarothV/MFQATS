@@ -330,7 +330,7 @@ system.** Remove them from the paper too (see items 9, 11, 18, 21, 30, 31 and 36
       - "Timestamptz" → **timestamptz**.
       - Table 12 title "Detection-Logs" → **Detection_Logs**.
       - The DEFECTS table is missing its PK/FK marks.
-    - **products.ar_model_support:** AR was removed. Remove the column from the dictionary, or mark it "not used".
+    - **products.ar_model_support:** AR was removed and migration 035 drops the column. Remove it from the dictionary and the ERD.
     - **qa_checklists:** no screen uses it (item 17). Mark it "reserved", or remove it.
     - **ORDERS:** add `assigned_to` and `assigned_at` (item 44).
     - **AUDIT_LOGS:** columns user_id, action, entity_type, entity_id, old_values (jsonb), new_values (jsonb),
