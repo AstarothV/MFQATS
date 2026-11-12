@@ -11,7 +11,7 @@ import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleto
 
 import { peso } from '@/lib/money';
 import PhotoSlider from '@/components/ui/PhotoSlider';
-import { CHAIR_SETS } from '@/lib/pieces';
+import { CHAIR_SETS, maxQty } from '@/lib/pieces';
 interface Product {
   id: string;
   product_ref: string;
@@ -120,15 +120,19 @@ export default function CustomerShopContent() {
   }
 
   function addToCart(product: Product, count = 1) {
+    const max = maxQty(product.category);
+    const already = cart.find(i => i.product.id === product.id)?.quantity ?? 0;
+    if (already >= max) { showToast('error', `${max} is the most you can order of the ${product.name} at once. Send us an inquiry for a bigger order.`); return; }
+    const added = Math.min(count, max - already);
     setCart(prev => {
       const existing = prev.find(i => i.product.id === product.id);
       if (existing) {
-        return prev.map(i => i.product.id === product.id ? { ...i, quantity: Math.min(99, i.quantity + count) } : i);
+        return prev.map(i => i.product.id === product.id ? { ...i, quantity: i.quantity + added } : i);
       }
-      return [...prev, { product, quantity: count, customization: '' }];
+      return [...prev, { product, quantity: added, customization: '' }];
     });
-    const set = product.category === 'Chairs' && (CHAIR_SETS as readonly number[]).includes(count);
-    showToast('success', `${count > 1 ? `${count} × ` : ''}${product.name}${set ? ` (set of ${count})` : ''} added to cart`);
+    const set = product.category === 'Chairs' && (CHAIR_SETS as readonly number[]).includes(added);
+    showToast('success', `${added > 1 ? `${added} × ` : ''}${product.name}${set ? ` (set of ${added})` : ''} added to cart${added < count ? ` (${max} is the most per order)` : ''}`);
   }
 
   function removeFromCart(productId: string) {
@@ -137,7 +141,7 @@ export default function CustomerShopContent() {
 
   function updateQuantity(productId: string, qty: number) {
     if (qty <= 0) { removeFromCart(productId); return; }
-    setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: qty } : i));
+    setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: Math.min(qty, maxQty(i.product.category)) } : i));
   }
 
   function updateCustomization(productId: string, notes: string) {
@@ -213,10 +217,10 @@ export default function CustomerShopContent() {
   , document.body);
 
   // how many: type it, or use - and +
-  const qtyInput = (productId: string, qty: number, size: string) => (
-    <input type="number" inputMode="numeric" min={1} max={99} value={qty} aria-label="Quantity"
+  const qtyInput = (productId: string, qty: number, size: string, max: number) => (
+    <input type="number" inputMode="numeric" min={1} max={max} value={qty} aria-label={`Quantity, up to ${max}`}
       onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) updateQuantity(productId, Math.min(99, n)); }}
+      onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) updateQuantity(productId, n); }}
       className={`input-dark px-1 py-0 text-center font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${size}`} />
   );
 
@@ -380,8 +384,8 @@ export default function CustomerShopContent() {
                           <button type="button" onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Minus size={12} />
                           </button>
-                          {qtyInput(item.product.id, item.quantity, 'h-8 w-12 text-sm')}
-                          <button type="button" onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                          {qtyInput(item.product.id, item.quantity, 'h-8 w-12 text-sm', maxQty(item.product.category))}
+                          <button type="button" disabled={item.quantity >= maxQty(item.product.category)} onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="disabled:opacity-40 w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Plus size={12} />
                           </button>
                         </div>
@@ -524,8 +528,8 @@ export default function CustomerShopContent() {
                         <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) - 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Minus size={14} />
                         </button>
-                        {qtyInput(product.id, cartItem?.quantity || 1, 'h-9 w-14 flex-1')}
-                        <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) + 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                        {qtyInput(product.id, cartItem?.quantity || 1, 'h-9 w-14 flex-1', maxQty(product.category))}
+                        <button type="button" disabled={(cartItem?.quantity || 1) >= maxQty(product.category)} onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) + 1)} className="disabled:opacity-40 w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Plus size={14} />
                         </button>
                         <button type="button" onClick={() => setStep('cart')} className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-1">
@@ -623,17 +627,18 @@ export default function CustomerShopContent() {
                   const isChair = selectedProduct.category === 'Chairs';
                   const count = isChair && chairSet !== 'custom' ? chairSet : customQty;
                   const unit = isChair ? 'chair' : 'piece';
-                  // custom quantity: type it, or use - and + (1 to 99)
+                  const max = maxQty(selectedProduct.category);
+                  // custom quantity: type it, or use - and + (1 to the product's limit)
                   const custom = (
                     <div className="flex items-center gap-2">
                       <button type="button" onClick={() => setCustomQty(Math.max(1, customQty - 1))} aria-label="One less"
                         className="flex h-10 w-10 items-center justify-center rounded-xl border border-border transition-colors hover:bg-muted"><Minus size={14} /></button>
-                      <input type="number" inputMode="numeric" min={1} max={99} value={customQty} aria-label={`How many ${unit}s`}
+                      <input type="number" inputMode="numeric" min={1} max={max} value={customQty} aria-label={`How many ${unit}s, up to ${max}`}
                         onFocus={(e) => e.currentTarget.select()}
-                        onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) setCustomQty(Math.min(99, n)); }}
+                        onChange={(e) => { const n = parseInt(e.target.value, 10); if (n >= 1) setCustomQty(Math.min(max, n)); }}
                         className="input-dark h-10 w-16 px-1 py-0 text-center font-semibold tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
-                      <button type="button" onClick={() => setCustomQty(Math.min(99, customQty + 1))} aria-label="One more"
-                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-border transition-colors hover:bg-muted"><Plus size={14} /></button>
+                      <button type="button" disabled={customQty >= max} onClick={() => setCustomQty(Math.min(max, customQty + 1))} aria-label="One more"
+                        className="disabled:opacity-40 flex h-10 w-10 items-center justify-center rounded-xl border border-border transition-colors hover:bg-muted"><Plus size={14} /></button>
                       <span className="ml-auto text-right text-sm font-semibold text-foreground">{peso(selectedProduct.price * customQty)}</span>
                     </div>
                   );
@@ -654,6 +659,7 @@ export default function CustomerShopContent() {
                         )}
                         {(!isChair || chairSet === 'custom') && custom}
                         {count > 1 && <p className="text-xs text-muted-foreground">{count} matching {unit}s, priced per {unit}. Each {unit} is inspected on its own.</p>}
+                        <p className="text-xs text-muted-foreground">Up to {max} {unit}s per order. For a bigger order, send us an inquiry.</p>
                       </fieldset>
                       <button
                         type="button"

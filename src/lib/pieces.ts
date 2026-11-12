@@ -26,3 +26,7 @@ export function furnitureLabel(o: { product_name?: string | null; pieces?: strin
 
 /** Chairs come in dining sets of 4 or 6, or in any number (Custom quantity). */
 export const CHAIR_SETS = [4, 6] as const;
+
+/** The most of one product a customer can order at once: a handmade workshop's realistic batch. Two dining sets of
+ *  six chairs, ten office pieces, five of anything else. Larger orders go through an inquiry. */
+export const maxQty = (category: string) => (category === 'Chairs' ? 12 : category === 'Office Furniture' ? 10 : 5);

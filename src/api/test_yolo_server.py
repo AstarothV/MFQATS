@@ -1,14 +1,19 @@
 """Run: python -m pytest src/api  (or: python src/api/test_yolo_server.py)"""
+import io
+import json
+import struct
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from fastapi import HTTPException  # noqa: E402
+from PIL import Image  # noqa: E402
 from yolo_server import (  # noqa: E402
     build_response, detect_image, merge_duplicates, model3d_start, model3d_status, summarize, tile_windows, to_detections,
 )
 
-NAMES = {0: "Live_Knot", 1: "Crack", 2: "person", 3: "Unfinished Sanding", 4: "joint-misalignment"}
+TRIANGLE = struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0)  # the binary part of a one-triangle .glb
+NAMES = {0:"Live_Knot", 1: "Crack", 2: "person", 3: "Unfinished Sanding", 4: "joint-misalignment"}
 
 
 def test_build_response():
@@ -132,15 +137,33 @@ def test_model3d_falls_back_to_this_computer():
         assert job["status"] == "failed" and "used up" in job["error"] and "hunyuan_local" in job["error"], job
 
         yolo_server.build_local = lambda photos: b"glTF..."  # the local server answers
+        # a minimal real .glb (one triangle, no material) for the painting check below
+        gltf = json.dumps({"asset": {"version": "2.0"}, "buffers": [{"byteLength": 36}],
+                           "bufferViews": [{"buffer": 0, "byteLength": 36}],
+                           "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+                                          "min": [0, 0, 0], "max": [1, 1, 0]}],
+                           "meshes": [{"primitives": [{"attributes": {"POSITION": 0}}]}]}).encode()
+        gltf += b" " * (-len(gltf) % 4)
+        body = struct.pack("<II", len(gltf), 0x4E4F534A) + gltf + struct.pack("<II", 36, 0x004E4942) + TRIANGLE
+        shape_glb = struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body
         job = {"status": "running", "message": "", "error": None, "model": None}
         yolo_server.run_ai_job(job, [b"jpg", None, None, None])
         assert job["status"] == "done" and job["model"] == b"glTF...", job
 
-        # colors asked for but unavailable: still a model (shape only), with a note saying so
+        # colors asked for but unavailable: the backup shape is painted in the photos' wood color, with a note
         yolo_server.build_online_color = quota
+        yolo_server.build_local = lambda photos: shape_glb
         job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
-        yolo_server.run_ai_job(job, [b"jpg", None, None, None], color=True)
-        assert job["status"] == "done" and not job["colored"] and "shape only" in job["note"], job
+        brown = io.BytesIO()
+        Image.new("RGB", (40, 40), (150, 90, 40)).save(brown, "JPEG")
+        yolo_server.run_ai_job(job, [brown.getvalue(), None, None, None], color=True)
+        assert job["status"] == "done" and job["colored"] and "wood color" in job["note"], job
+        model = job["model"]
+        painted = json.loads(model[20:20 + struct.unpack_from("<I", model, 12)[0]])
+        r, g, b, _ = painted["materials"][0]["pbrMetallicRoughness"]["baseColorFactor"]
+        assert r > g > b and painted["meshes"][0]["primitives"][0]["material"] == 0, painted
+        assert struct.unpack_from("<I", model, 8)[0] == len(model) and model.endswith(TRIANGLE), "GLB layout"
+        yolo_server.build_local = lambda photos: b"glTF..."
 
         yolo_server.build_online_color = lambda job, photos: b"glTF-colored"
         job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
@@ -149,9 +172,16 @@ def test_model3d_falls_back_to_this_computer():
 
         # colors unavailable with top/bottom photos: the backup uses the sides only, and the panel is told so
         yolo_server.build_online_color = quota
+        yolo_server.build_local = lambda photos: shape_glb
         job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
         yolo_server.run_ai_job(job, [b"jpg", None, None, None, b"top", None], color=True)
-        assert job["status"] == "done" and "four side photos" in job["note"], job
+        assert job["status"] == "done" and job["colored"] and "four side photos" in job["note"], job
+
+        # a file that cannot be painted: the shape is kept, and the note says so
+        yolo_server.build_local = lambda photos: b"glTF..."
+        job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
+        yolo_server.run_ai_job(job, [b"jpg", None, None, None], color=True)
+        assert job["status"] == "done" and not job["colored"] and "shape only" in job["note"], job
 
         # shape only with top/bottom photos: they cannot be used, and the panel is told so
         job = {"status": "running", "message": "", "error": None, "model": None, "colored": False, "note": None}
