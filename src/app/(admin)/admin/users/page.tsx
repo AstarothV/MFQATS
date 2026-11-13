@@ -5,6 +5,7 @@ import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Loader2, X, CheckCircle2
 import AppLayout from '@/components/AppLayout';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
+import { createClient as createIsolatedClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, TableSkeleton } from '@/components/ui/LoadingSkeleton';
 
@@ -97,7 +98,12 @@ export default function AdminUsersPage() {
     setFormLoading(true);
     try {
       // Create auth user via Supabase signUp
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // A throw-away client that keeps nothing in this browser: supabase.auth.signUp on the page's own client
+      // would replace the admin's session with the new account's.
+      const signUpClient = createIsolatedClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'mfqats-admin-signup' },
+      });
+      const { data: authData, error: authError } = await signUpClient.auth.signUp({
         email: form.email,
         password: form.password || `TempPass@${Date.now()}`,
         options: {

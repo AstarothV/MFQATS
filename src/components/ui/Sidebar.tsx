@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   BarChart3,
@@ -106,7 +106,6 @@ const navByRole: Record<SidebarProps['role'], NavGroup[]> = {
 
 export default function Sidebar({ role, currentPath, open, onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { signOut } = useAuth();
   const groups = navByRole[role];
   const nav = groups.flatMap((g) => g.items);
@@ -122,13 +121,10 @@ export default function Sidebar({ role, currentPath, open, onClose, collapsed = 
   const slim = collapsed;
 
   async function handleLogout() {
-    try {
-      await signOut();
-      router.replace('/sign-up-login-screen');
-    } catch {
-      router.replace('/sign-up-login-screen');
-    }
+    await signOut().catch(() => {});
+    window.location.replace('/sign-up-login-screen');
   }
+
 
   return (
     <>

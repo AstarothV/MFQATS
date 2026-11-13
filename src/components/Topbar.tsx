@@ -94,13 +94,10 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
 
   async function handleLogout() {
     setLoggingOut(true);
-    try {
-      await signOut();
-      router.replace('/sign-up-login-screen');
-    } catch {
-      setLoggingOut(false);
-    }
+    await signOut().catch(() => {});
+    window.location.replace('/sign-up-login-screen');
   }
+
 
   // open what the notification is about, and mark it read
   async function openNotification(n: Notification) {
@@ -284,8 +281,8 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             <span className="hidden sm:inline">{theme === 'dark' ? 'Light' : 'Dark'}</span>
           </button>
 
-          {/* User Menu */}
-          <div className="relative">
+          {/* User Menu (above the click-away layer, so Sign out always gets the click) */}
+          <div className="relative z-50">
             <button
               type="button"
               onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
