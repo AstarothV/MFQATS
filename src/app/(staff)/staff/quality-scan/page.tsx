@@ -21,6 +21,7 @@ import { insideCaption, PART_KINDS, partOfCaption, suggestedParts } from './insi
 import FurnitureOrderPicker from '@/components/ui/FurnitureOrderPicker';
 import { dataUserId } from '@/lib/viewer';
 import { captionFor, pieceCaption, piecesOf } from '@/lib/pieces';
+import CustomFurniturePanel from './CustomFurniturePanel';
 import DefectsBySide, { drawDetections, formatLabel, severityBadge, type Detection, type SideTile } from './DefectsBySide';
 
 // The Detection History table's columns: not the photo or the detections, which made the list several MB.
@@ -353,6 +354,17 @@ export default function QualityScanPage() {
     parts.clear();
     partCloseUps.clear();
     setPartScans({});
+  }
+
+  // Clear (no order): start over with empty photos, no 3D model and no scans
+  const [modelResetKey, setModelResetKey] = useState(0);
+  function clearAll() {
+    pauseScan();
+    stopCamera();
+    clearWork();
+    setModel3dUrl(null);
+    setModelResetKey((k) => k + 1); // a fresh 3D panel, without the model built before
+    goTo(0);
   }
 
   function chooseOrder(id: string) {
@@ -922,6 +934,12 @@ export default function QualityScanPage() {
           </button>
         </div>
 
+        {/* no order: a piece that is not in the catalog can be scanned, modelled and kept (migration 039) */}
+        {!selectedOrderId && user && (
+          <CustomFurniturePanel supabase={supabase} userId={user.id} modelUrl={model3dUrl} photo={photoSet.photos[0] ?? photoSet.photos.find(Boolean) ?? null}
+            scanResult={inspectionResult} defectCount={failing.length} notes={notes} onClear={clearAll} notify={showToast} />
+        )}
+
         {/* a set of chairs (or several items): each piece is inspected on its own */}
         {orderPieces.length > 0 && (
           <div className="card-dark space-y-3 p-3 sm:p-4">
@@ -1074,7 +1092,7 @@ export default function QualityScanPage() {
                 <button onClick={() => choosePiece(orderPieces[0])} className="btn-secondary text-sm">Go to {orderPieces[0]}</button>
               </div>
             ) : (
-              <Model3DPanel key={selectedOrderId} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
+              <Model3DPanel key={`${selectedOrderId}-${modelResetKey}`} apiUrl={YOLO_API_URL} orderId={selectedOrderId} set={photoSet} onChangePhotos={() => goTo(0)} onBuild={() => advance('upload', 'reconstruction_3d')} onModel={modelBuilt} saved={savedModel} />
             )}
           </div>
         </section>
