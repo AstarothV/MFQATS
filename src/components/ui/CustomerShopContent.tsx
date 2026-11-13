@@ -12,6 +12,8 @@ import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleto
 import { peso } from '@/lib/money';
 import PhotoSlider from '@/components/ui/PhotoSlider';
 import { CHAIR_SETS, maxQty } from '@/lib/pieces';
+import AddressBook from '@/components/AddressBook';
+import type { SavedAddress } from '@/lib/delivery';
 interface Product {
   id: string;
   product_ref: string;
@@ -73,9 +75,8 @@ export default function CustomerShopContent() {
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [selectedProduct]);
-  const [deliveryForm, setDeliveryForm] = useState({
-    address: '', city: '', phone: profile?.phone || '', notes: ''
-  });
+  const [deliveryForm, setDeliveryForm] = useState({ notes: '' });
+  const [address, setAddress] = useState<SavedAddress | null>(null); // one of the customer's saved addresses
   const [placedOrderRef, setPlacedOrderRef] = useState('');
 
   function showToast(type: 'success' | 'error', message: string) {
@@ -151,8 +152,8 @@ export default function CustomerShopContent() {
   async function placeOrder() {
     if (!user || cart.length === 0) return;
     setTriedOrder(true);
-    if (!deliveryForm.address.trim() || !deliveryForm.city.trim()) {
-      showToast('error', 'Add your street address and city to place the order.');
+    if (!address) {
+      showToast('error', 'Choose or add the address to deliver to.');
       return;
     }
     setOrderLoading(true);
@@ -171,9 +172,9 @@ export default function CustomerShopContent() {
         status: 'pending',
         extended_status: 'pending',
         completion_pct: 0,
-        delivery_address: deliveryForm.address,
-        delivery_city: deliveryForm.city,
-        delivery_phone: deliveryForm.phone,
+        delivery_address: address.street,
+        delivery_city: address.city,
+        delivery_phone: address.phone || profile?.phone || '',
         quantity: cartCount,
         customization_notes: cart.map(i => i.customization).filter(Boolean).join('; '),
         notes: deliveryForm.notes,
@@ -264,7 +265,7 @@ export default function CustomerShopContent() {
           <div>
             <p className="page-eyebrow">Shop</p>
             <h1 className="page-title">Checkout</h1>
-            <p className="page-subtitle">Enter your delivery details</p>
+            <p className="page-subtitle">Choose where to deliver your order</p>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -273,26 +274,13 @@ export default function CustomerShopContent() {
               <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                 <MapPin size={18} className="text-primary" /> Delivery Information
               </h2>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
-                  Street Address *
-                  <input value={deliveryForm.address} onChange={e => setDeliveryForm(f => ({ ...f, address: e.target.value }))} aria-invalid={missing(deliveryForm.address)}
-                    className={`input-dark w-full mt-1 ${missing(deliveryForm.address) ? 'border-danger' : ''}`} placeholder="e.g. 12 Rizal Street, Brgy. San Isidro" />
-                  {missing(deliveryForm.address) && <span className="block text-xs text-danger">Enter your street address.</span>}
-                </label>
-                <label className="space-y-1 text-sm text-muted-foreground">
-                  City *
-                  <input value={deliveryForm.city} onChange={e => setDeliveryForm(f => ({ ...f, city: e.target.value }))} aria-invalid={missing(deliveryForm.city)}
-                    className={`input-dark w-full mt-1 ${missing(deliveryForm.city) ? 'border-danger' : ''}`} placeholder="e.g. Quezon City" />
-                  {missing(deliveryForm.city) && <span className="block text-xs text-danger">Enter your city.</span>}
-                </label>
-                <label className="space-y-1 text-sm text-muted-foreground">
-                  Phone Number
-                  <input value={deliveryForm.phone} onChange={e => setDeliveryForm(f => ({ ...f, phone: e.target.value }))} className="input-dark w-full mt-1" placeholder="e.g. 0917 123 4567" />
-                </label>
+              <AddressBook selectedId={address?.id} onSelect={setAddress}
+                onLoaded={(list) => setAddress((cur) => cur && list.some((x) => x.id === cur.id) ? cur : list.find((x) => x.is_default) ?? list[0] ?? null)} />
+              {triedOrder && !address && <p className="mt-2 text-xs text-danger">Choose or add the address to deliver to.</p>}
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
                   Special Instructions
-                  <textarea value={deliveryForm.notes} onChange={e => setDeliveryForm(f => ({ ...f, notes: e.target.value }))} className="input-dark w-full mt-1 min-h-[80px] resize-none" placeholder="Any special delivery instructions..." />
+                  <textarea value={deliveryForm.notes} onChange={e => setDeliveryForm({ notes: e.target.value })} className="input-dark w-full mt-1 min-h-[80px] resize-none" placeholder="Any special delivery instructions..." />
                 </label>
               </div>
             </div>

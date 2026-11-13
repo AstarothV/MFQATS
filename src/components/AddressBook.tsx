@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Loader2, LocateFixed, MapPin, Plus, Search, Star, Trash2 } from 'lucide-react';
+import { Check, Loader2, LocateFixed, MapPin, Plus, Star, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { currentPosition, findOnMap, SHOP_SPOT, type SavedAddress } from '@/lib/delivery';
-import LiveMap from '@/components/LiveMap';
+import { currentPosition, placeAt, type SavedAddress } from '@/lib/delivery';
+import PlaceSearch from '@/components/PlaceSearch';
 
 const PHONE = /^[+\d][\d\s-]{6,19}$/;
 
-// A customer's saved delivery addresses (migration 037). Each one is placed on the map when saved, so the delivery
-// fee can be worked out from its distance to the shop. In checkout, `onSelect` makes the list a picker.
+// A customer's saved delivery addresses (migrations 037, 038). While typing, real places are suggested (or "Use my
+// location" fills in the street and city where the customer is). In checkout, `onSelect` makes the list a picker.
 export default function AddressBook({ selectedId, onSelect, onLoaded }: {
   selectedId?: string | null;
   onSelect?: (a: SavedAddress) => void;
@@ -20,8 +20,9 @@ export default function AddressBook({ selectedId, onSelect, onLoaded }: {
   const [list, setList] = useState<SavedAddress[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ label: 'Home', street: '', city: '', phone: '' });
-  const [here, setHere] = useState<{ lat: number; lng: number } | null>(null); // the pin: found, my location, or placed by hand
-  const [fit, setFit] = useState(0); // re-frame the map after a search or "use my location" (not after a drag)
+  const [me, setMe] = useState<{ lat: number; lng: number } | null>(null); // my location: suggestions near me first
+  const [picked, setPicked] = useState(''); // the suggestion picked, shown under the search
+  const [searchKey, setSearchKey] = useState(0); // a new key empties the search box (after Use my location)
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [askFirst, confirmBox] = useConfirm();
@@ -38,25 +39,17 @@ export default function AddressBook({ selectedId, onSelect, onLoaded }: {
   async function useMyLocation() {
     setBusy(true); setMsg(null);
     try {
-      setHere(await currentPosition());
-      setFit((n) => n + 1);
-      setMsg({ ok: true, text: 'Pin placed at your location. Drag it if it is not exactly at your gate.' });
+      const pos = await currentPosition();
+      setMe(pos);
+      setSearchKey((k) => k + 1);
+      const p = await placeAt(pos.lat, pos.lng);
+      if (p) setForm((f) => ({ ...f, street: p.street, city: p.city || f.city }));
+      setPicked(p ? `${p.title}${p.detail ? `, ${p.detail}` : ''}` : 'Your current location');
+      setMsg({ ok: true, text: p ? 'Filled in from your location. Add your house number or landmark if needed.' : 'Your location could not be turned into an address. Please type it below.' });
     } catch (e: any) {
       setMsg({ ok: false, text: e.message });
     }
     setBusy(false);
-  }
-
-  async function findIt() {
-    const street = form.street.trim(), city = form.city.trim();
-    if (!street || !city) return setMsg({ ok: false, text: 'Type the street and the city first.' });
-    setBusy(true); setMsg(null);
-    const spot = await findOnMap(street, city);
-    setBusy(false);
-    if (!spot) return setMsg({ ok: false, text: 'Not found on the map. Tap the map at your place instead.' });
-    setHere(spot);
-    setFit((n) => n + 1);
-    setMsg({ ok: true, text: 'Found. Drag the pin onto your exact house or gate.' });
   }
 
   async function save(e: React.FormEvent) {
@@ -65,17 +58,16 @@ export default function AddressBook({ selectedId, onSelect, onLoaded }: {
     if (!street || !city) return setMsg({ ok: false, text: 'Enter the street and the city.' });
     if (phone && !PHONE.test(phone)) return setMsg({ ok: false, text: 'Enter a phone number like 0917 123 4567.' });
     setBusy(true); setMsg(null);
-    const spot = here ?? (await findOnMap(street, city));
     const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase.from('customer_addresses')
-      .insert({ user_id: user?.id, label: form.label.trim() || 'Home', street, city, phone, lat: spot?.lat ?? null, lng: spot?.lng ?? null })
+      .insert({ user_id: user?.id, label: form.label.trim() || 'Home', street, city, phone })
       .select().single();
     setBusy(false);
     if (error) return setMsg({ ok: false, text: /relation|does not exist/i.test(error.message) ? 'Saved addresses are not set up yet (migration 037).' : 'Could not save the address. Please try again.' });
     setForm({ label: 'Home', street: '', city: '', phone: '' });
-    setHere(null);
+    setPicked('');
     setAdding(false);
-    setMsg({ ok: true, text: spot ? 'Address saved.' : 'Address saved, but it was not found on the map: the shop will confirm the delivery fee.' });
+    setMsg({ ok: true, text: 'Address saved.' });
     await load();
     if (data && onSelect) onSelect(data as SavedAddress);
   }
@@ -126,13 +118,26 @@ export default function AddressBook({ selectedId, onSelect, onLoaded }: {
 
       {adding ? (
         <form onSubmit={save} className="space-y-3 rounded-2xl border border-border bg-muted/40 p-3">
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex-1">
+                <PlaceSearch key={searchKey} near={me} onPick={(p) => { setForm((f) => ({ ...f, street: p.street, city: p.city || f.city })); setPicked(`${p.title}${p.detail ? `, ${p.detail}` : ''}`); setMsg(null); }} />
+              </div>
+              <button type="button" onClick={useMyLocation} disabled={busy} className="btn-secondary flex shrink-0 items-center justify-center gap-2 text-sm">
+                <LocateFixed size={14} /> Use my location
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {picked ? <>Picked: <span className="font-medium text-foreground">{picked}</span>. Add your house number or landmark below if needed.</> : 'Start typing to see real places, then pick yours. You can also type the address yourself below.'}
+            </p>
+          </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="block space-y-1 text-sm text-muted-foreground">
               Label
               <input value={form.label} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} maxLength={30} placeholder="Home, Office…" className="input-dark mt-1 w-full" />
             </label>
             <label className="block space-y-1 text-sm text-muted-foreground sm:col-span-2">
-              Street, building, barangay *
+              House no., street, barangay *
               <input value={form.street} onChange={(e) => setForm((f) => ({ ...f, street: e.target.value }))} autoComplete="street-address" placeholder="e.g. 12 Rizal Street, Brgy. San Isidro" className="input-dark mt-1 w-full" />
             </label>
             <label className="block space-y-1 text-sm text-muted-foreground">
@@ -143,25 +148,9 @@ export default function AddressBook({ selectedId, onSelect, onLoaded }: {
               Phone for the driver
               <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} type="tel" inputMode="tel" autoComplete="tel" placeholder="0917 123 4567" className="input-dark mt-1 w-full" />
             </label>
-            <div className="flex items-end">
-              <button type="button" onClick={useMyLocation} disabled={busy} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm">
-                <LocateFixed size={14} /> Use my location
-              </button>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs text-muted-foreground">
-                {here ? 'Drag the green pin, or tap the map, to mark your exact house or gate.' : 'Find your street, or tap the map where you live. The delivery fee is based on this pin.'}
-              </p>
-              <button type="button" onClick={findIt} disabled={busy} className="btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-xs"><Search size={13} /> Find on map</button>
-            </div>
-            <LiveMap className="h-56 sm:h-64" fitKey={`${fit}`}
-              pins={[{ ...SHOP_SPOT, kind: 'shop', label: 'MVCA WoodWorks (shop)' }, ...(here ? [{ ...here, kind: 'home' as const, label: 'Your address' }] : [])]}
-              onPick={(lat, lng) => setHere({ lat, lng })} />
           </div>
           <div className="flex gap-2">
-            {list && list.length > 0 && <button type="button" onClick={() => { setAdding(false); setHere(null); setMsg(null); }} className="btn-secondary flex-1 text-sm">Cancel</button>}
+            {list && list.length > 0 && <button type="button" onClick={() => { setAdding(false); setPicked(''); setMsg(null); }} className="btn-secondary flex-1 text-sm">Cancel</button>}
             <button type="submit" disabled={busy} className="btn-primary flex flex-1 items-center justify-center gap-2 text-sm">
               {busy && <Loader2 size={14} className="animate-spin" />} Save address
             </button>
@@ -183,7 +172,6 @@ function AddressText({ a }: { a: SavedAddress }) {
       <span className="flex flex-wrap items-center gap-2 font-semibold text-foreground">
         {a.label}
         {a.is_default && <span className="badge status-ok">Default</span>}
-        {(a.lat == null || a.lng == null) && <span className="badge status-warning">Not on map</span>}
       </span>
       <span className="block text-muted-foreground">{a.street}, {a.city}</span>
       {a.phone && <span className="block text-xs text-muted-foreground">{a.phone}</span>}

@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, Loader2, Mail, Trash2, User } from 'lucide-react';
+import { Camera, Check, Loader2, Mail, MapPin, Trash2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import MfaSettings from '@/components/MfaSettings';
 import { isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 import AvatarCropper from '@/components/AvatarCropper';
+import AddressBook from '@/components/AddressBook';
 
 const PHONE = /^[+\d][\d\s-]{6,19}$/; // e.g. 0917 123 4567 or +63 917 123 4567
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -136,7 +137,7 @@ export default function ProfileSettings() {
       <div>
         <p className="page-eyebrow">Account</p>
         <h1 className="page-title">Profile settings</h1>
-        <p className="page-subtitle">Your photo, details, sign-in email and two-step sign-in.</p>
+        <p className="page-subtitle">Your photo, details, {profile?.role === 'customer' ? 'delivery addresses, ' : ''}sign-in email and two-step sign-in.</p>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -196,6 +197,17 @@ export default function ProfileSettings() {
               <Note msg={detailsMsg} />
             </div>
           </form>
+
+          {/* customers: where orders are delivered */}
+          {profile?.role === 'customer' && !viewer && (
+            <section className="card-dark space-y-4 p-6">
+              <div>
+                <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><MapPin size={16} className="text-primary dark:text-accent" /> Delivery addresses</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Pick one of these at checkout.</p>
+              </div>
+              <AddressBook />
+            </section>
+          )}
 
           {viewer && (
             <p className="card-dark p-6 text-sm text-muted-foreground">{VIEW_ONLY_MESSAGE} The sign-in email and two-step sign-in can only be changed on a normal account.</p>

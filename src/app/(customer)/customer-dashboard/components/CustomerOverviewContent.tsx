@@ -27,8 +27,6 @@ interface Order {
   completion_pct: number;
   due_date: string;
   queue_position: number | null;
-  payment_status: string;
-  pickup_type: string;
   quantity: number;
   material: string;
   dimensions: string;
@@ -356,16 +354,8 @@ export default function CustomerOverviewContent() {
                   <p className="text-base font-bold text-foreground">{selectedOrder.due_date || 'TBD'}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Payment</p>
-                  <p className="text-sm font-semibold text-foreground capitalize">{selectedOrder.payment_status || 'Pending'}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Quantity</p>
                   <p className="text-base font-bold text-foreground">{selectedOrder.quantity || 1}</p>
-                </div>
-                <div className="rounded-xl border border-border bg-card p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Delivery Method</p>
-                  <p className="text-sm font-semibold text-foreground capitalize">{selectedOrder.pickup_type || 'Delivery'}</p>
                 </div>
               </div>
 
