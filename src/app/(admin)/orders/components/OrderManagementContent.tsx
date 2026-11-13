@@ -105,15 +105,17 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
 
   const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0];
 
-  async function updateOrderStatus(orderId: string, newStatus: string) {
+  async function updateOrderStatus(orderId: string, newStatus: string, done = `Order moved to ${statusLabel(newStatus)}`) {
     setUpdating(true);
     try {
       await moveOrderStage(supabase, orders.find(o => o.id === orderId) || { id: orderId }, newStatus);
 
-      showToast('success', `Order moved to ${statusLabel(newStatus)}`);
+      showToast('success', done);
       fetchOrders();
+      return true;
     } catch (err: any) {
       showToast('error', err?.message || 'Failed to update status');
+      return false;
     } finally {
       setUpdating(false);
     }
@@ -147,8 +149,8 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   };
 
   async function approveOrder(orderId: string) {
-    await updateOrderStatus(orderId, 'confirmed');
-    goToStaff(); // approved: show who can work on it
+    // approved: show who can work on it
+    if (await updateOrderStatus(orderId, 'confirmed', 'Order approved. Now assign a staff member to it.')) goToStaff();
   }
 
   async function setStaffFor(orderId: string, staffId: string | null) {
