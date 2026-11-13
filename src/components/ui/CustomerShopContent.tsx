@@ -56,6 +56,28 @@ export default function CustomerShopContent() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  // the cart is kept in this browser per customer, so it survives moving to another page or tab
+  const cartKey = user ? `mfqats-cart-${user.id}` : null;
+  const cartLoaded = useRef<string | null>(null);
+  // (save runs before load, so the empty first render never overwrites the saved cart)
+  useEffect(() => {
+    if (!cartKey || cartLoaded.current !== cartKey) return;
+    try { localStorage.setItem(cartKey, JSON.stringify(cart)); } catch { /* no browser storage: the cart lasts for this visit only */ }
+  }, [cart, cartKey]);
+  useEffect(() => {
+    if (!cartKey) return;
+    let saved: CartItem[] = [];
+    try { const s = JSON.parse(localStorage.getItem(cartKey) || '[]'); if (Array.isArray(s)) saved = s; } catch { /* no browser storage: the cart lasts for this visit only */ }
+    cartLoaded.current = cartKey;
+    setCart(saved);
+  }, [cartKey]);
+  // another browser tab changed the cart
+  useEffect(() => {
+    if (!cartKey) return;
+    const sync = (e: StorageEvent) => { if (e.key === cartKey) try { setCart(JSON.parse(e.newValue || '[]')); } catch { /* no browser storage: the cart lasts for this visit only */ } };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, [cartKey]);
   const [step, setStep] = useState<CheckoutStep>('browse');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
