@@ -16,7 +16,6 @@ import Link from 'next/link';
 import PhotoGallery from './PhotoGallery';
 import ProductDetail3D from './ProductDetail3D';
 import OrderStatusTimeline from './OrderStatusTimeline';
-import DeliveryMap from '@/components/DeliveryMap';
 
 
 interface Order {
@@ -31,17 +30,12 @@ interface Order {
   completion_pct: number;
   due_date: string;
   queue_position: number | null;
-  payment_status: string;
-  pickup_type: string;
   quantity: number;
   material: string;
   dimensions: string;
   delivery_address: string;
   delivery_city: string;
   delivery_phone: string;
-  delivery_lat?: number | null;
-  delivery_lng?: number | null;
-  delivery_km?: number | null;
   customization_notes: string;
   notes: string;
   created_at: string;
@@ -298,10 +292,7 @@ export default function OrderViewContent() {
       {/* keyed by tab, so each switch plays the short fade-up */}
       <div key={activeTab} className="tab-in">
       {activeTab === 'queue' && (
-        <div className="space-y-4">
-          <OrderStatusTimeline order={selectedOrder} />
-          <DeliveryMap order={selectedOrder} />
-        </div>
+        <OrderStatusTimeline order={selectedOrder} />
       )}
 
       {activeTab === 'gallery' && (

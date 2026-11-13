@@ -12,7 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isRememberedDevice, rememberThisDevice } from '@/lib/rememberDevice';
 import { createClient } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/activity';
-import { findOnMap } from '@/lib/delivery';
+import PlaceSearch from '@/components/PlaceSearch';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
@@ -60,7 +60,7 @@ export default function LoginPageClient() {
   const [steps, setSteps] = useState({ app: true, email: false });
   const [method, setMethod] = useState<'app' | 'email'>('app');
   const [codeSentTo, setCodeSentTo] = useState('');
-  const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, formState: { errors: regErrors } } = useForm<RegisterForm>();
+  const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, setValue: setRegValue, formState: { errors: regErrors } } = useForm<RegisterForm>();
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
   useEffect(() => {
@@ -303,10 +303,9 @@ export default function LoginPageClient() {
         phone: data.phone,
       });
       if (created?.session && created.user) {
-        // the first delivery address (migration 037), placed on the map for the delivery fee
+        // the first delivery address (migration 037)
         const street = data.street.trim(), city = data.city.trim();
-        const spot = await findOnMap(street, city);
-        await supabase.from('customer_addresses').insert({ user_id: created.user.id, label: 'Home', street, city, phone: data.phone?.trim() ?? '', lat: spot?.lat ?? null, lng: spot?.lng ?? null, is_default: true });
+        await supabase.from('customer_addresses').insert({ user_id: created.user.id, label: 'Home', street, city, phone: data.phone?.trim() ?? '', is_default: true });
         showMessage('success', 'Account created.');
         await goHome(created.user.id);
         return;
@@ -558,8 +557,12 @@ export default function LoginPageClient() {
                   {field('Phone number', Phone,
                     <input {...regRegister('phone')} type="tel" autoComplete="tel" className="input-dark w-full pl-10" placeholder="0917 123 4567" />)}
                   </div>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-foreground/80">Find your delivery address</span>
+                    <PlaceSearch onPick={(pl) => { setRegValue('street', pl.street, { shouldValidate: true }); setRegValue('city', pl.city, { shouldValidate: true }); }} />
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                  {field('Delivery address', MapPin,
+                  {field('House no., street, barangay', MapPin,
                     <input {...regRegister('street', { required: 'Enter your street and barangay' })} autoComplete="street-address" className="input-dark w-full pl-10" placeholder="12 Rizal St., Brgy. San Isidro" />,
                     regErrors.street?.message)}
                   {field('City', MapPin,

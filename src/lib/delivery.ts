@@ -1,27 +1,8 @@
-// Delivery and payment: the same distance and fee rule the database uses (migration 037, km_between / delivery_fee_for),
-// so checkout can show the fee before the order is placed. The database works it out again when the order is saved.
+// Delivery addresses (migrations 037, 038): suggestions of real places while an address is typed, and the address
+// where the customer is ("Use my location"). Payment and delivery methods are a future recommendation (Chapter 6).
 
-export type PaymentMethod = 'cash' | 'gcash' | 'bank_transfer';
-export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
-  cash: 'Cash (pay on delivery or pick-up)',
-  gcash: 'GCash',
-  bank_transfer: 'Bank transfer',
-};
-
-/** The shop on the map (migration 037 default; the admin can move it in the settings). */
+/** The shop (Caloocan): suggestions favour places near it until the customer shares their location. */
 export const SHOP_SPOT = { lat: 14.6460477, lng: 120.9806895 };
-
-export interface ShopSettings {
-  pickup_address: string;
-  shop_lat: number;
-  shop_lng: number;
-  delivery_base_fee: number;
-  delivery_free_km: number;
-  delivery_per_km: number;
-  gcash_name: string;
-  gcash_number: string;
-  bank_details: string;
-}
 
 export interface SavedAddress {
   id: string;
@@ -29,40 +10,56 @@ export interface SavedAddress {
   street: string;
   city: string;
   phone: string;
-  lat: number | null;
-  lng: number | null;
   is_default: boolean;
 }
 
-/** Straight-line distance in km, one decimal (haversine). */
-export function kmBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const r = (d: number) => (d * Math.PI) / 180;
-  const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2;
-  return Math.round(2 * 6371 * Math.asin(Math.sqrt(a)) * 10) / 10;
+/** A real place picked from the address suggestions. */
+export interface Place { key: string; title: string; detail: string; street: string; city: string; lat: number; lng: number }
+
+// Photon (photon.komoot.io): free OpenStreetMap search made for suggestions while typing, no key. Results are kept to
+// the Philippines and favour places near `near` (the customer, or the shop).
+const PH_BOX = '116.9,4.5,126.7,21.2';
+type PhotonFeature = { geometry: { coordinates: [number, number] }; properties: Record<string, string | undefined> };
+
+function toPlace(f: PhotonFeature, named = true): Place | null {
+  // named = false: the nearest shop or bank is not the customer's house, so only the street and area are kept
+  const p = named ? f.properties : { ...f.properties, name: undefined };
+  if (p.countrycode && p.countrycode !== 'PH') return null;
+  const [lng, lat] = f.geometry.coordinates;
+  const road = p.housenumber && p.street ? `${p.housenumber} ${p.street}` : p.street;
+  const area = p.district || p.locality;
+  const city = p.city || p.county || p.state || '';
+  const title = p.name || road || area || city;
+  if (!title) return null;
+  const parts = [p.name && p.name !== road ? p.name : '', road, area].filter((x, i, a) => x && a.indexOf(x) === i) as string[];
+  const street = parts.join(', ') || title;
+  const detail = [p.name ? road : '', area, city, p.state !== city ? p.state : ''].filter((x, i, a) => x && x !== title && a.indexOf(x) === i).join(', ');
+  return { key: `${p.osm_type}${p.osm_id}`, title, detail, street, city, lat, lng };
 }
 
-/** Base fee covers the first free km; each started km after that adds the per-km rate. */
-export function deliveryFee(km: number, s: Pick<ShopSettings, 'delivery_base_fee' | 'delivery_free_km' | 'delivery_per_km'>): number {
-  return Math.round(Number(s.delivery_base_fee) + Number(s.delivery_per_km) * Math.ceil(Math.max(km - Number(s.delivery_free_km), 0)));
+/** Suggestions for what has been typed so far (at most 6, no repeats). */
+export async function searchPlaces(q: string, near?: { lat: number; lng: number } | null, signal?: AbortSignal): Promise<Place[]> {
+  const at = near ?? SHOP_SPOT;
+  const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=8&lang=en&bbox=${PH_BOX}&lat=${at.lat}&lon=${at.lng}`, { signal });
+  const feats: PhotonFeature[] = (await res.json())?.features ?? [];
+  const seen = new Set<string>();
+  return feats.map((f) => toPlace(f)).filter((x): x is Place => {
+    if (!x) return false;
+    const k = `${x.title}|${x.detail}`.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  }).slice(0, 6);
 }
 
-/**
- * Finds an address on OpenStreetMap (free, no key). Null when it cannot be found. Tries the whole address, then
- * without the house number, then just the area at its end ("Tondo Manila"), then the city: the first hit wins.
- */
-export async function findOnMap(street: string, city: string): Promise<{ lat: number; lng: number } | null> {
-  const s = street.trim(), c = city.trim();
-  const noNumber = s.replace(/^\s*[\d\-/]+\s*/, '');
-  const area = s.split(',').map((x) => x.trim()).filter(Boolean).slice(1).join(', ');
-  const tries = [...new Set([[s, c], [noNumber, c], [area, c], [c]].map((p) => p.filter(Boolean).join(', ')).filter(Boolean))];
-  for (const q of tries.slice(0, 4)) {
-    try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=ph&q=${encodeURIComponent(`${q}, Philippines`)}`, { headers: { Accept: 'application/json' } });
-      const hit = (await res.json())?.[0];
-      if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon) };
-    } catch { return null; } // offline or blocked: the shop confirms the fee
-  }
-  return null;
+/** The address at a position (for "Use my location"). */
+export async function placeAt(lat: number, lng: number): Promise<Place | null> {
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=en`);
+    const f: PhotonFeature | undefined = (await res.json())?.features?.[0];
+    const p = f ? toPlace(f, false) : null;
+    return p ? { ...p, lat, lng } : null; // keep the phone's exact position
+  } catch { return null; }
 }
 
 /** The phone's own location (asks permission). */
