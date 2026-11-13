@@ -6,12 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import {
   Eye, EyeOff, Loader2, CheckCircle2, ScanSearch, Layers, Timer, AlertTriangle, Moon, SunMedium, ArrowLeft,
-  User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck,
+  User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck, MapPin, Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isRememberedDevice, rememberThisDevice } from '@/lib/rememberDevice';
 import { createClient } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/activity';
+import { findOnMap } from '@/lib/delivery';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
@@ -22,7 +23,7 @@ const said = (error: any, fallback: string) =>
 type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa' | 'confirm' | 'code' | 'code-verify';
 
 type LoginForm = { email: string; password: string; remember: boolean };
-type RegisterForm = { fullName: string; email: string; phone: string; password: string; confirmPassword: string };
+type RegisterForm = { fullName: string; email: string; phone: string; street: string; city: string; password: string; confirmPassword: string };
 type ForgotForm = { email: string };
 
 const roleRedirect: Record<string, string> = {
@@ -55,6 +56,10 @@ export default function LoginPageClient() {
   const { register, handleSubmit, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
   // Remember me: after the 6-digit code, this browser skips the code for 30 days (migration 034)
   const [rememberDevice, setRememberDevice] = useState(false);
+  // Two-step sign-in (migrations 019, 037): which ways this person turned on, and the one chosen for this sign-in
+  const [steps, setSteps] = useState({ app: true, email: false });
+  const [method, setMethod] = useState<'app' | 'email'>('app');
+  const [codeSentTo, setCodeSentTo] = useState('');
   const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, formState: { errors: regErrors } } = useForm<RegisterForm>();
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
@@ -76,7 +81,7 @@ export default function LoginPageClient() {
       }
     }
     if (tabParam === 'forgot') setTab('forgot');
-    if (tabParam === 'mfa') setTab('mfa');
+    if (tabParam === 'mfa') void (async () => { const s = await secondSteps(); if (s) openSecondStep(s); else setTab('mfa'); })();
     if (searchParams?.get('link') === 'expired') showMessage('error', 'That email link has expired or was already used. Sign in, or ask for a new one.');
   }, [searchParams]);
 
@@ -117,10 +122,10 @@ export default function LoginPageClient() {
 
       // two-step sign-in turned on: the 6-digit code comes next, unless this browser is remembered
       setRememberDevice(data.remember);
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await isRememberedDevice(supabase, result.user.id))) {
+      const s = await needsSecondStep(result.user.id);
+      if (s) {
         setLoading(false);
-        setTab('mfa');
+        openSecondStep(s);
         return;
       }
       showMessage('success', 'Signed in successfully');
@@ -129,6 +134,41 @@ export default function LoginPageClient() {
       setLoading(false);
       showMessage('error', said(error, 'Invalid credentials. Please try again.'));
     }
+  }
+
+  // which second steps this person has turned on (null when none); before migration 037: the app only
+  async function secondSteps(): Promise<{ app: boolean; email: boolean } | null> {
+    const { data, error } = await supabase.rpc('my_second_steps');
+    if (!error && data) return data.app || data.email ? { app: Boolean(data.app), email: Boolean(data.email) } : null;
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    return aal?.nextLevel === 'aal2' ? { app: true, email: false } : null;
+  }
+
+  // after the password (or an email sign-in code): is a second step needed for this session?
+  async function needsSecondStep(userId: string) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal?.currentLevel === 'aal2') return null;
+    const s = await secondSteps();
+    if (!s || (await isRememberedDevice(supabase, userId))) return null;
+    return s;
+  }
+
+  function openSecondStep(s: { app: boolean; email: boolean }) {
+    setSteps(s);
+    setMethod(s.app ? 'app' : 'email');
+    setCodeSentTo('');
+    setTab('mfa');
+    if (!s.app) void emailMeACode(); // email is the only way: send it right away
+  }
+
+  async function emailMeACode() {
+    setLoading(true);
+    const { error } = await supabase.rpc('send_email_code');
+    setLoading(false);
+    if (error) { showMessage('error', /wait/i.test(error.message) ? 'Please wait a minute before asking for another code.' : 'Could not send the email. Please try again.'); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    setCodeSentTo(user?.email ?? 'your email');
+    showMessage('success', 'We emailed you a 6-digit code.');
   }
 
   // the signed-in person's home page, by role
@@ -142,15 +182,20 @@ export default function LoginPageClient() {
   async function onMfa(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const code = String(new FormData(e.currentTarget).get('code') || '').replace(/\s/g, '');
-    if (!/^\d{6}$/.test(code)) { showMessage('error', 'Enter the 6-digit code from your authenticator app.'); return; }
+    if (!/^\d{6}$/.test(code)) { showMessage('error', method === 'email' ? 'Enter the 6-digit code from the email.' : 'Enter the 6-digit code from your authenticator app.'); return; }
     setLoading(true);
     try {
-      const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
-      if (listError) throw listError;
-      const factor = factors?.totp?.[0];
-      if (!factor) throw new Error('No authenticator app is set up for this account.');
-      const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
-      if (error) throw new Error('That code did not work. Check the time on your phone and try the newest code.');
+      if (method === 'email') {
+        const { data, error } = await supabase.rpc('verify_email_code', { code });
+        if (error || data !== true) throw new Error('That code did not work or has expired. Ask for a new one.');
+      } else {
+        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+        if (listError) throw listError;
+        const factor = factors?.totp?.[0];
+        if (!factor) throw new Error('No authenticator app is set up for this account.');
+        const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code });
+        if (error) throw new Error('That code did not work. Check the time on your phone and try the newest code.');
+      }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Your session ended. Sign in again.');
       if (rememberDevice) await rememberThisDevice(supabase, user.id);
@@ -200,8 +245,8 @@ export default function LoginPageClient() {
       const { data, error } = await supabase.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
       if (error || !data.user) throw new Error('That code did not work or has expired. Ask for a new one.');
       // two-step sign-in still applies
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2' && !(await isRememberedDevice(supabase, data.user.id))) { setLoading(false); setTab('mfa'); return; }
+      const s = await needsSecondStep(data.user.id);
+      if (s) { setLoading(false); openSecondStep(s); return; }
       showMessage('success', 'Signed in successfully');
       await goHome(data.user.id);
     } catch (err: any) {
@@ -258,6 +303,10 @@ export default function LoginPageClient() {
         phone: data.phone,
       });
       if (created?.session && created.user) {
+        // the first delivery address (migration 037), placed on the map for the delivery fee
+        const street = data.street.trim(), city = data.city.trim();
+        const spot = await findOnMap(street, city);
+        await supabase.from('customer_addresses').insert({ user_id: created.user.id, label: 'Home', street, city, phone: data.phone?.trim() ?? '', lat: spot?.lat ?? null, lng: spot?.lng ?? null, is_default: true });
         showMessage('success', 'Account created.');
         await goHome(created.user.id);
         return;
@@ -509,6 +558,14 @@ export default function LoginPageClient() {
                   {field('Phone number', Phone,
                     <input {...regRegister('phone')} type="tel" autoComplete="tel" className="input-dark w-full pl-10" placeholder="0917 123 4567" />)}
                   </div>
+                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  {field('Delivery address', MapPin,
+                    <input {...regRegister('street', { required: 'Enter your street and barangay' })} autoComplete="street-address" className="input-dark w-full pl-10" placeholder="12 Rizal St., Brgy. San Isidro" />,
+                    regErrors.street?.message)}
+                  {field('City', MapPin,
+                    <input {...regRegister('city', { required: 'Enter your city' })} autoComplete="address-level2" className="input-dark w-full pl-10" placeholder="Caloocan" />,
+                    regErrors.city?.message)}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {field('Password', Lock,
                       <input {...regRegister('password', { required: 'Enter a password', minLength: { value: 8, message: 'At least 8 characters' } })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="8+ characters" />,
@@ -530,8 +587,26 @@ export default function LoginPageClient() {
               <div className="space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Enter your code</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Open your authenticator app and type the 6-digit code for MVCA WoodWorks.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {method === 'app' ? 'Open your authenticator app and type the 6-digit code for MVCA WoodWorks.'
+                      : codeSentTo ? `We emailed a 6-digit code to ${codeSentTo}. It works for 10 minutes.` : 'We will email a 6-digit code to your sign-in email.'}
+                  </p>
                 </div>
+                {steps.app && steps.email && (
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How to get your code">
+                    {([['app', 'Authenticator app', Smartphone], ['email', 'Email me a code', Mail]] as const).map(([m, label, Icon]) => (
+                      <button key={m} type="button" role="radio" aria-checked={method === m} onClick={() => setMethod(m)}
+                        className={`flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors ${method === m ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}>
+                        <Icon size={15} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {method === 'email' && (
+                  <button type="button" onClick={emailMeACode} disabled={loading} className="btn-secondary flex w-full items-center justify-center gap-2 text-sm">
+                    <Mail size={15} /> {codeSentTo ? 'Send a new code' : 'Email me a code'}
+                  </button>
+                )}
                 <form onSubmit={onMfa} className="space-y-3" noValidate>
                   {field('6-digit code', ShieldCheck,
                     <input name="code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={7} autoFocus

@@ -1,7 +1,8 @@
 // Called by the database (migration 032) when a customer gets a notification about their order: emails it to them.
+// Also called for a two-step sign-in code by email (migration 037).
 // Only the database knows the shared secret, so nobody else can make the site send email.
 import nodemailer from 'nodemailer';
-import { buildOrderEmail } from '@/lib/orderEmail';
+import { buildCodeEmail, buildOrderEmail } from '@/lib/orderEmail';
 
 export const runtime = 'nodejs';
 
@@ -13,12 +14,19 @@ export async function POST(request: Request) {
   if (!user || !pass) return new Response('Email is not set up (GMAIL_USER / GMAIL_APP_PASSWORD)', { status: 503 });
 
   const body = await request.json().catch(() => null);
-  if (!body?.to || !body?.title || !body?.message || !body?.order_id) return new Response('Missing fields', { status: 400 });
-
-  const mail = buildOrderEmail(
-    { to: body.to, name: body.name, title: body.title, message: body.message, orderRef: body.order_ref, orderId: body.order_id },
-    process.env.SITE_URL || new URL(request.url).origin,
-  );
+  const site = process.env.SITE_URL || new URL(request.url).origin;
+  let mail: { subject: string; html: string; text: string };
+  if (body?.kind === 'signin_code') {
+    // the two-step sign-in code by email (migration 037, send_email_code)
+    if (!body.to || !/^\d{6}$/.test(String(body.code ?? ''))) return new Response('Missing fields', { status: 400 });
+    mail = buildCodeEmail({ to: body.to, name: body.name, code: String(body.code) }, site);
+  } else {
+    if (!body?.to || !body?.title || !body?.message || !body?.order_id) return new Response('Missing fields', { status: 400 });
+    mail = buildOrderEmail(
+      { to: body.to, name: body.name, title: body.title, message: body.message, orderRef: body.order_ref, orderId: body.order_id },
+      site,
+    );
+  }
   try {
     await nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user, pass } })
       .sendMail({ from: `"MVCA WoodWorks" <${user}>`, to: body.to, subject: mail.subject, html: mail.html, text: mail.text });
