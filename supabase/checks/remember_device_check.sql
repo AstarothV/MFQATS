@@ -48,11 +48,14 @@ BEGIN
     PERFORM set_config('request.jwt.claims', json_build_object('sub', other, 'aal', 'aal1', 'session_id', gen_random_uuid())::text, true);
     INSERT INTO results VALUES (6, 'key does not work for another account', NOT public.use_remembered_device(k));
 
-    -- 7. forgetting the devices ends it, also for the session already let in
+    -- 7. forgetting the devices: the key stops working at the next sign-in (migration 037 keeps the session that
+    --    pressed the button signed in, so it is not cut off mid-use)
     PERFORM set_config('request.jwt.claim.sub', u::text, true);
     PERFORM set_config('request.jwt.claims', json_build_object('sub', u, 'aal', 'aal1', 'session_id', s2)::text, true);
     PERFORM public.forget_remembered_devices();
-    INSERT INTO results VALUES (7, 'forget remembered devices: code needed again', NOT public.mfa_ok() AND NOT public.use_remembered_device(k));
+    ok := public.mfa_ok();
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', u, 'aal', 'aal1', 'session_id', gen_random_uuid())::text, true);
+    INSERT INTO results VALUES (7, 'forget remembered devices: code needed again at the next sign-in', ok AND NOT public.use_remembered_device(k) AND NOT public.mfa_ok());
 
     -- 8. an expired remembered browser is not trusted
     PERFORM set_config('request.jwt.claims', json_build_object('sub', u, 'aal', 'aal2', 'session_id', s1)::text, true);

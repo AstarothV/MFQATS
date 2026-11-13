@@ -542,8 +542,8 @@ export default function LandingPage() {
               </p>
               <div className="space-y-4">
                 {[
-                { icon: MapPin, label: 'Address', value: '123 Woodcraft Lane, Manila, Philippines' },
-                { icon: Phone, label: 'Phone', value: '+63 912 345 6789' },
+                { icon: MapPin, label: 'Address', value: '202 C. Cordero St., Caloocan, 1400 Metro Manila' },
+                { icon: Phone, label: 'Phone', value: '+63 917 564 2134 / +63 2 8554 1501', tel: ['+639175642134', '+63285541501'] },
                 { icon: Mail, label: 'Email', value: 'hello@mvcawood.com' }].
                 map((item) => {
                   const ItemIcon = item.icon;
@@ -554,7 +554,13 @@ export default function LandingPage() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">{item.label}</p>
-                        <p className="text-sm font-medium text-foreground">{item.value}</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {'tel' in item && item.tel
+                            ? item.value.split(' / ').map((n, i) => (
+                                <React.Fragment key={n}>{i > 0 && ' / '}<a href={`tel:${item.tel[i]}`} className="hover:text-primary hover:underline">{n}</a></React.Fragment>
+                              ))
+                            : item.value}
+                        </p>
                       </div>
                     </div>);
 
