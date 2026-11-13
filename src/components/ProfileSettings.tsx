@@ -1,14 +1,12 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Camera, Check, CreditCard, Loader2, Mail, MapPin, Trash2, User } from 'lucide-react';
+import { Camera, Check, Loader2, Mail, Trash2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createClient } from '@/lib/supabase/client';
 import MfaSettings from '@/components/MfaSettings';
 import { isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 import AvatarCropper from '@/components/AvatarCropper';
-import AddressBook from '@/components/AddressBook';
-import { PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
 
 const PHONE = /^[+\d][\d\s-]{6,19}$/; // e.g. 0917 123 4567 or +63 917 123 4567
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,21 +37,6 @@ export default function ProfileSettings() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null); // a picked photo, being positioned before upload
   const [photoMsg, setPhotoMsg] = useState<Msg>(null);
-
-  // customers: how they usually pay (checkout starts from it)
-  const [payment, setPayment] = useState<PaymentMethod | ''>('');
-  const [paymentMsg, setPaymentMsg] = useState<Msg>(null);
-  useEffect(() => {
-    if (!user || profile?.role !== 'customer') return;
-    supabase.from('user_profiles').select('preferred_payment').eq('id', user.id).maybeSingle()
-      .then(({ data }) => setPayment((data?.preferred_payment as PaymentMethod) ?? ''));
-  }, [user, profile?.role, supabase]);
-  async function savePayment(value: PaymentMethod | '') {
-    if (!user) return;
-    setPayment(value); setPaymentMsg(null);
-    const { error } = await supabase.from('user_profiles').update({ preferred_payment: value || null }).eq('id', user.id);
-    setPaymentMsg(error ? { ok: false, text: 'Could not save. Please try again.' } : { ok: true, text: 'Saved.' });
-  }
 
   // the form starts from the profile once it has loaded (only the first time, so typing is never overwritten)
   const loaded = useRef(false);
@@ -153,7 +136,7 @@ export default function ProfileSettings() {
       <div>
         <p className="page-eyebrow">Account</p>
         <h1 className="page-title">Profile settings</h1>
-        <p className="page-subtitle">Your photo, details, {profile?.role === 'customer' ? 'addresses, payment method, ' : ''}sign-in email and two-step sign-in.</p>
+        <p className="page-subtitle">Your photo, details, sign-in email and two-step sign-in.</p>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -213,28 +196,6 @@ export default function ProfileSettings() {
               <Note msg={detailsMsg} />
             </div>
           </form>
-
-          {/* customers: delivery addresses and how they pay */}
-          {profile?.role === 'customer' && !viewer && (
-            <>
-              <section className="card-dark space-y-4 p-6">
-                <div>
-                  <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><MapPin size={16} className="text-primary dark:text-accent" /> Delivery addresses</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Pick one of these at checkout. The delivery fee depends on how far it is from the shop.</p>
-                </div>
-                <AddressBook />
-              </section>
-              <section className="card-dark space-y-3 p-6">
-                <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><CreditCard size={16} className="text-primary dark:text-accent" /> Payment method</h2>
-                <p className="text-sm text-muted-foreground">Chosen first at checkout; you can change it for each order. Payment is made to the shop directly, never through this site.</p>
-                <select value={payment} onChange={(e) => savePayment(e.target.value as PaymentMethod | '')} aria-label="Payment method" className="input-dark w-full sm:w-80">
-                  <option value="">Choose at checkout</option>
-                  {(Object.keys(PAYMENT_LABEL) as PaymentMethod[]).map((m) => <option key={m} value={m}>{PAYMENT_LABEL[m]}</option>)}
-                </select>
-                <Note msg={paymentMsg} />
-              </section>
-            </>
-          )}
 
           {viewer && (
             <p className="card-dark p-6 text-sm text-muted-foreground">{VIEW_ONLY_MESSAGE} The sign-in email and two-step sign-in can only be changed on a normal account.</p>

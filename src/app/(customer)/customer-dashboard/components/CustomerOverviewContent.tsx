@@ -15,7 +15,6 @@ import { furnitureLabel } from '@/lib/pieces';
 import { CustomerOverviewSkeleton as PageSkeleton } from '@/components/ui/LoadingSkeleton';
 
 import { peso } from '@/lib/money';
-import { PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
 interface Order {
   id: string;
   order_ref: string;
@@ -30,9 +29,6 @@ interface Order {
   queue_position: number | null;
   payment_status: string;
   pickup_type: string;
-  payment_method: PaymentMethod | null;
-  delivery_fee: number | null;
-  delivery_km: number | null;
   quantity: number;
   material: string;
   dimensions: string;
@@ -347,8 +343,7 @@ export default function CustomerOverviewContent() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Order Value</p>
-                  <p className="text-base font-bold text-foreground">{peso(Number(selectedOrder.amount) + Number(selectedOrder.delivery_fee ?? 0))}</p>
-                  {Number(selectedOrder.delivery_fee) > 0 && <p className="text-[11px] text-muted-foreground">incl. {peso(Number(selectedOrder.delivery_fee))} delivery</p>}
+                  <p className="text-base font-bold text-foreground">{peso(selectedOrder.amount)}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Queue Position</p>
@@ -362,8 +357,7 @@ export default function CustomerOverviewContent() {
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Payment</p>
-                  <p className="text-sm font-semibold text-foreground">{selectedOrder.payment_status === 'paid' ? 'Paid' : 'Not paid yet'}</p>
-                  {selectedOrder.payment_method && <p className="text-[11px] text-muted-foreground">{PAYMENT_LABEL[selectedOrder.payment_method]}</p>}
+                  <p className="text-sm font-semibold text-foreground capitalize">{selectedOrder.payment_status || 'Pending'}</p>
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Quantity</p>
@@ -371,15 +365,14 @@ export default function CustomerOverviewContent() {
                 </div>
                 <div className="rounded-xl border border-border bg-card p-3">
                   <p className="text-xs text-muted-foreground mb-1">Delivery Method</p>
-                  <p className="text-sm font-semibold text-foreground">{selectedOrder.pickup_type === 'pickup' ? 'Pick-up at the shop' : 'Delivery'}</p>
-                  {selectedOrder.pickup_type !== 'pickup' && selectedOrder.delivery_km != null && <p className="text-[11px] text-muted-foreground">{selectedOrder.delivery_km} km from the shop</p>}
+                  <p className="text-sm font-semibold text-foreground capitalize">{selectedOrder.pickup_type || 'Delivery'}</p>
                 </div>
               </div>
 
               {/* Delivery Info */}
               {selectedOrder.delivery_address && (
                 <div className="rounded-xl border border-border bg-card p-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">{selectedOrder.pickup_type === 'pickup' ? 'Pick-up Address' : 'Delivery Address'}</p>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Delivery Address</p>
                   <p className="text-sm text-foreground">{selectedOrder.delivery_address}{selectedOrder.delivery_city ? `, ${selectedOrder.delivery_city}` : ''}</p>
                 </div>
               )}

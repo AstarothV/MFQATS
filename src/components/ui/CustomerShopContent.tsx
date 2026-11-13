@@ -12,8 +12,6 @@ import { SkeletonRegion, CardGridSkeleton } from '@/components/ui/LoadingSkeleto
 import { peso } from '@/lib/money';
 import PhotoSlider from '@/components/ui/PhotoSlider';
 import { CHAIR_SETS, maxQty } from '@/lib/pieces';
-import AddressBook from '@/components/AddressBook';
-import { deliveryFee, kmBetween, PAYMENT_LABEL, type PaymentMethod, type SavedAddress, type ShopSettings } from '@/lib/delivery';
 interface Product {
   id: string;
   product_ref: string;
@@ -75,19 +73,9 @@ export default function CustomerShopContent() {
     document.addEventListener('keydown', esc);
     return () => document.removeEventListener('keydown', esc);
   }, [selectedProduct]);
-  const [deliveryForm, setDeliveryForm] = useState({ notes: '' });
-  // checkout (migration 037): how they pay, then pick-up or delivery to a saved address
-  const [payment, setPayment] = useState<PaymentMethod | ''>('');
-  const [paymentRef, setPaymentRef] = useState('');
-  const [pickupType, setPickupType] = useState<'delivery' | 'pickup'>('delivery');
-  const [address, setAddress] = useState<SavedAddress | null>(null);
-  const [shop, setShop] = useState<ShopSettings | null>(null);
-  useEffect(() => {
-    if (step !== 'checkout' || !user) return;
-    supabase.from('shop_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => setShop((data as ShopSettings) ?? null));
-    supabase.from('user_profiles').select('preferred_payment').eq('id', user.id).maybeSingle()
-      .then(({ data }) => setPayment((p) => p || ((data?.preferred_payment as PaymentMethod) ?? '')));
-  }, [step, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [deliveryForm, setDeliveryForm] = useState({
+    address: '', city: '', phone: profile?.phone || '', notes: ''
+  });
   const [placedOrderRef, setPlacedOrderRef] = useState('');
 
   function showToast(type: 'success' | 'error', message: string) {
@@ -125,10 +113,6 @@ export default function CustomerShopContent() {
   });
 
   const cartTotal = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  // the database works the fee out again when the order is saved; this is the same rule, shown before ordering
-  const km = pickupType === 'delivery' && shop && address?.lat != null && address?.lng != null
-    ? kmBetween(Number(shop.shop_lat), Number(shop.shop_lng), Number(address.lat), Number(address.lng)) : null;
-  const fee = pickupType === 'pickup' ? 0 : km != null && shop ? deliveryFee(km, shop) : null;
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   function toggleFavorite(id: string) {
@@ -167,8 +151,10 @@ export default function CustomerShopContent() {
   async function placeOrder() {
     if (!user || cart.length === 0) return;
     setTriedOrder(true);
-    if (!payment) { showToast('error', 'Choose how you will pay.'); return; }
-    if (pickupType === 'delivery' && !address) { showToast('error', 'Choose or add the address to deliver to.'); return; }
+    if (!deliveryForm.address.trim() || !deliveryForm.city.trim()) {
+      showToast('error', 'Add your street address and city to place the order.');
+      return;
+    }
     setOrderLoading(true);
     try {
       const orderRef = `ORD-${Date.now().toString().slice(-6)}`;
@@ -185,22 +171,18 @@ export default function CustomerShopContent() {
         status: 'pending',
         extended_status: 'pending',
         completion_pct: 0,
-        pickup_type: pickupType,
-        delivery_address: pickupType === 'delivery' ? address!.street : '',
-        delivery_city: pickupType === 'delivery' ? address!.city : '',
-        delivery_phone: (pickupType === 'delivery' && address!.phone) || profile?.phone || '',
-        delivery_lat: pickupType === 'delivery' ? address!.lat : null,
-        delivery_lng: pickupType === 'delivery' ? address!.lng : null,
-        payment_method: payment,
-        payment_reference: payment === 'cash' ? '' : paymentRef.trim(),
+        delivery_address: deliveryForm.address,
+        delivery_city: deliveryForm.city,
+        delivery_phone: deliveryForm.phone,
         quantity: cartCount,
         customization_notes: cart.map(i => i.customization).filter(Boolean).join('; '),
         notes: deliveryForm.notes,
         due_date: new Date(Date.now() + (firstItem.product.estimated_production_days || 14) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       };
       const items = cart.map(i => ({ product_id: i.product.id, name: i.product.name, category: i.product.category, quantity: i.quantity }));
-      const { data: orderData, error } = await supabase.from('orders').insert({ ...order, items }).select().single();
-      if (error) throw new Error(/pickup_type|payment_method|delivery_lat/.test(error.message) ? 'Checkout is being updated (migration 037). Please try again later.' : error.message);
+      let { data: orderData, error } = await supabase.from('orders').insert({ ...order, items }).select().single();
+      if (error && /items/.test(error.message)) ({ data: orderData, error } = await supabase.from('orders').insert(order).select().single()); // before migration 026
+      if (error) throw error;
 
       // Clear cart items
       await supabase.from('cart_items').delete().eq('customer_id', user.id).eq('status', 'active');
@@ -273,72 +255,46 @@ export default function CustomerShopContent() {
   }
 
   if (step === 'checkout') {
-    const choice = (on: boolean) => `flex-1 rounded-2xl border p-3 text-left text-sm transition-colors ${on ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`;
-    const payTo = payment === 'gcash' ? (shop?.gcash_number ? `GCash ${shop.gcash_number}${shop.gcash_name ? ` (${shop.gcash_name})` : ''}` : '')
-      : payment === 'bank_transfer' ? (shop?.bank_details ?? '') : '';
+    const missing = (v: string) => triedOrder && !v.trim();
     return (
       <div className="space-y-6">
         {toastEl}
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => setStep('cart')} className="btn-ghost p-2" aria-label="Back to cart">←</button>
+          <button type="button" onClick={() => setStep('cart')} className="btn-ghost p-2">←</button>
           <div>
             <p className="page-eyebrow">Shop</p>
             <h1 className="page-title">Checkout</h1>
-            <p className="page-subtitle">Choose how you pay and how you get your furniture</p>
+            <p className="page-subtitle">Enter your delivery details</p>
           </div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            {/* 1. payment */}
-            <div className="card-dark rounded-3xl border border-border p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">1. Payment method</h2>
-              <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Payment method">
-                {(Object.keys(PAYMENT_LABEL) as PaymentMethod[]).map((m) => (
-                  <button key={m} type="button" role="radio" aria-checked={payment === m} onClick={() => setPayment(m)} className={choice(payment === m)}>
-                    <span className="font-semibold text-foreground">{m === 'cash' ? 'Cash' : PAYMENT_LABEL[m]}</span>
-                    <span className="block text-xs text-muted-foreground">{m === 'cash' ? 'Pay when you receive or pick up' : m === 'gcash' ? 'Send to the shop\'s GCash' : 'Deposit to the shop\'s bank'}</span>
-                  </button>
-                ))}
+            <div className="card-dark rounded-3xl border border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <MapPin size={18} className="text-primary" /> Delivery Information
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
+                  Street Address *
+                  <input value={deliveryForm.address} onChange={e => setDeliveryForm(f => ({ ...f, address: e.target.value }))} aria-invalid={missing(deliveryForm.address)}
+                    className={`input-dark w-full mt-1 ${missing(deliveryForm.address) ? 'border-danger' : ''}`} placeholder="e.g. 12 Rizal Street, Brgy. San Isidro" />
+                  {missing(deliveryForm.address) && <span className="block text-xs text-danger">Enter your street address.</span>}
+                </label>
+                <label className="space-y-1 text-sm text-muted-foreground">
+                  City *
+                  <input value={deliveryForm.city} onChange={e => setDeliveryForm(f => ({ ...f, city: e.target.value }))} aria-invalid={missing(deliveryForm.city)}
+                    className={`input-dark w-full mt-1 ${missing(deliveryForm.city) ? 'border-danger' : ''}`} placeholder="e.g. Quezon City" />
+                  {missing(deliveryForm.city) && <span className="block text-xs text-danger">Enter your city.</span>}
+                </label>
+                <label className="space-y-1 text-sm text-muted-foreground">
+                  Phone Number
+                  <input value={deliveryForm.phone} onChange={e => setDeliveryForm(f => ({ ...f, phone: e.target.value }))} className="input-dark w-full mt-1" placeholder="e.g. 0917 123 4567" />
+                </label>
+                <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
+                  Special Instructions
+                  <textarea value={deliveryForm.notes} onChange={e => setDeliveryForm(f => ({ ...f, notes: e.target.value }))} className="input-dark w-full mt-1 min-h-[80px] resize-none" placeholder="Any special delivery instructions..." />
+                </label>
               </div>
-              {triedOrder && !payment && <p className="text-xs text-danger">Choose how you will pay.</p>}
-              {(payment === 'gcash' || payment === 'bank_transfer') && (
-                <div className="space-y-2 rounded-2xl bg-muted/50 p-3 text-sm">
-                  <p className="text-muted-foreground">{payTo ? <>Pay to: <span className="font-semibold text-foreground">{payTo}</span></> : 'The shop sends the payment details when it approves your order.'}</p>
-                  <label className="block space-y-1 text-muted-foreground">
-                    Reference number <span className="font-normal">(if you already paid)</span>
-                    <input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} maxLength={40} placeholder="e.g. 1234 567 890" className="input-dark mt-1 w-full" />
-                  </label>
-                  <p className="text-xs text-muted-foreground">The shop checks the payment and marks your order as paid. No money goes through this site.</p>
-                </div>
-              )}
-            </div>
-
-            {/* 2. pick-up or delivery */}
-            <div className="card-dark rounded-3xl border border-border p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground flex items-center gap-2"><MapPin size={18} className="text-primary" /> 2. Pick-up or delivery</h2>
-              <div className="flex flex-col gap-2 sm:flex-row" role="radiogroup" aria-label="Pick-up or delivery">
-                <button type="button" role="radio" aria-checked={pickupType === 'delivery'} onClick={() => setPickupType('delivery')} className={choice(pickupType === 'delivery')}>
-                  <span className="font-semibold text-foreground">Deliver to me</span>
-                  <span className="block text-xs text-muted-foreground">Fee depends on the distance from the shop</span>
-                </button>
-                <button type="button" role="radio" aria-checked={pickupType === 'pickup'} onClick={() => setPickupType('pickup')} className={choice(pickupType === 'pickup')}>
-                  <span className="font-semibold text-foreground">I&apos;ll pick it up</span>
-                  <span className="block text-xs text-muted-foreground">Free, at the shop</span>
-                </button>
-              </div>
-              {pickupType === 'pickup' ? (
-                <p className="rounded-2xl bg-muted/50 p-3 text-sm text-muted-foreground">Pick up at <span className="font-semibold text-foreground">{shop?.pickup_address || '202 C. Cordero St., Caloocan, 1400 Metro Manila'}</span>. We notify you when it is ready.</p>
-              ) : (
-                <>
-                  <AddressBook selectedId={address?.id} onSelect={setAddress}
-                    onLoaded={(list) => setAddress((cur) => cur && list.some((a) => a.id === cur.id) ? cur : list.find((a) => a.is_default) ?? list[0] ?? null)} />
-                  {triedOrder && !address && <p className="text-xs text-danger">Choose or add the address to deliver to.</p>}
-                </>
-              )}
-              <label className="block space-y-1 text-sm text-muted-foreground">
-                Special instructions
-                <textarea value={deliveryForm.notes} onChange={e => setDeliveryForm({ notes: e.target.value })} className="input-dark w-full mt-1 min-h-[80px] resize-none" placeholder={pickupType === 'pickup' ? 'e.g. the day you plan to pick it up' : 'e.g. landmarks, gate code, best time to deliver'} />
-              </label>
             </div>
           </div>
           <div className="space-y-4">
@@ -351,18 +307,11 @@ export default function CustomerShopContent() {
                     <span className="font-semibold text-foreground whitespace-nowrap">{peso((item.product.price * item.quantity))}</span>
                   </div>
                 ))}
-                <div className="flex justify-between gap-3 text-sm">
-                  <span className="text-muted-foreground">{pickupType === 'pickup' ? 'Pick-up' : `Delivery${km != null ? ` (${km} km)` : ''}`}</span>
-                  <span className="font-semibold text-foreground whitespace-nowrap">{fee == null ? (address ? 'Shop confirms' : '—') : fee === 0 ? 'Free' : peso(fee)}</span>
-                </div>
               </div>
               <div className="border-t border-border pt-3 flex justify-between text-base font-bold text-foreground">
                 <span>Total</span>
-                <span>{peso(cartTotal + (fee ?? 0))}</span>
+                <span>{peso(cartTotal)}</span>
               </div>
-              {fee == null && pickupType === 'delivery' && address && (
-                <p className="mt-2 text-xs text-muted-foreground">This address was not found on the map, so the shop adds the delivery fee when it approves the order.</p>
-              )}
               <button
                 type="button"
                 onClick={placeOrder}

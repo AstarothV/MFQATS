@@ -13,9 +13,6 @@ import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
 
 import { peso } from '@/lib/money';
-import { PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
-import ShopSettingsCard from '@/components/ShopSettingsCard';
-import DeliveryMap from '@/components/DeliveryMap';
 import { deleteOrder } from '@/lib/orderMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { assignOrder, fetchStaff, isActive, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
@@ -124,31 +121,6 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
     }
   }
 
-  // Payment (migration 037): the customer pays the shop directly; the admin marks it received here, and the customer
-  // is notified (and emailed). Only admins can change it; the database checks that too.
-  async function setPaid(order: any, paid: boolean) {
-    if (!paid && !(await confirm({ title: 'Mark as not paid?', message: `${order.order_ref} will show as not paid again.`, confirmLabel: 'Mark not paid', cancelLabel: 'Keep it paid' }))) return;
-    setUpdating(true);
-    // the database notifies (and emails) the customer: trg_notify_payment_and_fee
-    const { error } = await supabase.from('orders').update({ payment_status: paid ? 'paid' : 'unpaid' }).eq('id', order.id);
-    setUpdating(false);
-    if (error) { showToast('error', error.message); return; }
-    showToast('success', paid ? 'Marked as paid. The customer was notified.' : 'Marked as not paid.');
-    fetchOrders();
-  }
-
-  // an address that was not found on the map: the admin sets the delivery fee by hand
-  async function setFee(order: any, value: string) {
-    const fee = Math.round(Number(value));
-    if (!value.trim() || !Number.isFinite(fee) || fee < 0) { showToast('error', 'Enter the delivery fee in pesos.'); return; }
-    setUpdating(true);
-    const { error } = await supabase.from('orders').update({ delivery_fee: fee }).eq('id', order.id);
-    setUpdating(false);
-    if (error) { showToast('error', error.message); return; }
-    showToast('success', `Delivery fee set to ${peso(fee)}.`);
-    fetchOrders();
-  }
-
   // Only cancelled orders, only admins (the database checks both too). Its scans, photos and history go with it.
   async function removeOrder(order: any) {
     if (!(await confirm({
@@ -219,7 +191,6 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         <h1 className="page-title">Track orders through the inspection process</h1>
         <p className="page-subtitle">Pick an order in the list to see its details, assigned staff and stage below.</p>
       </div>
-      {isAdmin && <ShopSettingsCard />}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status group">
           {(Object.keys(STATUS_GROUPS) as (keyof typeof STATUS_GROUPS)[]).map((g) => {
@@ -372,51 +343,18 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     )}
                     <div className="flex justify-between gap-4">
                       <span>Order value</span>
-                      <span className="text-foreground font-semibold">{peso(Number(activeOrder.amount) + Number(activeOrder.delivery_fee || 0))}{Number(activeOrder.delivery_fee) > 0 ? ' incl. delivery' : ''}</span>
+                      <span className="text-foreground font-semibold">{peso(activeOrder.amount)}</span>
                     </div>
                     <div className="flex justify-between gap-4">
                       <span>Due date</span>
                       <span className="text-foreground font-semibold">{activeOrder.due_date || '—'}</span>
                     </div>
-                    {activeOrder.pickup_type === 'pickup' ? (
+                    {activeOrder.delivery_address && (
                       <div className="flex justify-between gap-4">
-                        <span>Pick-up</span>
-                        <span className="text-foreground font-semibold text-right">At the shop</span>
+                        <span>Delivery</span>
+                        <span className="text-foreground font-semibold text-right">{activeOrder.delivery_address}, {activeOrder.delivery_city}</span>
                       </div>
-                    ) : activeOrder.delivery_address && (
-                      <>
-                        <div className="flex justify-between gap-4">
-                          <span>Delivery</span>
-                          <span className="text-foreground font-semibold text-right">{activeOrder.delivery_address}, {activeOrder.delivery_city}{activeOrder.delivery_phone ? ` · ${activeOrder.delivery_phone}` : ''}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-4">
-                          <span>Delivery fee</span>
-                          {activeOrder.delivery_km == null && isAdmin && activeOrder.payment_status !== 'paid' ? (
-                            <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); void setFee(activeOrder, String(new FormData(e.currentTarget).get('fee') || '')); }}>
-                              <input name="fee" type="number" min={0} step={1} defaultValue={activeOrder.delivery_fee || ''} placeholder="Pesos" aria-label="Delivery fee in pesos" className="input-dark w-24 py-1 text-right" />
-                              <button type="submit" disabled={updating} className="btn-secondary px-3 py-1 text-xs">Set</button>
-                            </form>
-                          ) : (
-                            <span className="text-foreground font-semibold text-right">{peso(Number(activeOrder.delivery_fee || 0))}{activeOrder.delivery_km != null ? ` (${activeOrder.delivery_km} km)` : ''}</span>
-                          )}
-                        </div>
-                      </>
                     )}
-                    <div className="flex items-center justify-between gap-4">
-                      <span>Payment</span>
-                      <span className="flex flex-wrap items-center justify-end gap-2 text-right">
-                        <span className="text-foreground font-semibold">
-                          {activeOrder.payment_method ? PAYMENT_LABEL[activeOrder.payment_method as PaymentMethod] : 'Not chosen'}
-                          {activeOrder.payment_reference ? ` · Ref ${activeOrder.payment_reference}` : ''}
-                        </span>
-                        <StatusBadge variant={activeOrder.payment_status === 'paid' ? 'ok' : 'warning'} label={activeOrder.payment_status === 'paid' ? 'Paid' : 'Not paid'} />
-                        {isAdmin && (
-                          <button type="button" disabled={updating} onClick={() => setPaid(activeOrder, activeOrder.payment_status !== 'paid')} className="text-xs font-semibold text-primary hover:underline disabled:opacity-50">
-                            {activeOrder.payment_status === 'paid' ? 'Undo' : 'Mark as paid'}
-                          </button>
-                        )}
-                      </span>
-                    </div>
                     <div className="rounded-3xl bg-muted p-4">
                       <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-3">
                         <span>Process progress</span>
@@ -428,9 +366,6 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     </div>
                   </div>
                 </section>
-
-                {/* where it goes: the delivery address (or the shop for a pick-up) on a map */}
-                <DeliveryMap order={activeOrder} />
 
                 {/* Assigned staff */}
                 <section ref={staffCard} className={`card-dark scroll-mt-24 rounded-3xl border p-6 ${isActive(activeOrder.extended_status) && !activeOrder.assigned_to ? 'border-warning/60 ring-1 ring-warning/30' : 'border-border'}`}>
