@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { clearAuthStorage, createClient } from '@/lib/supabase/client';
 import { clearPageCache } from '@/lib/pageCache';
 import { accessAlreadyLogged, logActivity, markAccessLogged } from '@/lib/activity';
 
@@ -129,10 +129,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return data;
   };
 
+  // Never hangs or fails: a slow network or a stuck auth lock used to leave "Signing out..." on screen.
   const signOut = async () => {
-    await logActivity(supabase, 'user_logout'); // before signing out, while the person is still known
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    await Promise.race([logActivity(supabase, 'user_logout').catch(() => {}), wait(1500)]); // while the person is still known
+    await Promise.race([supabase.auth.signOut({ scope: 'local' }).catch(() => {}), wait(3000)]);
+    clearAuthStorage();
     setProfile(null);
     clearPageCache();
   };

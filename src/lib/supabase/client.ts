@@ -83,6 +83,17 @@ const deleteCookie = (name: string) => {
   });
 };
 
+// Removes the saved sign-in from this browser even if the auth library is stuck (used by sign-out).
+export function clearAuthStorage() {
+  if (typeof document === 'undefined') return;
+  document.cookie.split(';').map((c) => c.trim().split('=')[0]).filter((n) => n.startsWith('sb-')).forEach(deleteCookie);
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith(PFX + 'sb-') || k.startsWith('sb-')).forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* storage blocked */
+  }
+}
+
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
