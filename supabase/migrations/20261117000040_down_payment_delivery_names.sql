@@ -36,6 +36,10 @@ CREATE POLICY shop_settings_read ON public.shop_settings FOR SELECT TO authentic
 DROP POLICY IF EXISTS shop_settings_admin ON public.shop_settings;
 CREATE POLICY shop_settings_admin ON public.shop_settings FOR UPDATE TO authenticated
     USING (public.is_admin()) WITH CHECK (public.is_admin());
+-- the same "code entered if needed" rule as every other table (migrations 019, 037)
+DROP POLICY IF EXISTS require_mfa_when_enrolled ON public.shop_settings;
+CREATE POLICY require_mfa_when_enrolled ON public.shop_settings AS RESTRICTIVE FOR ALL TO authenticated
+    USING ((SELECT public.mfa_ok())) WITH CHECK ((SELECT public.mfa_ok()));
 
 -- straight-line distance in km between two map positions (haversine), and the fee for it
 CREATE OR REPLACE FUNCTION public.km_between(lat1 NUMERIC, lng1 NUMERIC, lat2 NUMERIC, lng2 NUMERIC)

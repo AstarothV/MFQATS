@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { clearAllPractice } from '@/lib/practiceDraft';
 import { clearAuthStorage, createClient } from '@/lib/supabase/client';
 import { clearPageCache } from '@/lib/pageCache';
 import { accessAlreadyLogged, logActivity, markAccessLogged } from '@/lib/activity';
@@ -143,6 +144,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await Promise.race([logActivity(supabase, 'user_logout').catch(() => {}), wait(1500)]); // while the person is still known
     await Promise.race([supabase.auth.signOut({ scope: 'local' }).catch(() => {}), wait(3000)]);
     clearAuthStorage();
+    await Promise.race([clearAllPractice(), wait(1500)]); // a practice scan in Quality Scan goes with the session
     setProfile(null);
     clearPageCache();
   };
