@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Images, Trash2, X } from 'lucide-react';
 import { nextPartLabel, PART_KINDS } from './insideParts';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // The order's inspection photos, taken once in the Upload step and used by the 3D Model and the defect scan.
 // The server's slot order: all six go to the 3D model (its backup, when the free time runs out, takes the four sides).
@@ -112,6 +113,8 @@ export function PhotoSlots({ set, disabled, name = 'photo', onRemoveSlot, grid =
   const cameraRef = useRef<HTMLInputElement>(null);
   const libraryRef = useRef<HTMLInputElement>(null);
   const slotRef = useRef(0);
+  const [askFirst, confirmBox] = useConfirm();
+  const ask = (title: string, message: string) => askFirst({ title, message, confirmLabel: 'Remove', cancelLabel: 'Keep it', danger: true });
 
   function pick(slot: number, from: 'camera' | 'library') {
     slotRef.current = slot;
@@ -126,6 +129,7 @@ export function PhotoSlots({ set, disabled, name = 'photo', onRemoveSlot, grid =
 
   return (
     <>
+      {confirmBox}
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPicked} />
       <input ref={libraryRef} type="file" accept="image/*" className="hidden" onChange={onPicked} />
       <div className={`grid grid-cols-2 gap-3 ${grid}`}>
@@ -136,7 +140,7 @@ export function PhotoSlots({ set, disabled, name = 'photo', onRemoveSlot, grid =
                 <img src={set.previews[i]!} alt={`${view} ${name}`} className="h-full w-full object-cover" />
                 <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-xs text-white">{view}</span>
                 <button
-                  onClick={() => set.setSlot(i, null)}
+                  onClick={async () => { if (await ask(`Remove the ${view.toLowerCase()} ${name}?`, 'You can take or choose it again.')) set.setSlot(i, null); }}
                   disabled={disabled}
                   aria-label={`Remove ${view.toLowerCase()} ${name}`}
                   className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white"
@@ -149,7 +153,7 @@ export function PhotoSlots({ set, disabled, name = 'photo', onRemoveSlot, grid =
                 <span className="flex min-w-0 items-center justify-center gap-0.5 text-sm font-semibold text-foreground/80">
                   <span className="truncate" title={view}>{view}</span>
                   {onRemoveSlot && (
-                    <button onClick={() => onRemoveSlot(i)} disabled={disabled} aria-label={`Remove the ${view.toLowerCase()} part`}
+                    <button onClick={async () => { if (await ask(`Remove the ${view.toLowerCase()} part?`, 'Its slot is taken out of this inspection.')) onRemoveSlot(i); }} disabled={disabled} aria-label={`Remove the ${view.toLowerCase()} part`}
                       className="-my-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-danger/10 hover:text-danger">
                       <Trash2 size={13} aria-hidden="true" />
                     </button>

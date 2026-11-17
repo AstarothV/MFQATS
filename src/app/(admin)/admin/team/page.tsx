@@ -9,6 +9,7 @@ import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, assignOrder, fetchStaff, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
 import { byFurniture } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface ActiveOrder {
   id: string;
@@ -33,6 +34,7 @@ export default function TeamManagementPage() {
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedOrder, setSelectedOrder] = useState('');
   const [saving, setSaving] = useState(false);
+  const [askFirst, confirmBox] = useConfirm();
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   function showToast(type: 'success' | 'error', message: string) {
@@ -66,6 +68,10 @@ export default function TeamManagementPage() {
 
   async function assign() {
     if (!selectedStaff || !selectedOrder) return;
+    const o = orders.find((x) => x.id === selectedOrder);
+    if (!(await askFirst({ title: `Assign ${chosen?.full_name ?? 'this staff member'}?`,
+      message: `${chosen?.full_name ?? 'They'} will work on ${o?.order_ref ?? 'the order'}${o?.assigned_to ? `, in place of ${staffById.get(o.assigned_to)?.full_name ?? 'the current staff member'}` : ''}, and is notified.`,
+      confirmLabel: 'Assign', cancelLabel: 'Cancel' }))) return;
     setSaving(true);
     try {
       await assignOrder(supabase, selectedOrder, selectedStaff);
@@ -94,6 +100,7 @@ export default function TeamManagementPage() {
   return (
     <AppLayout role="admin" currentPath="/admin/team">
       <div className="space-y-6">
+        {confirmBox}
         {toast && (
           <div className={`fixed top-4 right-4 z-[60] flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl text-sm font-semibold text-white ${toast.type === 'success' ? 'bg-success' : 'bg-danger'}`}>
             {toast.type === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}

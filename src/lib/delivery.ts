@@ -1,5 +1,6 @@
-// Delivery addresses (migrations 037, 038): suggestions of real places while an address is typed, and the address
-// where the customer is ("Use my location"). Payment and delivery methods are a future recommendation (Chapter 6).
+// Delivery addresses, the delivery fee and payment (migrations 037, 038, 040): suggestions of real places while an
+// address is typed, the address where the customer is ("Use my location"), and the same distance, fee and down
+// payment rule the database uses, so checkout can show them before the order is placed.
 
 /** The shop (Caloocan): suggestions favour places near it until the customer shares their location. */
 export const SHOP_SPOT = { lat: 14.6460477, lng: 120.9806895 };
@@ -10,8 +11,43 @@ export interface SavedAddress {
   street: string;
   city: string;
   phone: string;
+  lat: number | null;
+  lng: number | null;
   is_default: boolean;
 }
+
+export interface ShopSettings {
+  pickup_address: string;
+  shop_lat: number;
+  shop_lng: number;
+  delivery_base_fee: number;
+  delivery_free_km: number;
+  delivery_per_km: number;
+  down_payment_percent: number;
+  gcash_name: string;
+  gcash_number: string;
+  bank_details: string;
+}
+
+/** How the balance is paid. Cash on delivery only for delivery. */
+export type PaymentMethod = 'cod' | 'store' | 'online';
+export const PAYMENT_LABEL: Record<PaymentMethod, string> = { cod: 'Cash on delivery', store: 'Pay at the store', online: 'Online (GCash or bank)' };
+export const PAYMENT_STATUS_LABEL: Record<string, string> = { unpaid: 'Waiting for down payment', down_paid: 'Down payment received', paid: 'Fully paid' };
+
+/** Straight-line distance in km, one decimal (haversine), as km_between in the database. */
+export function kmBetween(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const r = (d: number) => (d * Math.PI) / 180;
+  const a = Math.sin(r(lat2 - lat1) / 2) ** 2 + Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lng2 - lng1) / 2) ** 2;
+  return Math.round(2 * 6371 * Math.asin(Math.sqrt(a)) * 10) / 10;
+}
+
+/** Base fee covers the first free km; each started km after that adds the per-km rate (delivery_fee_for). */
+export function deliveryFee(km: number, s: Pick<ShopSettings, 'delivery_base_fee' | 'delivery_free_km' | 'delivery_per_km'>): number {
+  return Math.round(Number(s.delivery_base_fee) + Number(s.delivery_per_km) * Math.ceil(Math.max(km - Number(s.delivery_free_km), 0)));
+}
+
+/** The down payment: a percent of the furniture plus the delivery fee (as the database works it out). */
+export const downPayment = (total: number, s: Pick<ShopSettings, 'down_payment_percent'>) => Math.round((total * Number(s.down_payment_percent)) / 100);
 
 /** A real place picked from the address suggestions. */
 export interface Place { key: string; title: string; detail: string; street: string; city: string; lat: number; lng: number }
@@ -73,3 +109,9 @@ export function currentPosition(): Promise<{ lat: number; lng: number }> {
     );
   });
 }
+
+/** Philippine mobile numbers: typed as the 10 digits after +63 (9XX XXX XXXX). */
+export const PH_MOBILE = /^9\d{9}$/;
+/** Keeps only the 10 digits after +63 from what was typed or pasted (0917…, +63917…, 917…). */
+export const phDigits = (s: string) => s.replace(/\D/g, '').replace(/^(63|0)(?=9)/, '').slice(0, 10);
+export const phPhone = (d: string) => `+63 ${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;

@@ -6,6 +6,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { mediaLinks } from '@/lib/orderMedia';
 import { shrink } from './serverApi';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // "My custom furniture" (migration 039): a piece that is not in the catalog, scanned with "No order", is named and
 // kept with its 3D model, front photo and scan result. Files go in order-media under custom/<staff id>/.
@@ -38,6 +39,7 @@ export default function CustomFurniturePanel({ supabase, userId, modelUrl, photo
   const [saving, setSaving] = useState(false);
   const [viewing, setViewing] = useState<{ name: string; url: string } | null>(null);
   const [missing, setMissing] = useState(false); // migration 039 not run yet
+  const [askFirst, confirmBox] = useConfirm();
 
   async function load() {
     const { data, error } = await supabase.from('custom_furniture')
@@ -83,7 +85,7 @@ export default function CustomFurniturePanel({ supabase, userId, modelUrl, photo
   }
 
   async function remove(p: CustomPiece) {
-    if (!window.confirm(`Delete ${p.name} from My custom furniture?`)) return;
+    if (!(await askFirst({ title: `Delete ${p.name}?`, message: 'It is removed from My custom furniture with its photo and 3D model. This cannot be undone.', confirmLabel: 'Delete', cancelLabel: 'Keep it', danger: true }))) return;
     const { error } = await supabase.from('custom_furniture').delete().eq('id', p.id);
     if (error) { notify('error', error.message); return; }
     const files = [p.model_path, p.photo_path].filter((x): x is string => !!x);
@@ -100,6 +102,7 @@ export default function CustomFurniturePanel({ supabase, userId, modelUrl, photo
 
   return (
     <div className="card-dark space-y-4 p-4 sm:p-5">
+      {confirmBox}
       <div>
         <h2 className="text-base font-semibold text-foreground">Furniture not in the catalog</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -114,7 +117,7 @@ export default function CustomFurniturePanel({ supabase, userId, modelUrl, photo
           <button type="button" onClick={save} disabled={saving || missing} className="btn-primary flex flex-1 items-center justify-center gap-2 text-sm sm:flex-none">
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Save to my custom furniture
           </button>
-          <button type="button" onClick={() => { onClear(); setName(''); }} className="btn-secondary flex items-center gap-2 text-sm">
+          <button type="button" onClick={async () => { if (await askFirst({ title: 'Clear everything?', message: 'The photos, 3D model and scan on screen are cleared. Saved custom furniture is not affected.', confirmLabel: 'Clear', cancelLabel: 'Cancel', danger: true })) { onClear(); setName(''); } }} className="btn-secondary flex items-center gap-2 text-sm">
             <Eraser size={15} /> Clear
           </button>
         </div>

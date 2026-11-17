@@ -8,8 +8,9 @@ import MfaSettings from '@/components/MfaSettings';
 import { isViewer, VIEW_ONLY_MESSAGE } from '@/lib/viewer';
 import AvatarCropper from '@/components/AvatarCropper';
 import AddressBook from '@/components/AddressBook';
+import { phDigits, phPhone, PH_MOBILE } from '@/lib/delivery';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
-const PHONE = /^[+\d][\d\s-]{6,19}$/; // e.g. 0917 123 4567 or +63 917 123 4567
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ROLE_LABEL: Record<string, string> = { admin: 'Supervisor', staff: 'Worker', customer: 'Customer' };
 
@@ -25,9 +26,9 @@ export default function ProfileSettings() {
   const supabase = useRef(createClient()).current;
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const [fullName, setFullName] = useState(profile?.full_name ?? '');
+  const [names, setNames] = useState({ first: '', middle: '', last: '' });
   const [nickname, setNickname] = useState(profile?.nickname ?? '');
-  const [phone, setPhone] = useState(profile?.phone ?? '');
+  const [phone, setPhone] = useState(''); // the 10 digits after +63
   const [savingDetails, setSavingDetails] = useState(false);
   const [detailsMsg, setDetailsMsg] = useState<Msg>(null);
 
@@ -38,29 +39,32 @@ export default function ProfileSettings() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null); // a picked photo, being positioned before upload
   const [photoMsg, setPhotoMsg] = useState<Msg>(null);
+  const [askFirst, confirmBox] = useConfirm();
 
   // the form starts from the profile once it has loaded (only the first time, so typing is never overwritten)
   const loaded = useRef(false);
   useEffect(() => {
     if (!profile || loaded.current) return;
     loaded.current = true;
-    setFullName(profile.full_name ?? '');
+    setNames(nameParts(profile));
     setNickname(profile.nickname ?? '');
-    setPhone(profile.phone ?? '');
+    setPhone(phDigits(profile.phone ?? ''));
   }, [profile]);
 
   const name = profile?.full_name || 'Your profile';
   const initials = name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
-  const changed = fullName.trim() !== (profile?.full_name ?? '') || nickname.trim() !== (profile?.nickname ?? '') || phone.trim() !== (profile?.phone ?? '');
+  const was = profile ? nameParts(profile) : { first: '', middle: '', last: '' };
+  const changed = (['first', 'middle', 'last'] as const).some((k) => names[k].trim() !== was[k]) || nickname.trim() !== (profile?.nickname ?? '') || phone !== phDigits(profile?.phone ?? '');
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
-    const n = fullName.trim(), nick = nickname.trim(), tel = phone.trim();
-    if (!n) return setDetailsMsg({ ok: false, text: 'Please enter your full name.' });
-    if (tel && !PHONE.test(tel)) return setDetailsMsg({ ok: false, text: 'Enter a phone number like 0917 123 4567.' });
+    const first = names.first.trim(), middle = names.middle.trim(), last = names.last.trim(), nick = nickname.trim();
+    if (!first || !last) return setDetailsMsg({ ok: false, text: 'Please enter your first and last name.' });
+    if (phone && !PH_MOBILE.test(phone)) return setDetailsMsg({ ok: false, text: 'Enter a mobile number like 917 123 4567 (10 digits after +63).' });
+    const n = [first, middle, last].filter(Boolean).join(' '), tel = phone ? phPhone(phone) : '';
     if (!user) return;
     setSavingDetails(true); setDetailsMsg(null);
-    const { error } = await supabase.from('user_profiles').update({ full_name: n, nickname: nick, phone: tel }).eq('id', user.id);
+    const { error } = await supabase.from('user_profiles').update({ full_name: n, first_name: first, middle_name: middle, last_name: last, nickname: nick, phone: tel }).eq('id', user.id);
     setSavingDetails(false);
     if (error) return setDetailsMsg({ ok: false, text: 'Could not save. Please try again.' });
     await refreshProfile();
@@ -120,6 +124,7 @@ export default function ProfileSettings() {
 
   async function removePhoto() {
     if (!user || !profile?.avatar_url) return;
+    if (!(await askFirst({ title: 'Remove your photo?', message: 'Your initials are shown instead. You can add a photo again anytime.', confirmLabel: 'Remove', cancelLabel: 'Keep it', danger: true }))) return;
     setPhotoBusy(true); setPhotoMsg(null);
     await removeOldPhoto();
     const { error } = await supabase.from('user_profiles').update({ avatar_url: '' }).eq('id', user.id);
@@ -169,6 +174,7 @@ export default function ProfileSettings() {
             )}
           </div>
           <Note msg={photoMsg} />
+          {confirmBox}
           {cropFile && <AvatarCropper file={cropFile} saving={photoBusy} onCancel={() => setCropFile(null)} onSave={uploadPhoto} />}
         </section>
 
@@ -176,18 +182,25 @@ export default function ProfileSettings() {
           {/* personal details */}
           <form onSubmit={saveDetails} className="card-dark space-y-4 p-6">
             <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><User size={16} className="text-primary dark:text-accent" /> Personal details</h2>
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-foreground/80">Full name</span>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={80} autoComplete="name" className="input-dark w-full" />
-            </label>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {([['first', 'First name', 'given-name', ''], ['middle', 'Middle name', 'additional-name', '(optional)'], ['last', 'Last name', 'family-name', '']] as const).map(([k, label, ac, note]) => (
+                <label key={k} className="block space-y-1.5">
+                  <span className="text-sm font-medium text-foreground/80">{label} {note && <span className="font-normal text-muted-foreground">{note}</span>}</span>
+                  <input value={names[k]} onChange={(e) => setNames((v) => ({ ...v, [k]: e.target.value }))} maxLength={40} autoComplete={ac} className="input-dark w-full" />
+                </label>
+              ))}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-foreground/80">Nickname <span className="font-normal text-muted-foreground">(optional, shown at the top)</span></span>
                 <input value={nickname} onChange={(e) => setNickname(e.target.value)} maxLength={30} autoComplete="nickname" placeholder="What should we call you?" className="input-dark w-full" />
               </label>
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-foreground/80">Phone number</span>
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} type="tel" inputMode="tel" autoComplete="tel" placeholder="0917 123 4567" className="input-dark w-full" />
+                <span className="text-sm font-medium text-foreground/80">Mobile number</span>
+                <span className="flex">
+                  <span className="flex items-center rounded-l-xl border border-r-0 border-border bg-muted px-3 text-sm text-foreground">+63</span>
+                  <input value={phone} onChange={(e) => setPhone(phDigits(e.target.value))} maxLength={16} type="tel" inputMode="numeric" autoComplete="tel-national" placeholder="917 123 4567" className="input-dark w-full rounded-l-none" />
+                </span>
               </label>
             </div>
             <div className="flex flex-wrap items-center gap-3">
@@ -203,7 +216,7 @@ export default function ProfileSettings() {
             <section className="card-dark space-y-4 p-6">
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold text-foreground"><MapPin size={16} className="text-primary dark:text-accent" /> Delivery addresses</h2>
-                <p className="mt-1 text-sm text-muted-foreground">Pick one of these at checkout.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Pin each address on the map. At checkout you pick one, and the delivery fee is worked out from the distance to the store.</p>
               </div>
               <AddressBook />
             </section>
@@ -240,4 +253,12 @@ export default function ProfileSettings() {
       </div>
     </div>
   );
+}
+
+// first / middle / last from the profile; accounts made before the name was split keep only full_name, so it is split
+// here (last word = last name) until the person saves
+function nameParts(p: { full_name?: string; first_name?: string; middle_name?: string; last_name?: string }) {
+  if (p.first_name || p.last_name) return { first: p.first_name ?? '', middle: p.middle_name ?? '', last: p.last_name ?? '' };
+  const w = (p.full_name ?? '').trim().split(/\s+/).filter(Boolean);
+  return { first: w.slice(0, -1).join(' ') || (w[0] ?? ''), middle: '', last: w.length > 1 ? w[w.length - 1] : '' };
 }

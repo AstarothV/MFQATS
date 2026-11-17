@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
 import StatusBadge from '@/components/ui/StatusBadge';
 import CancelOrderButton from '@/components/CancelOrderButton';
+import PaymentCard from '@/components/PaymentCard';
 import { furnitureLabel } from '@/lib/pieces';
 import Link from 'next/link';
 import PhotoGallery from './PhotoGallery';
@@ -263,6 +264,8 @@ export default function OrderViewContent() {
           )}
         </div>
       )}
+
+      {selectedOrder && <PaymentCard order={selectedOrder as any} onChanged={fetchOrders} />}
 
       {/* Tab Navigation */}
       <div className="rounded-2xl border border-border bg-card p-1.5">

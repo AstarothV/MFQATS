@@ -8,6 +8,8 @@ import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVari
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
 import FurnitureFilter from '@/components/ui/FurnitureFilter';
 import CancelRequestReview from './CancelRequestReview';
+import PaymentCard from '@/components/PaymentCard';
+import ShopSettingsCard from '@/components/ShopSettingsCard';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
@@ -106,6 +108,14 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   const activeOrder = orders.find(o => o.id === selectedOrderId) || orders[0];
 
   async function updateOrderStatus(orderId: string, newStatus: string, done = `Order moved to ${statusLabel(newStatus)}`) {
+    const o = orders.find((x) => x.id === orderId);
+    const cancel = newStatus === 'cancelled';
+    if (!(await confirm({
+      title: cancel ? `Cancel ${o?.order_ref ?? 'this order'}?` : newStatus === 'confirmed' ? `Approve ${o?.order_ref ?? 'this order'}?` : `Move to ${statusLabel(newStatus)}?`,
+      message: cancel ? 'The customer is notified, and the order stops here.'
+        : `${o?.order_ref ?? 'The order'} moves from ${statusLabel(o?.extended_status || 'pending')} to ${statusLabel(newStatus)}. The customer sees the new stage.`,
+      confirmLabel: cancel ? 'Cancel order' : newStatus === 'confirmed' ? 'Approve' : 'Move', cancelLabel: cancel ? 'Keep it' : 'Not yet', danger: cancel,
+    }))) return false;
     setUpdating(true);
     try {
       await moveOrderStage(supabase, orders.find(o => o.id === orderId) || { id: orderId }, newStatus);
@@ -154,6 +164,11 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
   }
 
   async function setStaffFor(orderId: string, staffId: string | null) {
+    const o = orders.find((x) => x.id === orderId);
+    const who = staffId ? staff.find((m) => m.id === staffId)?.full_name ?? 'this staff member' : o?.staff?.full_name ?? 'the staff member';
+    if (!(await confirm(staffId
+      ? { title: `Assign ${who}?`, message: `${who} will work on ${o?.order_ref ?? 'this order'}${o?.assigned_to ? `, in place of ${o?.staff?.full_name ?? 'the current staff member'}` : ''}, and is notified.`, confirmLabel: 'Assign', cancelLabel: 'Cancel' }
+      : { title: `Remove ${who}?`, message: `${o?.order_ref ?? 'This order'} will have nobody working on it until you assign someone.`, confirmLabel: 'Remove', cancelLabel: 'Keep', danger: true }))) return;
     setAssigning(staffId ?? 'none');
     try {
       await assignOrder(supabase, orderId, staffId);
@@ -191,6 +206,7 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         <h1 className="page-title">Track orders through the inspection process</h1>
         <p className="page-subtitle">Pick an order in the list to see its details, assigned staff and stage below.</p>
       </div>
+      {isAdmin && <ShopSettingsCard />}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status group">
           {(Object.keys(STATUS_GROUPS) as (keyof typeof STATUS_GROUPS)[]).map((g) => {
@@ -366,6 +382,8 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                     </div>
                   </div>
                 </section>
+
+                <PaymentCard order={activeOrder} as={isAdmin ? 'admin' : 'view'} onChanged={fetchOrders} />
 
                 {/* Assigned staff */}
                 <section ref={staffCard} className={`card-dark scroll-mt-24 rounded-3xl border p-6 ${isActive(activeOrder.extended_status) && !activeOrder.assigned_to ? 'border-warning/60 ring-1 ring-warning/30' : 'border-border'}`}>
