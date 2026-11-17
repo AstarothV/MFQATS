@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Package, Truck, AlertTriangle, CheckCircle2, Plus, Edit2, Trash2, Loader2, X } from 'lucide-react';
+import { Search, Package, Truck, AlertTriangle, CheckCircle2, Plus, Edit2, Archive, ArchiveRestore, Loader2, X } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { SkeletonRegion, ListSkeleton } from '@/components/ui/LoadingSkeleton';
@@ -49,6 +50,8 @@ export default function InventoryManagementContent() {
   const [stockAdjust, setStockAdjust] = useState(0);
   const [formLoading, setFormLoading] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [archived, setArchived] = useState(false); // archived items are kept (never deleted) and can be restored
+  const [askFirst, confirmBox] = useConfirm();
 
   function showToast(type: 'success' | 'error', message: string) {
     setToast({ type, message });
@@ -57,14 +60,14 @@ export default function InventoryManagementContent() {
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('inventory').select('*').eq('is_active', true);
+    let query = supabase.from('inventory').select('*').eq('is_active', !archived);
     if (search) query = query.ilike('name', `%${search}%`);
     if (selectedCategory !== 'All') query = query.eq('category', selectedCategory);
     query = query.order('name');
     const { data, error } = await query;
     if (!error && data) setItems(data as InventoryItem[]);
     setLoading(false);
-  }, [supabase, search, selectedCategory]);
+  }, [supabase, search, selectedCategory, archived]);
 
   useEffect(() => { fetchItems(); }, [fetchItems]);
 
@@ -112,17 +115,25 @@ export default function InventoryManagementContent() {
     }
   }
 
+  async function restore(item: InventoryItem) {
+    if (!(await askFirst({ title: `Restore ${item.name}?`, message: 'It goes back to the inventory list with its stock count.', confirmLabel: 'Restore', cancelLabel: 'Cancel' }))) return;
+    const { error } = await supabase.from('inventory').update({ is_active: true }).eq('id', item.id);
+    if (error) return showToast('error', error.message);
+    showToast('success', `${item.name} restored`);
+    fetchItems();
+  }
+
   async function handleDelete() {
     if (!selectedItemData) return;
     setFormLoading(true);
     try {
       const { error } = await supabase.from('inventory').update({ is_active: false }).eq('id', selectedItemData.id);
       if (error) throw error;
-      showToast('success', 'Item removed from inventory');
+      showToast('success', `${selectedItemData.name} archived. Find it under Archived.`);
       setModal(null);
       fetchItems();
     } catch (err: any) {
-      showToast('error', err?.message || 'Failed to delete item');
+      showToast('error', err?.message || 'Could not archive the item');
     } finally {
       setFormLoading(false);
     }
@@ -260,7 +271,11 @@ export default function InventoryManagementContent() {
         <button onClick={() => { setForm({ item_ref: '', name: '', category: 'Wood', supplier: '', stock_level: 0, min_stock: 0, unit: 'units', location: '', cost_per_unit: 0 }); setModal('add'); }} className="btn-primary shrink-0 justify-center whitespace-nowrap flex items-center gap-2">
           <Plus size={16} /> Add Item
         </button>
+        <button type="button" onClick={() => setArchived((a) => !a)} aria-pressed={archived} className="btn-secondary shrink-0 justify-center whitespace-nowrap flex items-center gap-2">
+          <Archive size={16} /> {archived ? 'Back to inventory' : 'Archived'}
+        </button>
       </div>
+      {confirmBox}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-3">
@@ -269,7 +284,7 @@ export default function InventoryManagementContent() {
           ) : items.length === 0 ? (
             <div className="text-center py-16 card-dark rounded-3xl border border-border">
               <Package size={32} className="text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No inventory items found</p>
+              <p className="text-muted-foreground">{archived ? 'No archived items' : 'No inventory items found'}</p>
             </div>
           ) : (
             items.map((item) => (
@@ -302,6 +317,11 @@ export default function InventoryManagementContent() {
                       <div><p className="text-muted-foreground">Cost/Unit</p><p className="font-semibold text-foreground">{peso(item.cost_per_unit)}</p></div>
                       <div><p className="text-muted-foreground">Last Updated</p><p className="font-semibold text-foreground">{new Date(item.last_updated).toLocaleDateString()}</p></div>
                     </div>
+                    {archived ? (
+                      <button onClick={(e) => { e.stopPropagation(); restore(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition">
+                        <ArchiveRestore size={12} /> Restore
+                      </button>
+                    ) : (
                     <div className="flex gap-2">
                       <button onClick={(e) => { e.stopPropagation(); openStock(item); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-accent text-xs font-semibold hover:bg-primary/30 transition">
                         <Truck size={12} /> Update Stock
@@ -310,9 +330,10 @@ export default function InventoryManagementContent() {
                         <Edit2 size={12} /> Edit
                       </button>
                       <button onClick={(e) => { e.stopPropagation(); setSelectedItemData(item); setModal('delete'); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-danger/10 text-danger text-xs font-semibold hover:bg-danger/20 transition">
-                        <Trash2 size={12} /> Remove
+                        <Archive size={12} /> Archive
                       </button>
                     </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -419,12 +440,12 @@ export default function InventoryManagementContent() {
       {modal === 'delete' && selectedItemData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setModal(null)}>
           <div className="card-dark rounded-2xl p-6 max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-foreground mb-3">Remove Item</h3>
-            <p className="text-sm text-muted-foreground mb-5">Remove <strong className="text-foreground">{selectedItemData.name}</strong> from inventory? This will mark it as inactive.</p>
+            <h3 className="text-lg font-bold text-foreground mb-3">Archive item?</h3>
+            <p className="text-sm text-muted-foreground mb-5"><strong className="text-foreground">{selectedItemData.name}</strong> ({selectedItemData.stock_level} {selectedItemData.unit} in stock) leaves the inventory list but is not deleted. You can restore it from Archived.</p>
             <div className="flex gap-3">
               <button onClick={handleDelete} disabled={formLoading} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger/20 text-danger border border-danger/30 hover:bg-danger/30 transition">
-                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                Remove
+                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+                Archive
               </button>
               <button onClick={() => setModal(null)} className="btn-secondary px-4">Cancel</button>
             </div>

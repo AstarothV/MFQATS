@@ -17,6 +17,19 @@ export async function GET(request: NextRequest) {
   const wanted = searchParams.get('next');
   const next = wanted && wanted.startsWith('/') && !wanted.startsWith('//') ? wanted : null;
 
+  // the link in the sign-up confirmation email: Supabase confirms the email before it sends the person here. They are
+  // not signed in: they go to the sign-in page and log in with their password.
+  if (searchParams.get('confirmed') === '1') {
+    if (searchParams.get('error') || searchParams.get('error_code')) return NextResponse.redirect(`${origin}/sign-up-login-screen?link=expired`);
+    if (code) {
+      const { createClient } = await import('@/lib/supabase/server');
+      const supabase = await createClient();
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (!error) await supabase.auth.signOut();
+    }
+    return NextResponse.redirect(`${origin}/sign-up-login-screen?confirmed=1`);
+  }
+
   if (code) {
     const { createClient } = await import('@/lib/supabase/server');
     const supabase = await createClient();

@@ -129,6 +129,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
   }
 
   async function removeNotification(n: Notification) {
+    if (!(await confirm({ title: 'Delete this notification?', message: n.title, confirmLabel: 'Delete', cancelLabel: 'Keep it', danger: true }))) return;
     const { error } = await supabase.from('notifications').delete().eq('id', n.id);
     if (error) { setNotifError(error.message || 'Could not delete the notification.'); return; }
     setNotifError('');

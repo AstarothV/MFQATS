@@ -6,13 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import {
   Eye, EyeOff, Loader2, CheckCircle2, ScanSearch, Layers, Timer, AlertTriangle, Moon, SunMedium, ArrowLeft,
-  User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck, MapPin, Smartphone,
+  User, Mail, Phone, Lock, LogIn, UserPlus, ShieldCheck, Smartphone,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { isRememberedDevice, rememberThisDevice } from '@/lib/rememberDevice';
 import { createClient } from '@/lib/supabase/client';
 import { logActivity } from '@/lib/activity';
-import PlaceSearch from '@/components/PlaceSearch';
+import { phDigits, phPhone, PH_MOBILE } from '@/lib/delivery';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import Link from 'next/link';
 
@@ -23,7 +23,18 @@ const said = (error: any, fallback: string) =>
 type AuthTab = 'login' | 'register' | 'forgot' | 'reset' | 'new-password' | 'mfa' | 'confirm' | 'code' | 'code-verify';
 
 type LoginForm = { email: string; password: string; remember: boolean };
-type RegisterForm = { fullName: string; email: string; phone: string; street: string; city: string; password: string; confirmPassword: string };
+type RegisterForm = { firstName: string; middleName: string; lastName: string; email: string; phone: string; password: string; confirmPassword: string };
+
+// throw-away inbox services: an account needs an email the person can open (the confirmation link is sent there)
+const THROWAWAY = new Set(['mailinator.com', 'guerrillamail.com', 'guerrillamail.net', 'sharklasers.com', '10minutemail.com', 'temp-mail.org',
+  'tempmail.com', 'tempmail.net', 'yopmail.com', 'trashmail.com', 'getnada.com', 'dispostable.com', 'maildrop.cc', 'fakeinbox.com',
+  'throwawaymail.com', 'mintemail.com', 'emailondeck.com', 'moakt.com', 'tempail.com', 'mohmal.com', 'burnermail.io', 'mailnesia.com']);
+// the same rule as Supabase (Authentication, Email, Password requirements): 8+ characters with a lowercase and an
+// uppercase letter, a digit and a symbol
+const weakPassword = (pw: string) =>
+  pw.length < 8 ? 'At least 8 characters'
+    : !/[a-z]/.test(pw) || !/[A-Z]/.test(pw) || !/\d/.test(pw) || !/[^A-Za-z0-9]/.test(pw) ? 'Use a lowercase and an uppercase letter, a number and a symbol' : '';
+const isThrowaway = (email: string) => THROWAWAY.has(email.trim().toLowerCase().split('@')[1] ?? '');
 type ForgotForm = { email: string };
 
 const roleRedirect: Record<string, string> = {
@@ -60,7 +71,7 @@ export default function LoginPageClient() {
   const [steps, setSteps] = useState({ app: true, email: false });
   const [method, setMethod] = useState<'app' | 'email'>('app');
   const [codeSentTo, setCodeSentTo] = useState('');
-  const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, setValue: setRegValue, formState: { errors: regErrors } } = useForm<RegisterForm>();
+  const { register: regRegister, handleSubmit: handleRegister, watch: watchReg, formState: { errors: regErrors } } = useForm<RegisterForm>();
   const { register: regForgot, handleSubmit: handleForgot, formState: { errors: forgotErrors } } = useForm<ForgotForm>();
 
   useEffect(() => {
@@ -82,6 +93,7 @@ export default function LoginPageClient() {
     }
     if (tabParam === 'forgot') setTab('forgot');
     if (tabParam === 'mfa') void (async () => { const s = await secondSteps(); if (s) openSecondStep(s); else setTab('mfa'); })();
+    if (searchParams?.get('confirmed') === '1') { setTab('login'); showMessage('success', 'Your email is confirmed. Sign in with your email and password.'); }
     if (searchParams?.get('link') === 'expired') showMessage('error', 'That email link has expired or was already used. Sign in, or ask for a new one.');
   }, [searchParams]);
 
@@ -213,7 +225,7 @@ export default function LoginPageClient() {
   async function resendConfirmation() {
     if (!pendingEmail || resendCooldown > 0) return;
     setLoading(true);
-    const { error } = await supabase.auth.resend({ type: 'signup', email: pendingEmail, options: { emailRedirectTo: linkBack() } });
+    const { error } = await supabase.auth.resend({ type: 'signup', email: pendingEmail, options: { emailRedirectTo: `${linkBack()}?confirmed=1` } });
     setLoading(false);
     if (error) { showMessage('error', /rate|seconds/i.test(error.message) ? 'Please wait a minute before asking again.' : 'Could not send the email. Try again later.'); return; }
     setResendCooldown(60);
@@ -265,7 +277,7 @@ export default function LoginPageClient() {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
     const password = String(form.get('newPassword') || '');
-    if (password.length < 8) { showMessage('error', 'Use at least 8 characters.'); return; }
+    if (weakPassword(password)) { showMessage('error', `${weakPassword(password)}.`); return; }
     if (password !== String(form.get('confirmNewPassword') || '')) { showMessage('error', 'Passwords do not match'); return; }
     setLoading(true);
     try {
@@ -297,19 +309,23 @@ export default function LoginPageClient() {
     }
     setLoading(true);
     try {
-      const created = await signUp(data.email, data.password, {
-        fullName: data.fullName,
+      // the account can be used only after the link in the confirmation email is opened (Supabase: Confirm email).
+      // The delivery address is added later in Profile, pinned on the map.
+      const [first, middle, last] = [data.firstName, data.middleName, data.lastName].map((s) => (s ?? '').trim().replace(/\s+/g, ' '));
+      const created = await signUp(data.email.trim(), data.password, {
+        fullName: [first, middle, last].filter(Boolean).join(' '),
+        firstName: first, middleName: middle, lastName: last,
         role: 'customer',
-        phone: data.phone,
+        phone: phPhone(phDigits(data.phone)),
       });
-      if (created?.session && created.user) {
-        // the first delivery address (migration 037)
-        const street = data.street.trim(), city = data.city.trim();
-        await supabase.from('customer_addresses').insert({ user_id: created.user.id, label: 'Home', street, city, phone: data.phone?.trim() ?? '', is_default: true });
-        showMessage('success', 'Account created.');
-        await goHome(created.user.id);
+      if (created?.user && created.user.identities?.length === 0) {
+        // Supabase answers this way when the email already has an account (it does not say so, to keep emails private)
+        showMessage('error', 'This email already has an account. Sign in, or use Forgot password.');
         return;
       }
+      // never signed in straight after registering: the email must be confirmed first (Supabase: Confirm email ON).
+      // If a session still comes back, that setting is off; it is ended here so nobody is let in from this form.
+      if (created?.session) await supabase.auth.signOut();
       setPendingEmail(data.email);
       setResendCooldown(60);
       setTab('confirm');
@@ -544,34 +560,36 @@ export default function LoginPageClient() {
               <div className="space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold tracking-[-0.01em] text-foreground">Create your account</h2>
-                  <p className="mt-1 text-sm text-muted-foreground [@media(max-height:620px)]:hidden">Order furniture and follow every stage to your door.</p>
+                  <p className="mt-1 text-sm text-muted-foreground [@media(max-height:620px)]:hidden">We email you a link to confirm it is your address. Add your delivery address later in Profile.</p>
                 </div>
                 <form onSubmit={handleRegister(onRegister)} className="space-y-3" noValidate>
-                  {field('Full name', User,
-                    <input {...regRegister('fullName', { required: 'Enter your full name' })} autoComplete="name" className="input-dark w-full pl-10" placeholder="Juan Dela Cruz" />,
-                    regErrors.fullName?.message)}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                  {field('First name', User,
+                    <input {...regRegister('firstName', { required: 'Enter your first name', maxLength: { value: 40, message: 'At most 40 characters' }, pattern: { value: /^[\p{L}][\p{L} .'-]*$/u, message: 'Letters only' } })} autoComplete="given-name" className="input-dark w-full pl-10" placeholder="Juan" />,
+                    regErrors.firstName?.message)}
+                  {field('Middle name', User,
+                    <input {...regRegister('middleName', { maxLength: { value: 40, message: 'At most 40 characters' }, pattern: { value: /^[\p{L} .'-]*$/u, message: 'Letters only' } })} autoComplete="additional-name" className="input-dark w-full pl-10" placeholder="Optional" />,
+                    regErrors.middleName?.message)}
+                  {field('Last name', User,
+                    <input {...regRegister('lastName', { required: 'Enter your last name', maxLength: { value: 40, message: 'At most 40 characters' }, pattern: { value: /^[\p{L}][\p{L} .'-]*$/u, message: 'Letters only' } })} autoComplete="family-name" className="input-dark w-full pl-10" placeholder="Dela Cruz" />,
+                    regErrors.lastName?.message)}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                   {field('Email', Mail,
-                    <input {...regRegister('email', { required: 'Enter your email', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Enter a valid email' } })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@mail.com" />,
+                    <input {...regRegister('email', { required: 'Enter your email', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, message: 'Enter a valid email' }, validate: (v) => !isThrowaway(v) || 'Use an email you can open: throw-away inboxes are not accepted' })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@mail.com" />,
                     regErrors.email?.message)}
-                  {field('Phone number', Phone,
-                    <input {...regRegister('phone')} type="tel" autoComplete="tel" className="input-dark w-full pl-10" placeholder="0917 123 4567" />)}
-                  </div>
-                  <div className="space-y-1.5">
-                    <span className="text-sm font-medium text-foreground/80">Find your delivery address</span>
-                    <PlaceSearch onPick={(pl) => { setRegValue('street', pl.street, { shouldValidate: true }); setRegValue('city', pl.city, { shouldValidate: true }); }} />
-                  </div>
-                  <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                  {field('House no., street, barangay', MapPin,
-                    <input {...regRegister('street', { required: 'Enter your street and barangay' })} autoComplete="street-address" className="input-dark w-full pl-10" placeholder="12 Rizal St., Brgy. San Isidro" />,
-                    regErrors.street?.message)}
-                  {field('City', MapPin,
-                    <input {...regRegister('city', { required: 'Enter your city' })} autoComplete="address-level2" className="input-dark w-full pl-10" placeholder="Caloocan" />,
-                    regErrors.city?.message)}
+                  {field('Mobile number', Phone,
+                    <>
+                      <span className="pointer-events-none absolute left-9 top-1/2 -translate-y-1/2 text-sm text-foreground">+63</span>
+                      <input {...regRegister('phone', { required: 'Enter your mobile number', setValueAs: (v: string) => phDigits(v ?? ''), validate: (v) => PH_MOBILE.test(phDigits(v)) || 'Enter the 10 digits after +63, like 917 123 4567' })}
+                        onInput={(e) => { e.currentTarget.value = phDigits(e.currentTarget.value); }}
+                        type="tel" inputMode="numeric" maxLength={16} autoComplete="tel-national" className="input-dark w-full pl-[4.25rem]" placeholder="917 123 4567" />
+                    </>,
+                    regErrors.phone?.message)}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {field('Password', Lock,
-                      <input {...regRegister('password', { required: 'Enter a password', minLength: { value: 8, message: 'At least 8 characters' } })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="8+ characters" />,
+                      <input {...regRegister('password', { required: 'Enter a password', validate: (v) => !weakPassword(v) || weakPassword(v) })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="e.g. Mesa#2026" />,
                       regErrors.password?.message, eye(showPass, () => setShowPass(!showPass)))}
                     {field('Confirm', Lock,
                       <input {...regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="Repeat it" />,
@@ -663,7 +681,7 @@ export default function LoginPageClient() {
                 </div>
                 <form onSubmit={onNewPassword} className="space-y-3">
                   {field('New password', Lock,
-                    <input name="newPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-10 pr-11" placeholder="8+ characters" />,
+                    <input name="newPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-10 pr-11" placeholder="e.g. Mesa#2026" />,
                     undefined, eye(showPass, () => setShowPass(!showPass)))}
                   {field('Confirm new password', Lock,
                     <input name="confirmNewPassword" type={showPass ? 'text' : 'password'} autoComplete="new-password" minLength={8} required className="input-dark w-full pl-10" placeholder="Repeat it" />)}

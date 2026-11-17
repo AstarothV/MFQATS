@@ -10,6 +10,9 @@ interface UserProfile {
   id: string;
   email: string;
   full_name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
   role: 'admin' | 'staff' | 'customer';
   department?: string;
   phone?: string;
@@ -104,10 +107,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       options: {
         data: {
           full_name: metadata?.fullName || '',
+          first_name: metadata?.firstName || '',
+          middle_name: metadata?.middleName || '',
+          last_name: metadata?.lastName || '',
+          phone: metadata?.phone || '',
           role: metadata?.role || 'customer',
           avatar_url: metadata?.avatarUrl || '',
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // the confirmation link: confirms the email, then opens the sign-in page (it does not sign the person in)
+        emailRedirectTo: `${window.location.origin}/auth/callback?confirmed=1`,
       },
     });
     if (error) throw error;
