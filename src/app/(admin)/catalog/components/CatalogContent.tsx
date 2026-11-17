@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Search, Plus, Edit2, Trash2, X, CheckCircle2, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Package, Eye, Save } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, CheckCircle2, AlertTriangle, Loader2, ChevronLeft, ChevronRight, Package, Eye, Save, Archive, ArchiveRestore } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -74,6 +75,8 @@ export default function CatalogContent() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [page, setPage] = useState(0);
+  const [archived, setArchived] = useState(false); // removed products are kept here (hidden from the shop) and can be restored
+  const [askFirst, confirmBox] = useConfirm();
   const [total, setTotal] = useState(0);
   const [modal, setModal] = useState<'add' | 'edit' | 'delete' | 'view' | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -89,7 +92,7 @@ export default function CatalogContent() {
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('products').select('*', { count: 'exact' });
+    let query = supabase.from('products').select('*', { count: 'exact' }).eq('is_active', !archived);
     if (search) query = query.ilike('name', `%${search}%`);
     if (activeCategory !== 'All') query = query.eq('category', activeCategory);
     query = query.order('created_at', { ascending: false }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
@@ -104,7 +107,7 @@ export default function CatalogContent() {
       setTotal(count || 0);
     }
     setLoading(false);
-  }, [supabase, search, activeCategory, page]);
+  }, [supabase, search, activeCategory, page, archived]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -231,13 +234,27 @@ export default function CatalogContent() {
     }
   }
 
+  async function restore(p: Product) {
+    // a wrong price must be fixed first: the edit form opens, and saving it restores the product (parseForm: is_active)
+    if (!(Number(p.price) > 0) || (Number(p.original_price) !== 0 && Number(p.original_price) < Number(p.price))) {
+      openEdit(p);
+      showToast('error', `Set a correct price for ${p.name}, then Save to restore it.`);
+      return;
+    }
+    if (!(await askFirst({ title: `Restore ${p.name}?`, message: 'It shows in the shop again.', confirmLabel: 'Restore', cancelLabel: 'Cancel' }))) return;
+    const { error } = await supabase.from('products').update({ is_active: true }).eq('id', p.id);
+    if (error) return showToast('error', error.message);
+    showToast('success', `${p.name} restored to the shop`);
+    fetchProducts();
+  }
+
   async function handleDelete() {
     if (!selectedProduct || confirmName !== selectedProduct.name) return;
     setFormLoading(true);
     try {
       const { error } = await supabase.from('products').update({ is_active: false }).eq('id', selectedProduct.id);
       if (error) throw error;
-      showToast('success', 'Product removed from catalog');
+      showToast('success', `${selectedProduct.name} archived: hidden from the shop. Find it under Archived.`);
       setModal(null);
       fetchProducts();
     } catch (err: any) {
@@ -299,7 +316,11 @@ export default function CatalogContent() {
         <button type="button" className="btn-primary flex shrink-0 items-center justify-center gap-2 whitespace-nowrap" onClick={openAdd}>
           <Plus size={18} /> Add Product
         </button>
+        <button type="button" onClick={() => { setArchived((a) => !a); setPage(0); }} aria-pressed={archived} className="btn-secondary flex shrink-0 items-center justify-center gap-2 whitespace-nowrap">
+          <Archive size={16} /> {archived ? 'Back to catalog' : 'Archived'}
+        </button>
       </div>
+      {confirmBox}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -322,7 +343,7 @@ export default function CatalogContent() {
       ) : products.length === 0 ? (
         <div className="card-dark rounded-3xl border border-border p-16 text-center">
           <Package size={32} className="mx-auto mb-3 text-muted-foreground" />
-          <p className="text-muted-foreground">No products found. Add your first product.</p>
+          <p className="text-muted-foreground">{archived ? 'No archived products.' : 'No products found. Add your first product.'}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5">
@@ -359,12 +380,20 @@ export default function CatalogContent() {
                   <button type="button" onClick={() => openView(product)} className="flex-1 btn-secondary text-xs py-2 flex items-center justify-center gap-1">
                     <Eye size={13} /> View
                   </button>
-                  <button type="button" onClick={() => openEdit(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
-                    <Edit2 size={13} /> Edit
-                  </button>
-                  <button type="button" onClick={() => openDelete(product)} className="p-2 rounded-xl border border-border text-danger hover:bg-danger/10 transition">
-                    <Trash2 size={14} />
-                  </button>
+                  {archived ? (
+                    <button type="button" onClick={() => restore(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
+                      <ArchiveRestore size={13} /> Restore
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => openEdit(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
+                        <Edit2 size={13} /> Edit
+                      </button>
+                      <button type="button" onClick={() => openDelete(product)} aria-label={`Archive ${product.name}`} title="Archive" className="p-2 rounded-xl border border-border text-danger hover:bg-danger/10 transition">
+                        <Archive size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -547,10 +576,10 @@ export default function CatalogContent() {
               <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center">
                 <Trash2 size={18} className="text-danger" />
               </div>
-              <h2 className="text-lg font-bold text-foreground">Remove Product</h2>
+              <h2 className="text-lg font-bold text-foreground">Archive product?</h2>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Type <strong className="text-foreground">{selectedProduct.name}</strong> to confirm removal.
+              It is hidden from the shop but not deleted; you can restore it from Archived. Type <strong className="text-foreground">{selectedProduct.name}</strong> to confirm.
             </p>
             <input
               value={confirmName}
@@ -566,8 +595,8 @@ export default function CatalogContent() {
                 disabled={confirmName !== selectedProduct.name || formLoading}
                 className="flex-1 rounded-2xl bg-danger py-3 text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                Remove
+                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Archive size={14} />}
+                Archive
               </button>
             </div>
           </div>
