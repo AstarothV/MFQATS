@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, PROCESS_STAGES, statusLabel } from '@/lib/orders';
 import { loadOrderMedia, removeOrderPhoto, saveOrderModel, saveOrderPhoto } from '@/lib/orderMedia';
 import { useAuth } from '@/contexts/AuthContext';
+import { clearPractice, loadPractice, savePractice } from '@/lib/practiceDraft';
 import StatusBadge from '@/components/ui/StatusBadge';
 import OrderChat from '@/components/OrderChat';
 import { shrink } from './serverApi';
@@ -344,6 +345,46 @@ export default function QualityScanPage() {
     return () => clearInterval(t);
   }, [savedInfo.review, selectedOrderId, piece]);
 
+  // A practice scan (no order) stays in this browser while the staff member visits other pages: put back on opening the
+  // page, kept as it changes, and wiped by Clear or by signing out (src/lib/practiceDraft.ts).
+  const practiceReady = useRef(false); // restored (or nothing to restore): saving may start
+  const practiceModel = useRef<{ url: string | null; blob: Blob | null }>({ url: null, blob: null });
+  useEffect(() => {
+    if (!user || practiceReady.current) return;
+    if (new URLSearchParams(window.location.search).get('order')) { practiceReady.current = true; return; }
+    loadPractice(user.id).then((d) => {
+      if (d && !selectedOrderId) {
+        d.photos.forEach((f, i) => f && photoSet.setSlot(i, f));
+        d.closeUps.forEach((f, i) => f && closeUps.setSlot(i, f));
+        d.parts.forEach((p) => parts.put(p.label, p.file));
+        Object.entries(d.partCloseUps).forEach(([label, f]) => partCloseUps.put(label, f));
+        setSideScans(VIEWS.map((_, i) => (d.sideScans[i] as SideScan | null) ?? null));
+        setPartScans(d.partScans as Record<string, SideScan>);
+        if (d.model) { practiceModel.current.blob = d.model; setSavedModel(URL.createObjectURL(d.model)); }
+        setStep(d.step);
+      }
+      practiceReady.current = true;
+    });
+  }, [user]);
+  useEffect(() => {
+    if (!user || !practiceReady.current || selectedOrderId) return;
+    const t = setTimeout(async () => {
+      const m = practiceModel.current;
+      if (model3dUrl !== m.url) { // the model changed: keep its file (a blob URL dies with the page)
+        m.blob = model3dUrl ? await fetch(model3dUrl).then((r) => r.blob()).catch(() => m.blob) : null;
+        m.url = model3dUrl;
+      }
+      savePractice(user.id, {
+        step,
+        photos: photoSet.photos, closeUps: closeUps.photos,
+        parts: parts.labels.map((label, i) => ({ label, file: parts.photos[i] })),
+        partCloseUps: Object.fromEntries(parts.labels.flatMap((l, i) => (partCloseUps.photos[i] ? [[l, partCloseUps.photos[i]!]] : []))),
+        model: m.blob, sideScans, partScans,
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [user, selectedOrderId, step, photoSet.photos, closeUps.photos, parts.labels, parts.photos, partCloseUps.photos, model3dUrl, sideScans, partScans]);
+
   // Choosing an order opens the step it is at, and loads what was already saved for it.
   // photos and scans on screen belong to one order (one piece of it): cleared before showing another
   function clearWork() {
@@ -363,6 +404,9 @@ export default function QualityScanPage() {
     stopCamera();
     clearWork();
     setModel3dUrl(null);
+    setSavedModel(null);
+    practiceModel.current = { url: null, blob: null };
+    if (user) clearPractice(user.id);
     setModelResetKey((k) => k + 1); // a fresh 3D panel, without the model built before
     goTo(0);
   }

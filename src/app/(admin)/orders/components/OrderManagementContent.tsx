@@ -10,6 +10,7 @@ import FurnitureFilter from '@/components/ui/FurnitureFilter';
 import CancelRequestReview from './CancelRequestReview';
 import PaymentCard from '@/components/PaymentCard';
 import ShopSettingsCard from '@/components/ShopSettingsCard';
+import WalkInOrder from '@/components/WalkInOrder';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';
@@ -206,6 +207,11 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
         <h1 className="page-title">Track orders through the inspection process</h1>
         <p className="page-subtitle">Pick an order in the list to see its details, assigned staff and stage below.</p>
       </div>
+      {isAdmin && (
+        <div className="flex flex-wrap items-start justify-end gap-3">
+          <WalkInOrder onPlaced={(ref) => { showToast('success', `Walk-in order ${ref} placed`); fetchOrders(); }} />
+        </div>
+      )}
       {isAdmin && <ShopSettingsCard />}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by status group">
@@ -345,8 +351,16 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                   <div className="space-y-3 text-sm text-muted-foreground">
                     <div className="flex justify-between gap-4">
                       <span>Customer</span>
-                      <span className="text-foreground font-semibold">{activeOrder.customer_name}</span>
+                      <span className="text-right font-semibold text-foreground">{activeOrder.customer_name}{activeOrder.customer_phone ? ` · ${activeOrder.customer_phone}` : ''}</span>
                     </div>
+                    {(activeOrder.order_source || activeOrder.order_type) && (
+                      <div className="flex justify-between gap-4">
+                        <span>Order type</span>
+                        <span className="text-right font-semibold text-foreground">
+                          {activeOrder.order_type === 'in_stock' ? 'In stock (ready-made)' : 'Made to order'} · {activeOrder.order_source === 'walk_in' ? 'Walk-in at the store' : 'Online'}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between gap-4">
                       <span>Product</span>
                       <span className="text-foreground font-semibold">{furnitureLabel(activeOrder)}</span>

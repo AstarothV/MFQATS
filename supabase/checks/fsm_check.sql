@@ -10,7 +10,9 @@ DECLARE
     report TEXT := '';
     s TEXT;
 BEGIN
-    INSERT INTO public.orders (order_ref) VALUES ('FSM-TEST-' || gen_random_uuid()) RETURNING id INTO oid;
+    -- a pick-up order whose down payment is received (migration 040: no pin needed, and it may be confirmed)
+    INSERT INTO public.orders (order_ref, pickup_type) VALUES ('FSM-TEST-' || gen_random_uuid(), 'pickup') RETURNING id INTO oid;
+    UPDATE public.orders SET payment_status = 'down_paid' WHERE id = oid;
 
     -- 1. skipping a stage must be blocked
     BEGIN

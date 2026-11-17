@@ -1,4 +1,4 @@
--- Self-test for saved delivery addresses and the email sign-in code (migrations 037 and 038). Makes throw-away users,
+-- Self-test for saved delivery addresses and the email sign-in code (migration 037). Makes throw-away users,
 -- tries each rule, then rolls everything back. Run in the Supabase SQL Editor or on a local copy.
 BEGIN;
 

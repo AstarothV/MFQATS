@@ -34,8 +34,14 @@ interface Product {
   width_cm: number;
   length_cm: number;
   estimated_production_days: number;
+  stock_type?: 'made_to_order' | 'in_stock';
+  stock_qty?: number;
   tags: string[];
 }
+
+// how many one order can hold: the per-order cap, and for ready-made furniture also what is in stock (migration 042)
+const cap = (p: Product) => (p.stock_type === 'in_stock' ? Math.min(maxQty(p.category), Math.max(p.stock_qty ?? 0, 0)) : maxQty(p.category));
+const leadText = (p: Product) => (p.stock_type === 'in_stock' ? `In stock (${p.stock_qty ?? 0}), ready in about 3 days` : `Made to order, ${p.estimated_production_days} days`);
 
 interface CartItem {
   product: Product;
@@ -153,8 +159,9 @@ export default function CustomerShopContent() {
   }
 
   function addToCart(product: Product, count = 1) {
-    const max = maxQty(product.category);
+    const max = cap(product);
     const already = cart.find(i => i.product.id === product.id)?.quantity ?? 0;
+    if (max === 0) { showToast('error', `${product.name} is out of stock.`); return; }
     if (already >= max) { showToast('error', `${max} is the most you can order of the ${product.name} at once. Send us an inquiry for a bigger order.`); return; }
     const added = Math.min(count, max - already);
     setCart(prev => {
@@ -176,7 +183,7 @@ export default function CustomerShopContent() {
 
   function updateQuantity(productId: string, qty: number) {
     if (qty <= 0) { removeFromCart(productId); return; }
-    setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: Math.min(qty, maxQty(i.product.category)) } : i));
+    setCart(prev => prev.map(i => i.product.id === productId ? { ...i, quantity: Math.min(qty, cap(i.product)) } : i));
   }
 
   function updateCustomization(productId: string, notes: string) {
@@ -273,7 +280,7 @@ export default function CustomerShopContent() {
     a === 'available' ? 'ok' : a === 'limited' ? 'warning' : a === 'out_of_stock' ? 'danger' : 'neutral';
 
   const getAvailabilityLabel = (a: string) =>
-    a === 'available' ? 'In Stock' : a === 'limited' ? 'Limited' : a === 'out_of_stock' ? 'Out of Stock' : 'Unavailable';
+    a === 'available' ? 'Available' : a === 'limited' ? 'Limited' : a === 'out_of_stock' ? 'Out of Stock' : 'Unavailable';
 
   if (step === 'confirm') {
     return (
@@ -481,8 +488,8 @@ export default function CustomerShopContent() {
                           <button type="button" onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Minus size={12} />
                           </button>
-                          {qtyInput(item.product.id, item.quantity, 'h-8 w-12 text-sm', maxQty(item.product.category))}
-                          <button type="button" disabled={item.quantity >= maxQty(item.product.category)} onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="disabled:opacity-40 w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                          {qtyInput(item.product.id, item.quantity, 'h-8 w-12 text-sm', cap(item.product))}
+                          <button type="button" disabled={item.quantity >= cap(item.product)} onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="disabled:opacity-40 w-7 h-7 rounded-full border border-border flex items-center justify-center hover:bg-muted transition-colors">
                             <Plus size={12} />
                           </button>
                         </div>
@@ -617,7 +624,7 @@ export default function CustomerShopContent() {
                         <span className="text-sm text-muted-foreground line-through">{peso(product.original_price)}</span>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">{product.estimated_production_days}d lead time</span>
+                    <span className="text-xs text-muted-foreground">{leadText(product)}</span>
                   </div>
                   {/* mt-auto pins the action to the card bottom so buttons line up across a row */}
                   <div className="mt-auto space-y-2">
@@ -626,8 +633,8 @@ export default function CustomerShopContent() {
                         <button type="button" onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) - 1)} className="w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Minus size={14} />
                         </button>
-                        {qtyInput(product.id, cartItem?.quantity || 1, 'h-9 w-14 flex-1', maxQty(product.category))}
-                        <button type="button" disabled={(cartItem?.quantity || 1) >= maxQty(product.category)} onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) + 1)} className="disabled:opacity-40 w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
+                        {qtyInput(product.id, cartItem?.quantity || 1, 'h-9 w-14 flex-1', cap(product))}
+                        <button type="button" disabled={(cartItem?.quantity || 1) >= cap(product)} onClick={() => updateQuantity(product.id, (cartItem?.quantity || 1) + 1)} className="disabled:opacity-40 w-9 h-9 rounded-xl border border-border flex items-center justify-center hover:bg-muted transition-colors">
                           <Plus size={14} />
                         </button>
                         <button type="button" onClick={() => setStep('cart')} className="flex-1 btn-primary text-sm py-2 flex items-center justify-center gap-1">
@@ -712,7 +719,7 @@ export default function CustomerShopContent() {
                   </div>
                   <div className="flex justify-between gap-3">
                     <span className="text-muted-foreground">Lead time</span>
-                    <span className="font-semibold text-foreground">{selectedProduct.estimated_production_days} days</span>
+                    <span className="font-semibold text-foreground">{leadText(selectedProduct)}</span>
                   </div>
                   {Object.entries(selectedProduct.specifications).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-3">
@@ -725,7 +732,7 @@ export default function CustomerShopContent() {
                   const isChair = selectedProduct.category === 'Chairs';
                   const count = isChair && chairSet !== 'custom' ? chairSet : customQty;
                   const unit = isChair ? 'chair' : 'piece';
-                  const max = maxQty(selectedProduct.category);
+                  const max = cap(selectedProduct);
                   // custom quantity: type it, or use - and + (1 to the product's limit)
                   const custom = (
                     <div className="flex items-center gap-2">

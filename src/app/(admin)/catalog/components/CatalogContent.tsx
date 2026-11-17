@@ -27,6 +27,8 @@ interface Product {
   model_3d_url: string;
   availability: 'available' | 'limited' | 'out_of_stock' | 'discontinued';
   estimated_production_days: number;
+  stock_type?: 'made_to_order' | 'in_stock';
+  stock_qty?: number;
   specifications: Record<string, string>;
   tags: string[];
   rating: number;
@@ -48,6 +50,8 @@ interface ProductForm {
   model_3d_url: string;
   availability: 'available' | 'limited' | 'out_of_stock' | 'discontinued';
   estimated_production_days: string;
+  stock_type: 'made_to_order' | 'in_stock';
+  stock_qty: string;
   specifications: string;
   tags: string;
 }
@@ -59,7 +63,7 @@ const emptyForm: ProductForm = {
   name: '', description: '', category: 'Tables', price: '', original_price: '',
   height_cm: '', width_cm: '', length_cm: '', material_type: '',
   images: '', model_3d_url: '', availability: 'available',
-  estimated_production_days: '14', specifications: '', tags: ''
+  estimated_production_days: '14', stock_type: 'made_to_order', stock_qty: '0', specifications: '', tags: ''
 };
 
 export default function CatalogContent() {
@@ -118,6 +122,7 @@ export default function CatalogContent() {
       length_cm: String(p.length_cm || ''), material_type: p.material_type || '',
       images: (p.images || []).join('\n'), model_3d_url: p.model_3d_url || '',
       availability: p.availability, estimated_production_days: String(p.estimated_production_days || 14),
+      stock_type: p.stock_type ?? 'made_to_order', stock_qty: String(p.stock_qty ?? 0),
       specifications: Object.entries(p.specifications || {}).map(([k, v]) => `${k}: ${v}`).join('\n'),
       tags: (p.tags || []).join(', ')
     });
@@ -161,6 +166,8 @@ export default function CatalogContent() {
       model_3d_url: form.model_3d_url.trim(),
       availability: form.availability,
       estimated_production_days: parseInt(form.estimated_production_days) || 14,
+      stock_type: form.stock_type,
+      stock_qty: form.stock_type === 'in_stock' ? parseInt(form.stock_qty) || 0 : 0,
       specifications: specsObj,
       tags: form.tags.split(',').map(s => s.trim()).filter(Boolean),
       is_active: true,
@@ -168,11 +175,28 @@ export default function CatalogContent() {
     };
   }
 
-  async function handleAdd() {
-    if (!form.name || !form.price || !form.category) {
-      showToast('error', 'Name, category, and price are required');
-      return;
+  // what is wrong with the form, or '' when it can be saved (the database checks price too: migration 041)
+  function formProblem() {
+    const num = (s: string) => (s.trim() === '' ? null : Number(s));
+    const price = num(form.price), original = num(form.original_price), days = num(form.estimated_production_days);
+    if (!form.name.trim()) return 'Enter the product name.';
+    if (!form.category) return 'Choose a category.';
+    if (price === null || !Number.isFinite(price) || price <= 0) return 'Enter a price above ₱0.';
+    if (price > 10_000_000) return 'The price is too high. Check the number.';
+    if (original !== null && (!Number.isFinite(original) || original < price)) return 'The original price must be empty, or at least the price.';
+    for (const [label, v] of [['Height', form.height_cm], ['Width', form.width_cm], ['Length', form.length_cm]] as const) {
+      const n = num(v);
+      if (n !== null && (!Number.isFinite(n) || n <= 0 || n > 1000)) return `${label} must be between 1 and 1,000 cm.`;
     }
+    if (days === null || !Number.isInteger(days) || days < 1 || days > 365) return 'Production days must be a whole number from 1 to 365.';
+    const qty = num(form.stock_qty);
+    if (form.stock_type === 'in_stock' && (qty === null || !Number.isInteger(qty) || qty < 0 || qty > 10000)) return 'Pieces in stock must be a whole number from 0 to 10,000.';
+    return '';
+  }
+
+  async function handleAdd() {
+    const problem = formProblem();
+    if (problem) { showToast('error', problem); return; }
     setFormLoading(true);
     try {
       const productRef = `PRD-${Date.now().toString().slice(-6)}`;
@@ -189,10 +213,9 @@ export default function CatalogContent() {
   }
 
   async function handleEdit() {
-    if (!selectedProduct || !form.name || !form.price) {
-      showToast('error', 'Name and price are required');
-      return;
-    }
+    if (!selectedProduct) return;
+    const problem = formProblem();
+    if (problem) { showToast('error', problem); return; }
     setFormLoading(true);
     try {
       const { error } = await supabase.from('products').update(parseForm()).eq('id', selectedProduct.id);
@@ -325,7 +348,7 @@ export default function CatalogContent() {
                       <span className="text-xs text-muted-foreground line-through ml-2">{peso(product.original_price)}</span>
                     )}
                   </div>
-                  <span className="text-xs text-muted-foreground">{product.estimated_production_days}d lead</span>
+                  <span className="text-xs text-muted-foreground">{product.stock_type === 'in_stock' ? `${product.stock_qty ?? 0} in stock` : `Made to order · ${product.estimated_production_days}d`}</span>
                 </div>
                 {(product.height_cm > 0 || product.width_cm > 0 || product.length_cm > 0) && (
                   <p className="text-xs text-muted-foreground mb-3">
@@ -389,26 +412,26 @@ export default function CatalogContent() {
               </label>
               <label className="space-y-1 text-sm text-muted-foreground">
                 Price (PHP ₱) *
-                <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1240" />
+                <input type="number" min={1} step="any" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1240" />
               </label>
               <label className="space-y-1 text-sm text-muted-foreground">
                 Original Price (PHP ₱)
-                <input type="number" value={form.original_price} onChange={e => setForm(f => ({ ...f, original_price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1399" />
+                <input type="number" min={0} step="any" value={form.original_price} onChange={e => setForm(f => ({ ...f, original_price: e.target.value }))} className="input-dark w-full mt-1" placeholder="1399" />
               </label>
               <div className="md:col-span-2">
                 <p className="text-sm text-muted-foreground mb-2">Dimensions (cm)</p>
                 <div className="grid grid-cols-3 gap-3">
                   <label className="space-y-1 text-xs text-muted-foreground">
                     Height
-                    <input type="number" value={form.height_cm} onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="75" />
+                    <input type="number" min={1} max={1000} step="any" value={form.height_cm} onChange={e => setForm(f => ({ ...f, height_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="75" />
                   </label>
                   <label className="space-y-1 text-xs text-muted-foreground">
                     Width
-                    <input type="number" value={form.width_cm} onChange={e => setForm(f => ({ ...f, width_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="90" />
+                    <input type="number" min={1} max={1000} step="any" value={form.width_cm} onChange={e => setForm(f => ({ ...f, width_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="90" />
                   </label>
                   <label className="space-y-1 text-xs text-muted-foreground">
                     Length
-                    <input type="number" value={form.length_cm} onChange={e => setForm(f => ({ ...f, length_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="180" />
+                    <input type="number" min={1} max={1000} step="any" value={form.length_cm} onChange={e => setForm(f => ({ ...f, length_cm: e.target.value }))} className="input-dark w-full mt-1" placeholder="180" />
                   </label>
                 </div>
               </div>
@@ -422,8 +445,20 @@ export default function CatalogContent() {
                 </select>
               </label>
               <label className="space-y-1 text-sm text-muted-foreground">
+                Made to order or in stock
+                <select value={form.stock_type} onChange={e => setForm(f => ({ ...f, stock_type: e.target.value as ProductForm['stock_type'] }))} className="input-dark w-full mt-1">
+                  <option value="made_to_order">Made to order (built after the order)</option>
+                  <option value="in_stock">In stock (already made, ready to inspect and hand over)</option>
+                </select>
+              </label>
+              <label className="space-y-1 text-sm text-muted-foreground">
+                Pieces in stock
+                <input type="number" min={0} max={10000} step={1} value={form.stock_type === 'in_stock' ? form.stock_qty : ''} disabled={form.stock_type !== 'in_stock'}
+                  onChange={e => setForm(f => ({ ...f, stock_qty: e.target.value }))} className="input-dark w-full mt-1 disabled:opacity-50" placeholder={form.stock_type === 'in_stock' ? '5' : 'Only for in-stock products'} />
+              </label>
+              <label className="space-y-1 text-sm text-muted-foreground">
                 Est. Production Days
-                <input type="number" value={form.estimated_production_days} onChange={e => setForm(f => ({ ...f, estimated_production_days: e.target.value }))} className="input-dark w-full mt-1" placeholder="14" />
+                <input type="number" min={1} max={365} step={1} value={form.estimated_production_days} onChange={e => setForm(f => ({ ...f, estimated_production_days: e.target.value }))} className="input-dark w-full mt-1" placeholder="14" />
               </label>
               <label className="space-y-1 text-sm text-muted-foreground md:col-span-2">
                 Description

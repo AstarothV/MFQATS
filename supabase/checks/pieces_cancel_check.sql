@@ -23,8 +23,8 @@ BEGIN
     UPDATE public.user_profiles SET role = 'admin' WHERE id = adm;
 
     -- 1. a set of 4 chairs becomes 4 pieces
-    INSERT INTO public.orders (order_ref, customer_id, product_name, product_category, quantity, items)
-    VALUES ('SET-TEST-' || gen_random_uuid(), cust, 'Ash Dining Chair', 'Chairs', 4,
+    INSERT INTO public.orders (order_ref, pickup_type, customer_id, product_name, product_category, quantity, items)
+    VALUES ('SET-TEST-' || gen_random_uuid(), 'pickup', cust, 'Ash Dining Chair', 'Chairs', 4,
             '[{"name":"Ash Dining Chair","category":"Chairs","quantity":4}]')
     RETURNING id INTO oid;
     SELECT cardinality(pieces) INTO n FROM public.orders WHERE id = oid;
@@ -32,6 +32,7 @@ BEGIN
               || (SELECT array_to_string(pieces, ', ') FROM public.orders WHERE id = oid);
 
     -- 2. Detect Defects needs a scan for every piece
+    UPDATE public.orders SET payment_status = 'down_paid' WHERE id = oid; -- migration 040: confirmed only after the down payment
     UPDATE public.orders SET extended_status = 'confirmed' WHERE id = oid;
     UPDATE public.orders SET extended_status = 'upload' WHERE id = oid;
     UPDATE public.orders SET extended_status = 'reconstruction_3d' WHERE id = oid;
@@ -60,8 +61,8 @@ BEGIN
     END;
 
     -- 4. cancel request: a reason is required, only the owner can ask, admins are told
-    INSERT INTO public.orders (order_ref, customer_id, product_name, product_category, quantity)
-    VALUES ('CANCEL-TEST-' || gen_random_uuid(), cust, 'Oak Writing Desk', 'Office Furniture', 1) RETURNING id INTO o2;
+    INSERT INTO public.orders (order_ref, pickup_type, customer_id, product_name, product_category, quantity)
+    VALUES ('CANCEL-TEST-' || gen_random_uuid(), 'pickup', cust, 'Oak Writing Desk', 'Office Furniture', 1) RETURNING id INTO o2;
     PERFORM set_config('request.jwt.claim.sub', cust::text, true);
     BEGIN
         PERFORM public.request_order_cancel(o2, '');
