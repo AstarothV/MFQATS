@@ -8,6 +8,9 @@ import { createClient } from '@/lib/supabase/client';
 import { createClient as createIsolatedClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { SkeletonRegion, TableSkeleton } from '@/components/ui/LoadingSkeleton';
+import dynamic from 'next/dynamic';
+// below the accounts list: loaded after the page itself
+const WalkInCustomers = dynamic(() => import('@/components/WalkInCustomers'), { ssr: false });
 
 interface UserProfile {
   id: string;
@@ -318,6 +321,8 @@ export default function AdminUsersPage() {
             </div>
           </div>
         )}
+
+        <WalkInCustomers />
 
         {/* Add/Edit Modal */}
         {(modal === 'add' || modal === 'edit') && (

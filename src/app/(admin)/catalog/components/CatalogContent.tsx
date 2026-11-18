@@ -248,6 +248,20 @@ export default function CatalogContent() {
     fetchProducts();
   }
 
+  // only from Archived (the database refuses a product that is still in the shop: migration 043)
+  async function deleteForGood(p: Product) {
+    if (!(await askFirst({
+      title: `Delete ${p.name} for good?`,
+      message: 'It is removed from the system with its 3D model files and cannot be restored. Orders that had it keep their record.',
+      confirmLabel: 'Delete for good', cancelLabel: 'Keep it', danger: true,
+    }))) return;
+    const { error } = await supabase.from('products').delete().eq('id', p.id);
+    if (error) return showToast('error', error.message);
+    removeUnusedProductModels(supabase, p.id, '').catch(() => {}); // its 3D model files
+    showToast('success', `${p.name} was deleted`);
+    fetchProducts();
+  }
+
   async function handleDelete() {
     if (!selectedProduct || confirmName !== selectedProduct.name) return;
     setFormLoading(true);
@@ -381,9 +395,14 @@ export default function CatalogContent() {
                     <Eye size={13} /> View
                   </button>
                   {archived ? (
-                    <button type="button" onClick={() => restore(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
-                      <ArchiveRestore size={13} /> Restore
-                    </button>
+                    <>
+                      <button type="button" onClick={() => restore(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">
+                        <ArchiveRestore size={13} /> Restore
+                      </button>
+                      <button type="button" onClick={() => deleteForGood(product)} aria-label={`Delete ${product.name} for good`} title="Delete for good" className="p-2 rounded-xl border border-border text-danger hover:bg-danger/10 transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </>
                   ) : (
                     <>
                       <button type="button" onClick={() => openEdit(product)} className="flex-1 btn-primary text-xs py-2 flex items-center justify-center gap-1">

@@ -3,28 +3,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import { Loader2, Plus, Store, Trash2, X } from 'lucide-react';
+import { Loader2, Plus, Store, Trash2, UserPlus, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import PlaceSearch from '@/components/PlaceSearch';
 import { peso } from '@/lib/money';
 import { maxQty } from '@/lib/pieces';
-import { phDigits, phPhone, PH_MOBILE, SHOP_SPOT, PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
+import { SHOP_SPOT, PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
+import { WalkInCustomerForm, type WalkInCustomer } from '@/components/WalkInCustomers';
 
 const LiveMap = dynamic(() => import('@/components/LiveMap'), { ssr: false, loading: () => <div className="h-56 w-full animate-pulse rounded-xl bg-muted" /> });
 
 type Product = { id: string; name: string; category: string; price: number; stock_type?: string; stock_qty?: number; estimated_production_days?: number; availability: string };
 type Line = { productId: string; qty: number };
 
-// Admin: an order taken at the store (migration 042, order_source 'walk_in'). The customer may have no account; their
-// name and mobile number are kept on the order. In-stock pieces come off the stock, and the database works out the
+// Admin: an order taken at the store (migrations 042, 044; order_source 'walk_in'). It belongs to a walk-in customer
+// (picked from the list or added here, no password); when that customer has an online account the order shows there. In-stock pieces come off the stock, and the database works out the
 // delivery fee and down payment as for online orders. It then goes through the same stages and inspection.
 export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => void }) {
   const supabase = useRef(createClient()).current;
   const [open, setOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [customers, setCustomers] = useState<WalkInCustomer[]>([]);
+  const [custId, setCustId] = useState('');
+  const [addingCustomer, setAddingCustomer] = useState(false);
   const [lines, setLines] = useState<Line[]>([{ productId: '', qty: 1 }]);
   const [pickup, setPickup] = useState<'pickup' | 'delivery'>('pickup');
   const [street, setStreet] = useState('');
@@ -40,7 +42,16 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
   useEffect(() => {
     if (!open || products.length) return;
     supabase.from('products').select('*').eq('is_active', true).order('name').then(({ data }) => setProducts((data ?? []) as Product[]));
+    loadCustomers();
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadCustomers = () => supabase.from('walk_in_customers').select('*').order('full_name').then(({ data }) => setCustomers((data ?? []) as WalkInCustomer[]));
+  const cust = customers.find((c) => c.id === custId) ?? null;
+  // the customer's saved address fills in the delivery address
+  function pickCustomer(c: WalkInCustomer | null) {
+    setCustId(c?.id ?? '');
+    setStreet(c?.street ?? ''); setCity(c?.city ?? '');
+    setPin(c?.lat != null && c?.lng != null ? { lat: Number(c.lat), lng: Number(c.lng) } : null);
+  }
   useEffect(() => { if (pickup === 'pickup' && payment === 'cod') setPayment('store'); }, [pickup, payment]);
 
   const byId = (id: string) => products.find((p) => p.id === id);
@@ -49,37 +60,35 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
   const total = chosen.reduce((s, l) => s + Number(l.p.price) * l.qty, 0);
 
   function reset() {
-    setName(''); setPhone(''); setLines([{ productId: '', qty: 1 }]); setPickup('pickup'); setStreet(''); setCity(''); setPin(null);
+    pickCustomer(null); setAddingCustomer(false); setLines([{ productId: '', qty: 1 }]); setPickup('pickup'); setStreet(''); setCity(''); setPin(null);
     setPayment('store'); setPaidNow(true); setNotes(''); setErr('');
   }
 
   async function place(e: React.FormEvent) {
     e.preventDefault();
-    const digits = phDigits(phone);
-    if (!name.trim()) return setErr('Enter the customer name.');
-    if (!PH_MOBILE.test(digits)) return setErr('Enter the customer mobile number: the 10 digits after +63.');
+    if (!cust) return setErr('Choose the walk-in customer, or add a new one.');
     if (!chosen.length) return setErr('Choose at least one product.');
     const over = chosen.find((l) => l.qty < 1 || l.qty > cap(l.p));
     if (over) return setErr(cap(over.p) === 0 ? `${over.p.name} is out of stock.` : `At most ${cap(over.p)} of ${over.p.name} in one order.`);
     if (pickup === 'delivery' && (!street.trim() || !city.trim() || !pin)) return setErr('For delivery, search the address so it is pinned on the map, and check the street and city.');
-    if (!(await askFirst({ title: 'Place this walk-in order?', message: `${name.trim()}: ${chosen.map((l) => `${l.p.name} × ${l.qty}`).join(', ')}, ${peso(total)}${pickup === 'delivery' ? ' plus the delivery fee' : ''}.${paidNow ? ' The down payment is marked received.' : ''}`, confirmLabel: 'Place order', cancelLabel: 'Cancel' }))) return;
+    if (!(await askFirst({ title: 'Place this walk-in order?', message: `${cust.full_name}: ${chosen.map((l) => `${l.p.name} × ${l.qty}`).join(', ')}, ${peso(total)}${pickup === 'delivery' ? ' plus the delivery fee' : ''}.${paidNow ? ' The down payment is marked received.' : ''}`, confirmLabel: 'Place order', cancelLabel: 'Cancel' }))) return;
     setBusy(true); setErr('');
     const first = chosen[0].p;
     const days = Math.max(...chosen.map((l) => l.p.estimated_production_days || 14));
     const orderRef = `ORD-${Date.now().toString().slice(-6)}`;
     const { error } = await supabase.from('orders').insert({
-      order_ref: orderRef, customer_id: null, customer_name: name.trim(), customer_phone: phPhone(digits),
+      order_ref: orderRef, customer_id: cust.linked_user_id, walk_in_customer_id: cust.id, customer_name: cust.full_name, customer_phone: cust.phone,
       product_name: chosen.length === 1 ? first.name : `${first.name} + ${chosen.length - 1} more`, product_category: first.category, product_id: first.id,
       amount: total, quantity: chosen.reduce((s, l) => s + l.qty, 0), status: 'pending', extended_status: 'pending', completion_pct: 0,
       items: chosen.map((l) => ({ product_id: l.p.id, name: l.p.name, category: l.p.category, quantity: l.qty })),
       pickup_type: pickup, delivery_address: pickup === 'delivery' ? street.trim() : '', delivery_city: pickup === 'delivery' ? city.trim() : '',
-      delivery_phone: phPhone(digits), delivery_lat: pickup === 'delivery' ? pin!.lat : null, delivery_lng: pickup === 'delivery' ? pin!.lng : null,
+      delivery_phone: cust.phone, delivery_lat: pickup === 'delivery' ? pin!.lat : null, delivery_lng: pickup === 'delivery' ? pin!.lng : null,
       payment_method: payment, order_source: 'walk_in', notes: notes.trim(),
       ...(paidNow ? { payment_status: 'down_paid', down_paid_at: new Date().toISOString() } : {}),
       due_date: new Date(Date.now() + days * 864e5).toISOString().split('T')[0],
     });
     setBusy(false);
-    if (error) return setErr(/order_source|customer_phone/.test(error.message) ? 'Walk-in orders need the latest database update (migration 042).' : error.message);
+    if (error) return setErr(/order_source|customer_phone|walk_in_customer/.test(error.message) ? 'Walk-in orders need the latest database updates (migrations 042 and 044).' : error.message);
     setOpen(false);
     reset();
     onPlaced(orderRef);
@@ -93,7 +102,7 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
       <button type="button" onClick={() => setOpen(true)} className="btn-primary flex items-center gap-2 text-sm"><Store size={15} /> New walk-in order</button>
       {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setOpen(false)}>
-          <form onSubmit={place} onClick={(e) => e.stopPropagation()} className="card-dark max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl p-6 shadow-2xl">
+          <div onClick={(e) => e.stopPropagation()} className="card-dark max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-2xl p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-bold text-foreground">New walk-in order</h2>
@@ -102,18 +111,24 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="btn-ghost p-1.5"><X size={16} /></button>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1 text-sm text-muted-foreground">Customer name *
-                <input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} className="input-dark mt-1 w-full" placeholder="Juan Dela Cruz" />
-              </label>
-              <label className="block space-y-1 text-sm text-muted-foreground">Mobile number *
-                <span className="mt-1 flex">
-                  <span className="flex items-center rounded-l-xl border border-r-0 border-border bg-muted px-3 text-sm text-foreground">+63</span>
-                  <input value={phone} onChange={(e) => setPhone(phDigits(e.target.value))} type="tel" inputMode="numeric" maxLength={16} className="input-dark w-full rounded-l-none" placeholder="917 123 4567" />
-                </span>
-              </label>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-foreground/80">Customer</p>
+              {addingCustomer ? (
+                <WalkInCustomerForm onCancel={() => setAddingCustomer(false)}
+                  onSaved={(c) => { setAddingCustomer(false); setCustomers((cs) => [...cs.filter((x) => x.id !== c.id), c].sort((x, y) => x.full_name.localeCompare(y.full_name))); pickCustomer(c); }} />
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <select value={custId} onChange={(e) => pickCustomer(customers.find((c) => c.id === e.target.value) ?? null)} className="input-dark min-w-0 flex-1" aria-label="Walk-in customer">
+                    <option value="">Choose a walk-in customer…</option>
+                    {customers.map((c) => <option key={c.id} value={c.id}>{c.full_name} · {c.phone}{c.linked_user_id ? ' · online account' : ''}</option>)}
+                  </select>
+                  <button type="button" onClick={() => setAddingCustomer(true)} className="btn-secondary flex items-center gap-2 text-sm"><UserPlus size={14} /> New customer</button>
+                </div>
+              )}
+              {cust && <p className="text-xs text-muted-foreground">{cust.phone}{cust.email ? ` · ${cust.email}` : ''}{cust.linked_user_id ? ' · this order will also show in their online account' : ''}</p>}
             </div>
 
+            <form onSubmit={place} className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium text-foreground/80">Products</p>
               {lines.map((l, i) => {
@@ -175,7 +190,8 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
               </div>
             </div>
             {err && <p role="alert" className="text-sm text-danger">{err}</p>}
-          </form>
+            </form>
+          </div>
         </div>, document.body)}
     </>
   );

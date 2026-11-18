@@ -10,7 +10,9 @@ import FurnitureFilter from '@/components/ui/FurnitureFilter';
 import CancelRequestReview from './CancelRequestReview';
 import PaymentCard from '@/components/PaymentCard';
 import ShopSettingsCard from '@/components/ShopSettingsCard';
-import WalkInOrder from '@/components/WalkInOrder';
+import dynamic from 'next/dynamic';
+// admin only, opened on a click: loaded after the page itself
+const WalkInOrder = dynamic(() => import('@/components/WalkInOrder'), { ssr: false });
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { furnitureOf } from '@/lib/furniture';
 import { furnitureLabel } from '@/lib/pieces';

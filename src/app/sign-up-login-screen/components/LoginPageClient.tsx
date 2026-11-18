@@ -62,6 +62,7 @@ export default function LoginPageClient() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [tab, setTab] = useState<AuthTab>('login');
   const [pendingEmail, setPendingEmail] = useState('');
+  const [storeCustomer, setStoreCustomer] = useState(false); // the typed email belongs to a walk-in customer (migration 044)
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<LoginForm>({ defaultValues: { remember: false } });
@@ -576,7 +577,12 @@ export default function LoginPageClient() {
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                   {field('Email', Mail,
-                    <input {...regRegister('email', { required: 'Enter your email', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, message: 'Enter a valid email' }, validate: (v) => !isThrowaway(v) || 'Use an email you can open: throw-away inboxes are not accepted' })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@mail.com" />,
+                    <input {...regRegister('email', { onBlur: async (e) => {
+                      const v = String(e.target.value ?? '').trim();
+                      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) { setStoreCustomer(false); return; }
+                      const { data } = await supabase.rpc('walk_in_email_on_file', { p_email: v });
+                      setStoreCustomer(data === true);
+                    }, required: 'Enter your email', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, message: 'Enter a valid email' }, validate: (v) => !isThrowaway(v) || 'Use an email you can open: throw-away inboxes are not accepted' })} type="email" autoComplete="email" className="input-dark w-full pl-10" placeholder="you@mail.com" />,
                     regErrors.email?.message)}
                   {field('Mobile number', Phone,
                     <>
@@ -587,6 +593,12 @@ export default function LoginPageClient() {
                     </>,
                     regErrors.phone?.message)}
                   </div>
+                  {storeCustomer && (
+                    <p role="status" className="rounded-xl border border-success/30 bg-success/10 px-3 py-2 text-sm text-foreground">
+                      You are already a customer from our store. Set a password below to finish your online account. We will email you a link to
+                      confirm it; your store orders appear in your account after you confirm.
+                    </p>
+                  )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     {field('Password', Lock,
                       <input {...regRegister('password', { required: 'Enter a password', validate: (v) => !weakPassword(v) || weakPassword(v) })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="e.g. Mesa#2026" />,
