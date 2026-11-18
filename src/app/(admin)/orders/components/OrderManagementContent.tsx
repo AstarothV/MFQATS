@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Search, Truck, ClipboardCheck, Loader2, CheckCircle2, AlertTriangle, X, Package, UserPlus, UserMinus, Trash2, ArrowRight } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SourceBadge from '@/components/ui/SourceBadge';
 import { createClient } from '@/lib/supabase/client';
 import { moveOrderStage, ORDER_STATUSES, PROCESS_STAGES, statusLabel, statusVariant } from '@/lib/orders';
 import { SkeletonRegion, SplitContentSkeleton } from '@/components/ui/LoadingSkeleton';
@@ -288,8 +289,9 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                         <td className="px-3 py-4 font-semibold text-foreground whitespace-nowrap sm:px-4">
                           {order.order_ref}
                           {/* phones: the status sits under the order (its own column shows from tablet size) */}
-                          <span className="mt-1 block font-normal sm:hidden">
+                          <span className="mt-1 flex flex-wrap gap-1 font-normal sm:hidden">
                             <StatusBadge variant={statusVariant(order.extended_status || order.status)} label={statusLabel(order.extended_status || order.status)} />
+                            <SourceBadge source={order.order_source} />
                           </span>
                           {order.cancel_requested_at && order.extended_status === 'pending' && (
                             <span className="mt-1 block text-xs font-semibold text-warning">Cancel requested</span>
@@ -299,7 +301,10 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                           <span className="block max-w-[7.5rem] truncate text-foreground sm:max-w-[14rem]" title={furnitureLabel(order)}>{furnitureLabel(order)}</span>
                           <span className="block text-xs text-muted-foreground">{furnitureOf(order)}</span>
                         </td>
-                        <td className="hidden px-4 py-4 text-muted-foreground sm:table-cell">{order.customer_name}</td>
+                        <td className="hidden px-4 py-4 text-muted-foreground sm:table-cell">
+                          <span className="block">{order.customer_name}</span>
+                          <SourceBadge source={order.order_source} className="mt-1" />
+                        </td>
                         <td className="hidden px-4 py-4 sm:table-cell">
                           <StatusBadge
                             variant={statusVariant(order.extended_status || order.status)}
@@ -355,14 +360,13 @@ export default function OrderManagementContent({ eyebrow = 'Order Management' }:
                       <span>Customer</span>
                       <span className="text-right font-semibold text-foreground">{activeOrder.customer_name}{activeOrder.customer_phone ? ` · ${activeOrder.customer_phone}` : ''}</span>
                     </div>
-                    {(activeOrder.order_source || activeOrder.order_type) && (
-                      <div className="flex justify-between gap-4">
-                        <span>Order type</span>
-                        <span className="text-right font-semibold text-foreground">
-                          {activeOrder.order_type === 'in_stock' ? 'In stock (ready-made)' : 'Made to order'} · {activeOrder.order_source === 'walk_in' ? 'Walk-in at the store' : 'Online'}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between gap-4">
+                      <span>Ordered</span>
+                      <span className="flex flex-wrap items-center justify-end gap-2 text-right font-semibold text-foreground">
+                        <SourceBadge source={activeOrder.order_source} />
+                        {activeOrder.order_type === 'in_stock' ? 'In stock (ready-made)' : 'Made to order'}
+                      </span>
+                    </div>
                     <div className="flex justify-between gap-4">
                       <span>Product</span>
                       <span className="text-foreground font-semibold">{furnitureLabel(activeOrder)}</span>

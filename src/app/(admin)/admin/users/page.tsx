@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Plus, Edit2, Trash2, UserX, UserCheck, Loader2, X, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Shield, Wrench, User } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SourceBadge from '@/components/ui/SourceBadge';
 import { createClient } from '@/lib/supabase/client';
 import { createClient as createIsolatedClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +55,13 @@ export default function AdminUsersPage() {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
   }
+
+  // accounts that began as walk-in customers at the store (migration 044)
+  const [walkInIds, setWalkInIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    supabase.from('walk_in_customers').select('linked_user_id').not('linked_user_id', 'is', null)
+      .then(({ data }) => setWalkInIds(new Set((data ?? []).map((r: { linked_user_id: string }) => r.linked_user_id))));
+  }, [supabase]);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -284,6 +292,7 @@ export default function AdminUsersPage() {
                           {roleIcon(u.role)}
                           {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
                         </span>
+                        {u.role === 'customer' && <SourceBadge source={walkInIds.has(u.id) ? 'walk_in' : 'online'} className="mt-1" />}
                       </td>
                       <td className="px-4 py-4 text-muted-foreground">{u.department || '—'}</td>
                       <td className="px-4 py-4">

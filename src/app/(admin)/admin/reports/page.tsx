@@ -61,9 +61,9 @@ export default function AdminReportsPage() {
     let filename = '';
 
     if (reportType === 'production') {
-      csvContent = 'Order Ref,Customer,Product,Status,Progress,Amount,Due Date\n';
+      csvContent = 'Order Ref,Customer,Source,Product,Status,Progress,Amount,Due Date\n';
       data.orders.forEach((o) => {
-        csvContent += `${o.order_ref},${o.customer_name},${o.product_name},${statusLabel(o.extended_status || o.status)},${o.completion_pct ?? 0}%,${o.amount},${o.due_date || ''}\n`;
+        csvContent += `${o.order_ref},${o.customer_name},${(o as { order_source?: string }).order_source === 'walk_in' ? 'Walk-in' : 'Online'},${o.product_name},${statusLabel(o.extended_status || o.status)},${o.completion_pct ?? 0}%,${o.amount},${o.due_date || ''}\n`;
       });
       filename = 'inspection_progress_report.csv';
     } else if (reportType === 'defects') {

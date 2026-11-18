@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Clock, AlertTriangle, Package, ChevronRight } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SourceBadge from '@/components/ui/SourceBadge';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { dataUserId } from '@/lib/viewer';
@@ -81,6 +82,7 @@ export default function AssignedTasksList() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-foreground">{t.order_ref}</span>
                         <StatusBadge variant={statusVariant(t.extended_status)} label={statusLabel(t.extended_status)} />
+                        <SourceBadge source={(t as { order_source?: string }).order_source} />
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 truncate">{furnitureLabel(t)} · {t.customer_name}</p>
                       <div className="flex items-center gap-3 mt-1.5 text-xs">
