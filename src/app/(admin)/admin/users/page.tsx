@@ -331,7 +331,8 @@ export default function AdminUsersPage() {
           </div>
         )}
 
-        <WalkInCustomers />
+        {/* walk-in customers belong with the customers: shown on the Customer tab only */}
+        {roleFilter === 'customer' && <WalkInCustomers />}
 
         {/* Add/Edit Modal */}
         {(modal === 'add' || modal === 'edit') && (
