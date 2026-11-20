@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { DonutChart, RevenueAreaChart } from '@/components/charts/lazy';
 import { PhilippinePeso, Package, Users, Bell, FileText, TrendingUp, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SourceBadge from '@/components/ui/SourceBadge';
 import { SkeletonRegion, StatCardsSkeleton, ChartCardSkeleton } from '@/components/ui/LoadingSkeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -283,7 +284,10 @@ export default function AdminDashboardContent() {
                   {orders.slice(0, 5).map((order) => (
                     <tr key={order.id} className="hover:bg-muted/50 transition-colors">
                       <td className="px-4 py-4 text-foreground font-semibold">{order.order_ref}</td>
-                      <td className="px-4 py-4 text-muted-foreground">{order.customer_name}</td>
+                      <td className="px-4 py-4 text-muted-foreground">
+                        <span className="block">{order.customer_name}</span>
+                        <SourceBadge source={order.order_source} className="mt-1" />
+                      </td>
                       <td className="px-4 py-4">
                         <StatusBadge
                           variant={statusVariant(order.extended_status || order.status)}

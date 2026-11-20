@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ClipboardList, Users, UserCheck, Coffee, AlertTriangle, UserPlus, Loader2, CheckCircle2 } from 'lucide-react';
 import AppLayout from '@/components/AppLayout';
 import StatusBadge from '@/components/ui/StatusBadge';
+import SourceBadge from '@/components/ui/SourceBadge';
 import { createClient } from '@/lib/supabase/client';
 import { statusLabel, statusVariant } from '@/lib/orders';
 import { ACTIVE_STATUSES, assignOrder, fetchStaff, watchOrders, workload, type StaffMember } from '@/lib/staffAssignment';
@@ -207,7 +208,7 @@ export default function TeamManagementPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-foreground">{o.order_ref} · {furnitureLabel(o)}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{o.customer_name}</p>
+                        <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">{o.customer_name} <SourceBadge source={(o as { order_source?: string }).order_source} /></p>
                       </div>
                       <StatusBadge variant={statusVariant(o.extended_status)} label={statusLabel(o.extended_status)} />
                     </div>
