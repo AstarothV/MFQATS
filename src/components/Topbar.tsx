@@ -165,17 +165,18 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             onClick={onMenuToggle}
             className="lg:hidden btn-ghost p-2"
             aria-label="Toggle navigation menu"
+            data-tour="menu"
           >
             <Menu size={18} />
           </button>
-          <Link href={role === 'admin' ? '/admin-dashboard' : role === 'staff' ? '/staff-dashboard' : '/customer-dashboard'} className="flex items-center gap-2" aria-label="MVCA WoodWorks: your home page">
+          <Link data-tour="home" href={role === 'admin' ? '/admin-dashboard' : role === 'staff' ? '/staff-dashboard' : '/customer-dashboard'} className="flex items-center gap-2" aria-label="MVCA WoodWorks: your home page">
             <AppLogo size={32} />
             <span className="hidden text-base font-semibold text-foreground sm:block">MVCA WoodWorks</span>
           </Link>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className={`badge ${roleColor[role]} hidden md:inline-flex`}>{roleLabel[role]}</span>
+          <span data-tour="role" className={`badge ${roleColor[role]} hidden md:inline-flex`}>{roleLabel[role]}</span>
           {isViewer(user) && (
             <span className="badge status-warning inline-flex items-center gap-1" title={VIEW_ONLY_MESSAGE}>
               <Eye size={12} aria-hidden="true" /> <span className="sr-only sm:not-sr-only">View only</span>
@@ -272,11 +273,12 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             )}
           </div>
 
-          {user && <PageTour userId={user.id} />}
+          {user && <PageTour userId={user.id} createdAt={user.created_at} />}
 
           <button
             type="button"
             onClick={toggleTheme}
+            data-tour="theme"
             className="flex h-10 min-w-10 items-center justify-center gap-2 rounded-xl px-2.5 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-200 sm:h-9 sm:px-3"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -290,6 +292,7 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
             <button
               type="button"
               onClick={() => { setUserMenuOpen(!userMenuOpen); setNotifOpen(false); }}
+              data-tour="account"
               className="flex items-center gap-2 rounded-full bg-muted/60 py-1 pl-1 pr-2.5 hover:bg-muted transition-colors duration-200"
             >
               <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground">
