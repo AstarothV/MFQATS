@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
 import { Archive, ArchiveRestore, Bell, ChevronDown, ChevronRight, Eye, Menu, X, LogOut, User, Moon, SunMedium, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import PageTour from './PageTour';
 import { createClient } from '@/lib/supabase/client';
 import { applyTheme, savedTheme } from '@/lib/theme';
 import { notificationLink, readable } from '@/lib/notifications';
@@ -270,6 +271,8 @@ export default function Topbar({ role, onMenuToggle }: TopbarProps) {
               </div>
             )}
           </div>
+
+          {user && <PageTour userId={user.id} />}
 
           <button
             type="button"
