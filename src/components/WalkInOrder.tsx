@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import PlaceSearch from '@/components/PlaceSearch';
 import { peso } from '@/lib/money';
 import { maxQty } from '@/lib/pieces';
-import { SHOP_SPOT, PAYMENT_LABEL, type PaymentMethod } from '@/lib/delivery';
+import { SHOP_SPOT, PAYMENT_LABEL, balanceMethod } from '@/lib/delivery';
 import { WalkInCustomerForm, type WalkInCustomer } from '@/components/WalkInCustomers';
 
 const LiveMap = dynamic(() => import('@/components/LiveMap'), { ssr: false, loading: () => <div className="h-56 w-full animate-pulse rounded-xl bg-muted" /> });
@@ -32,7 +32,6 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
   const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null);
-  const [payment, setPayment] = useState<PaymentMethod>('store');
   const [paidNow, setPaidNow] = useState(true);
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,7 +51,6 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
     setStreet(c?.street ?? ''); setCity(c?.city ?? '');
     setPin(c?.lat != null && c?.lng != null ? { lat: Number(c.lat), lng: Number(c.lng) } : null);
   }
-  useEffect(() => { if (pickup === 'pickup' && payment === 'cod') setPayment('store'); }, [pickup, payment]);
 
   const byId = (id: string) => products.find((p) => p.id === id);
   const cap = (p?: Product) => (!p ? 1 : p.stock_type === 'in_stock' ? Math.min(maxQty(p.category), p.stock_qty ?? 0) : maxQty(p.category));
@@ -61,7 +59,7 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
 
   function reset() {
     pickCustomer(null); setAddingCustomer(false); setLines([{ productId: '', qty: 1 }]); setPickup('pickup'); setStreet(''); setCity(''); setPin(null);
-    setPayment('store'); setPaidNow(true); setNotes(''); setErr('');
+    setPaidNow(true); setNotes(''); setErr('');
   }
 
   async function place(e: React.FormEvent) {
@@ -83,7 +81,7 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
       items: chosen.map((l) => ({ product_id: l.p.id, name: l.p.name, category: l.p.category, quantity: l.qty })),
       pickup_type: pickup, delivery_address: pickup === 'delivery' ? street.trim() : '', delivery_city: pickup === 'delivery' ? city.trim() : '',
       delivery_phone: cust.phone, delivery_lat: pickup === 'delivery' ? pin!.lat : null, delivery_lng: pickup === 'delivery' ? pin!.lng : null,
-      payment_method: payment, order_source: 'walk_in', notes: notes.trim(),
+      payment_method: balanceMethod(pickup), order_source: 'walk_in', notes: notes.trim(),
       ...(paidNow ? { payment_status: 'down_paid', down_paid_at: new Date().toISOString() } : {}),
       due_date: new Date(Date.now() + days * 864e5).toISOString().split('T')[0],
     });
@@ -168,11 +166,7 @@ export default function WalkInOrder({ onPlaced }: { onPlaced: (ref: string) => v
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1 text-sm text-muted-foreground">Balance paid by
-                <select value={payment} onChange={(e) => setPayment(e.target.value as PaymentMethod)} className="input-dark mt-1 w-full">
-                  {(pickup === 'delivery' ? ['cod', 'store', 'online'] : ['store', 'online']).map((m) => <option key={m} value={m}>{PAYMENT_LABEL[m as PaymentMethod]}</option>)}
-                </select>
-              </label>
+              <p className="self-end pb-2 text-sm text-muted-foreground">Balance paid by <span className="font-semibold text-foreground">{PAYMENT_LABEL[balanceMethod(pickup)]}</span> (cash only)</p>
               <label className="flex items-center gap-2 self-end pb-2 text-sm text-foreground">
                 <input type="checkbox" checked={paidNow} onChange={(e) => setPaidNow(e.target.checked)} className="h-4 w-4 rounded border-border" />
                 Down payment received now

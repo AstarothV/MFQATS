@@ -47,7 +47,7 @@ const orderManagement = (admin: boolean): Step[] => [
   ['.page-title', 'Order management', admin ? 'Every order and where it is in the inspection process.' : 'The orders in the workshop and where each one is.'],
   ...(admin ? [
     ['text:New walk-in order', 'Store orders', 'For a customer at the store: pick or add the walk-in customer, add the products, choose pick-up or delivery and payment.'] as Step,
-    ['card>text:Delivery & payment settings', 'Delivery and payment settings', 'The store address, delivery rates, down payment percent and your GCash and bank details. Press Save settings after changing them.'] as Step,
+    ['card>text:Delivery & payment settings', 'Delivery and payment settings', 'The store address, delivery rates and the down payment percent. Payment is cash only. Press Save settings after changing them.'] as Step,
   ] : []),
   ['up>starts:In production', 'Order status', 'New orders wait for approval, In production are in the workshop, Closed are delivered or cancelled.'],
   ['up>starts:All furniture', 'Kind of furniture', 'Show only tables, chairs, storage and so on.'],
@@ -83,8 +83,7 @@ const TOURS: Record<string, Step[]> = {
   '/customer-dashboard/order-view': [
     ['.page-title', 'Follow your orders', 'Everything about one order: its stages, photos, 3D model and payment.'],
     ['ph:Search orders...||main :is(.card-dark,.bg-card)', 'Pick an order', 'Choose which of your orders to look at.'],
-    ['card>text:Payment', 'Payment', 'Your down payment and balance, and how you chose to pay.'],
-    ['ph:GCash or bank reference number', 'Paid online?', 'Type the GCash or bank reference number and press Send reference, so the shop can confirm your payment.'],
+    ['card>text:Payment', 'Payment', 'Your down payment, paid in cash at the store, and the balance, paid by cash on delivery or at the store on pick-up.'],
     ['up>text:Order Queue', 'Order sections', 'Order Queue shows the stages, Photo Gallery the inspection photos, 3D Preview a 3D model you can turn, and Inquiry your questions about this order.'],
     ['text:Estimated Completion', 'Estimated completion', 'Worked out from how long each stage usually takes. It updates as work goes on.'],
     ['card>text:Inspection Process', 'Stage timeline', 'When each stage started and finished; the times are recorded by the system. Click a stage to see its details.'],

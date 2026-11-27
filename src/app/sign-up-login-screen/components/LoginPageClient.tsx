@@ -359,6 +359,10 @@ export default function LoginPageClient() {
   }
 
   // one field row: label, an icon inside the input, and the error under it
+  // the password must be typed twice: it cannot be copied out of the first box or pasted into the second
+  const [typeNote, setTypeNote] = useState(false);
+  const noCopy = (e: React.ClipboardEvent) => e.preventDefault();
+  const noPaste = (e: React.SyntheticEvent) => { e.preventDefault(); setTypeNote(true); };
   const field = (label: string, Icon: typeof Mail, input: React.ReactNode, error?: string, trailing?: React.ReactNode) => (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-foreground/80">{label}</span>
@@ -601,11 +605,13 @@ export default function LoginPageClient() {
                   )}
                   <div className="grid gap-3 sm:grid-cols-2">
                     {field('Password', Lock,
-                      <input {...regRegister('password', { required: 'Enter a password', validate: (v) => !weakPassword(v) || weakPassword(v) })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="e.g. Mesa#2026" />,
+                      <input {...regRegister('password', { required: 'Enter a password', validate: (v) => !weakPassword(v) || weakPassword(v) })} type={showPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="e.g. Mesa#2026"
+                        onCopy={noCopy} onCut={noCopy} />,
                       regErrors.password?.message, eye(showPass, () => setShowPass(!showPass)))}
                     {field('Confirm', Lock,
-                      <input {...regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} autoComplete="new-password" className="input-dark w-full pl-10 pr-11" placeholder="Repeat it" />,
-                      regErrors.confirmPassword?.message, eye(showConfirmPass, () => setShowConfirmPass(!showConfirmPass)))}
+                      <input {...regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} autoComplete="off" className="input-dark w-full pl-10 pr-11" placeholder="Type it again"
+                        onPaste={noPaste} onDrop={noPaste} />,
+                      regErrors.confirmPassword?.message || (typeNote ? 'Type the password again; pasting is turned off here.' : undefined), eye(showConfirmPass, () => setShowConfirmPass(!showConfirmPass)))}
                   </div>
                   <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
                     {loading ? <Loader2 size={16} className="animate-spin" /> : <UserPlus size={16} />}

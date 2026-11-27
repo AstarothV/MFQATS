@@ -7,8 +7,8 @@ import { deliveryFee, type ShopSettings } from '@/lib/delivery';
 import { peso } from '@/lib/money';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 
-// Admin: where customers pick up, how much delivery costs by distance, the down payment, and where customers pay
-// online (migrations 037, 040).
+// Admin: where customers pick up, how much delivery costs by distance, and the down payment (migrations 037, 040).
+// Payment is cash only (migration 045): no GCash or bank details.
 // The database uses these numbers when it works out each order's delivery fee.
 export default function ShopSettingsCard() {
   const supabase = useRef(createClient()).current;
@@ -32,12 +32,11 @@ export default function ShopSettingsCard() {
     const nums = [s.delivery_base_fee, s.delivery_free_km, s.delivery_per_km, s.shop_lat, s.shop_lng, s.down_payment_percent].map(Number);
     if (nums.some((n) => !Number.isFinite(n)) || nums.slice(0, 3).some((n) => n < 0)) return setMsg({ ok: false, text: 'Check the numbers: fees and kilometers cannot be negative.' });
     if (nums[5] < 0 || nums[5] > 100) return setMsg({ ok: false, text: 'The down payment is a percent from 0 to 100.' });
-    if (!(await askFirst({ title: 'Save the settings?', message: 'New orders use these rates, down payment and payment details. Orders already placed keep theirs.', confirmLabel: 'Save', cancelLabel: 'Cancel' }))) return;
+    if (!(await askFirst({ title: 'Save the settings?', message: 'New orders use these rates and down payment. Orders already placed keep theirs.', confirmLabel: 'Save', cancelLabel: 'Cancel' }))) return;
     setBusy(true); setMsg(null);
     const { error } = await supabase.from('shop_settings').update({
       pickup_address: s.pickup_address.trim(), shop_lat: nums[3], shop_lng: nums[4],
       delivery_base_fee: nums[0], delivery_free_km: nums[1], delivery_per_km: nums[2], down_payment_percent: nums[5],
-      gcash_name: s.gcash_name.trim(), gcash_number: s.gcash_number.trim(), bank_details: s.bank_details.trim(),
       updated_at: new Date().toISOString(),
     }).eq('id', 1);
     setBusy(false);
@@ -75,17 +74,9 @@ export default function ShopSettingsCard() {
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           {num('Down payment (% of the total)', 'down_payment_percent')}
-          <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">Work on an order starts only after its down payment is marked received.</p>
+          <p className="self-end pb-2 text-xs text-muted-foreground sm:col-span-2">Paid in cash at the store. Work on an order starts only after its down payment is marked received. The balance is cash on delivery, or at the store on pick-up.</p>
         </div>
         <p className="text-xs text-muted-foreground">Example: 3 km costs {example(3)}, 10 km costs {example(10)}, 25 km costs {example(25)}. Distance is measured in a straight line from the shop.</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1 text-sm text-muted-foreground">GCash account name<input value={s.gcash_name} onChange={set('gcash_name')} className="input-dark mt-1 w-full" /></label>
-          <label className="block space-y-1 text-sm text-muted-foreground">GCash number<input value={s.gcash_number} onChange={set('gcash_number')} inputMode="tel" placeholder="0917 123 4567" className="input-dark mt-1 w-full" /></label>
-        </div>
-        <label className="block space-y-1 text-sm text-muted-foreground">
-          Bank transfer details (bank, account name, account number)
-          <textarea value={s.bank_details} onChange={set('bank_details')} rows={2} className="input-dark mt-1 w-full resize-none" />
-        </label>
         <div className="flex flex-wrap items-center gap-3">
           <button type="submit" disabled={busy} className="btn-primary flex items-center gap-2 text-sm">{busy && <Loader2 size={14} className="animate-spin" />} Save settings</button>
           {msg && <p role="status" className={`text-sm ${msg.ok ? 'text-success' : 'text-danger'}`}>{msg.text}</p>}

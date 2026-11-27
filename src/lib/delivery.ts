@@ -24,14 +24,13 @@ export interface ShopSettings {
   delivery_free_km: number;
   delivery_per_km: number;
   down_payment_percent: number;
-  gcash_name: string;
-  gcash_number: string;
-  bank_details: string;
 }
 
-/** How the balance is paid. Cash on delivery only for delivery. */
-export type PaymentMethod = 'cod' | 'store' | 'online';
-export const PAYMENT_LABEL: Record<PaymentMethod, string> = { cod: 'Cash on delivery', store: 'Pay at the store', online: 'Online (GCash or bank)' };
+/** Cash only, no online payment: the down payment is paid at the store, the balance by cash on delivery (delivery)
+ *  or at the store when the furniture is picked up (pick-up). */
+export type PaymentMethod = 'cod' | 'store';
+export const PAYMENT_LABEL: Record<PaymentMethod, string> = { cod: 'Cash on delivery', store: 'Cash at the store on pick-up' };
+export const balanceMethod = (pickup: string | null | undefined): PaymentMethod => (pickup === 'delivery' ? 'cod' : 'store');
 export const PAYMENT_STATUS_LABEL: Record<string, string> = { unpaid: 'Waiting for down payment', down_paid: 'Down payment received', paid: 'Fully paid' };
 
 /** Straight-line distance in km, one decimal (haversine), as km_between in the database. */
