@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AppLogo from '@/components/ui/AppLogo';
@@ -363,6 +363,20 @@ export default function LoginPageClient() {
   const [typeNote, setTypeNote] = useState(false);
   const noCopy = (e: React.ClipboardEvent) => e.preventDefault();
   const noPaste = (e: React.SyntheticEvent) => { e.preventDefault(); setTypeNote(true); };
+  // Some pastes are not paste events: a phone keyboard's clipboard suggestion "types" the whole text at once, and a
+  // password manager fills the box. Typing adds one character per key, so anything that adds more at once is refused.
+  const PASTE_TYPES = ['insertFromPaste', 'insertFromPasteAsQuotation', 'insertFromDrop', 'insertFromYank', 'insertReplacementText'];
+  const noBulkInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const ev = e.nativeEvent as InputEvent;
+    if (PASTE_TYPES.includes(ev.inputType) || (ev.inputType === 'insertText' && (ev.data?.length ?? 0) > 1)) noPaste(e);
+  };
+  const confirmLen = useRef(0);
+  const confirmField = regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' });
+  const typedOnly = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.value.length - confirmLen.current > 1) { e.target.value = ''; setTypeNote(true); }  // filled at once: clear it
+    confirmLen.current = e.target.value.length;
+    return confirmField.onChange(e);
+  };
   const field = (label: string, Icon: typeof Mail, input: React.ReactNode, error?: string, trailing?: React.ReactNode) => (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-foreground/80">{label}</span>
@@ -609,8 +623,8 @@ export default function LoginPageClient() {
                         onCopy={noCopy} onCut={noCopy} />,
                       regErrors.password?.message, eye(showPass, () => setShowPass(!showPass)))}
                     {field('Confirm', Lock,
-                      <input {...regRegister('confirmPassword', { required: 'Repeat the password', validate: (val) => val === watchReg('password') || 'Passwords do not match' })} type={showConfirmPass ? 'text' : 'password'} autoComplete="off" className="input-dark w-full pl-10 pr-11" placeholder="Type it again"
-                        onPaste={noPaste} onDrop={noPaste} />,
+                      <input {...confirmField} onChange={typedOnly} type={showConfirmPass ? 'text' : 'password'} autoComplete="off" className="input-dark w-full pl-10 pr-11" placeholder="Type it again"
+                        onPaste={noPaste} onDrop={noPaste} onBeforeInput={noBulkInput} data-lpignore="true" data-1p-ignore />,
                       regErrors.confirmPassword?.message || (typeNote ? 'Type the password again; pasting is turned off here.' : undefined), eye(showConfirmPass, () => setShowConfirmPass(!showConfirmPass)))}
                   </div>
                   <button type="submit" disabled={loading} className="btn-primary flex w-full items-center justify-center gap-2 py-2.5">
