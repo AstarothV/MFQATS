@@ -14,7 +14,7 @@ import PhotoSlider from '@/components/ui/PhotoSlider';
 import { CHAIR_SETS, maxQty } from '@/lib/pieces';
 import AddressBook from '@/components/AddressBook';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { deliveryFee, downPayment, kmBetween, PAYMENT_LABEL, type PaymentMethod, type SavedAddress, type ShopSettings } from '@/lib/delivery';
+import { balanceMethod, deliveryFee, downPayment, kmBetween, PAYMENT_LABEL, type SavedAddress, type ShopSettings } from '@/lib/delivery';
 interface Product {
   id: string;
   product_ref: string;
@@ -108,13 +108,10 @@ export default function CustomerShopContent() {
   const [deliveryForm, setDeliveryForm] = useState({ notes: '' });
   const [address, setAddress] = useState<SavedAddress | null>(null); // one of the customer's saved addresses
   const [pickupType, setPickupType] = useState<'delivery' | 'pickup'>('delivery');
-  const [payment, setPayment] = useState<PaymentMethod | ''>(''); // how the balance is paid
-  const [paymentRef, setPaymentRef] = useState(''); // reference of an online down payment, if already sent
-  const [shop, setShop] = useState<ShopSettings | null>(null); // rates, down payment percent, GCash / bank (migration 040)
+  const [shop, setShop] = useState<ShopSettings | null>(null); // delivery rates and down payment percent (migration 040)
   useEffect(() => {
     supabase.from('shop_settings').select('*').eq('id', 1).maybeSingle().then(({ data }) => setShop((data as ShopSettings) ?? null));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { if (pickupType === 'pickup' && payment === 'cod') setPayment(''); }, [pickupType, payment]);
   const [placedOrderRef, setPlacedOrderRef] = useState('');
 
   function showToast(type: 'success' | 'error', message: string) {
@@ -201,7 +198,6 @@ export default function CustomerShopContent() {
       showToast('error', 'Pin this address on the map in Profile first, so the delivery fee can be worked out.');
       return;
     }
-    if (!payment) { showToast('error', 'Choose how you will pay the balance.'); return; }
     setOrderLoading(true);
     try {
       const orderRef = `ORD-${Date.now().toString().slice(-6)}`;
@@ -224,8 +220,7 @@ export default function CustomerShopContent() {
         delivery_phone: (pickupType === 'delivery' && address!.phone) || profile?.phone || '',
         delivery_lat: pickupType === 'delivery' ? address!.lat : null,
         delivery_lng: pickupType === 'delivery' ? address!.lng : null,
-        payment_method: payment,
-        payment_reference: paymentRef.trim().slice(0, 40),
+        payment_method: balanceMethod(pickupType), // cash only: COD for delivery, at the store for pick-up
         quantity: cartCount,
         customization_notes: cart.map(i => i.customization).filter(Boolean).join('; '),
         notes: deliveryForm.notes,
@@ -314,8 +309,7 @@ export default function CustomerShopContent() {
     const fee = pickupType === 'pickup' ? 0 : km != null && shop ? deliveryFee(km, shop) : null;
     const total = cartTotal + (fee ?? 0);
     const dp = shop ? downPayment(total, shop) : null;
-    const methods: PaymentMethod[] = pickupType === 'delivery' ? ['cod', 'store', 'online'] : ['store', 'online'];
-    const payTo = [shop?.gcash_number && `GCash ${shop.gcash_number}${shop.gcash_name ? ` (${shop.gcash_name})` : ''}`, shop?.bank_details].filter(Boolean) as string[];
+    const balanceBy = balanceMethod(pickupType);
     const storeAddress = shop?.pickup_address || '202 C. Cordero St., Caloocan, 1400 Metro Manila';
     return (
       <div className="space-y-6">
@@ -361,33 +355,20 @@ export default function CustomerShopContent() {
               </label>
             </div>
 
-            {/* 2. payment: a down payment first, then the balance */}
+            {/* 2. payment: cash only. A down payment at the store first, then the balance (COD, or at the store on pick-up) */}
             <div className="card-dark rounded-3xl border border-border p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-foreground">2. Payment</h2>
-              <div className="rounded-2xl bg-muted/50 p-3 text-sm text-muted-foreground space-y-2">
-                <p>
-                  <span className="font-semibold text-foreground">Down payment{shop ? ` (${Number(shop.down_payment_percent)}%)` : ''}: {dp != null ? peso(dp) : '—'}.</span>{' '}
-                  We start making your furniture once it is received. Pay it at the store, or send it online{payTo.length ? ' to:' : '.'}
-                </p>
-                {payTo.length > 0 && <ul className="list-disc pl-5 text-foreground">{payTo.map((x) => <li key={x}>{x}</li>)}</ul>}
-                <label className="block space-y-1">
-                  Online reference number <span className="font-normal">(if you already sent it; you can also add it later in your order)</span>
-                  <input value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} maxLength={40} placeholder="e.g. 1234 567 890" className="input-dark mt-1 w-full" />
-                </label>
-              </div>
-              <div>
-                <p className="mb-2 text-sm font-medium text-foreground/80">How will you pay the balance{dp != null ? ` (${peso(total - dp)})` : ''}?</p>
-                <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="How the balance is paid">
-                  {methods.map((m) => (
-                    <button key={m} type="button" role="radio" aria-checked={payment === m} onClick={() => setPayment(m)} className={choice(payment === m)}>
-                      <span className="font-semibold text-foreground">{PAYMENT_LABEL[m]}</span>
-                      <span className="block text-xs text-muted-foreground">{m === 'cod' ? 'Pay the driver in cash' : m === 'store' ? 'Pay at the store before pick-up or delivery' : 'GCash or bank transfer, then send the reference'}</span>
-                    </button>
-                  ))}
+              <h2 className="text-lg font-semibold text-foreground">2. Payment (cash only)</h2>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-2xl bg-muted/50 p-3 text-sm">
+                  <p className="font-semibold text-foreground">Down payment{shop ? ` (${Number(shop.down_payment_percent)}%)` : ''}: {dp != null ? peso(dp) : '—'}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Pay it in cash at the store. We start making your furniture once it is received.</p>
                 </div>
-                {triedOrder && !payment && <p className="mt-2 text-xs text-danger">Choose how you will pay the balance.</p>}
+                <div className="rounded-2xl bg-muted/50 p-3 text-sm">
+                  <p className="font-semibold text-foreground">Balance{dp != null ? `: ${peso(total - dp)}` : ''}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{PAYMENT_LABEL[balanceBy]}{balanceBy === 'cod' ? ': pay the driver in cash when the furniture arrives.' : ', when you collect the furniture.'}</p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">The store checks each payment and marks it received. No money goes through this site.</p>
+              <p className="text-xs text-muted-foreground">There is no online payment. The store marks each payment received.</p>
             </div>
           </div>
           <div className="space-y-4">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { CheckCircle2, Loader2, Truck, Store, Wallet } from 'lucide-react';
+import { CheckCircle2, Truck, Store, Wallet } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { peso } from '@/lib/money';
@@ -17,16 +17,15 @@ export type PaymentOrder = {
   delivery_fee?: number;
   down_payment?: number;
   payment_method?: string | null;
-  payment_reference?: string;
   payment_status?: string;
 };
 
-// An order's delivery and payment (migration 040): the delivery fee, the down payment and the balance, and where the
-// payment stands. The customer sends the reference of an online payment; an admin marks the down payment and the full
-// payment as received (each after a confirmation). Orders from before migration 040 have no payment_status: nothing shows.
+// An order's delivery and payment (migrations 040, 045): the delivery fee, the down payment and the balance, and where
+// the payment stands. Cash only: the down payment is paid at the store, the balance by cash on delivery or at the store
+// on pick-up. An admin marks the down payment and the full payment as received (each after a confirmation).
+// Orders from before migration 040 have no payment_status: nothing shows.
 export default function PaymentCard({ order, as = 'customer', onChanged }: { order: PaymentOrder; as?: 'customer' | 'admin' | 'view'; onChanged?: () => void }) {
   const supabase = useRef(createClient()).current;
-  const [ref, setRef] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [askFirst, confirmBox] = useConfirm();
@@ -37,17 +36,6 @@ export default function PaymentCard({ order, as = 'customer', onChanged }: { ord
   const dp = Number(order.down_payment ?? 0);
   const status = order.payment_status;
   const cancelled = order.extended_status === 'cancelled';
-
-  async function sendRef(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true); setMsg(null);
-    const { error } = await supabase.rpc('submit_payment_reference', { p_order: order.id, p_reference: ref });
-    setBusy(false);
-    if (error) return setMsg({ ok: false, text: error.message });
-    setRef('');
-    setMsg({ ok: true, text: 'Sent. The store will check it and mark your payment received.' });
-    onChanged?.();
-  }
 
   async function mark(next: 'down_paid' | 'paid' | 'unpaid') {
     const what = next === 'down_paid' ? `the down payment of ${peso(dp)}` : next === 'paid' ? `the full payment of ${peso(total)}` : 'this order as not paid';
@@ -80,21 +68,12 @@ export default function PaymentCard({ order, as = 'customer', onChanged }: { ord
         <div className="border-t border-border pt-1.5">{row('Total', peso(total), true)}</div>
         {row('Down payment', peso(dp))}
         {row(`Balance${order.payment_method ? ` · ${PAYMENT_LABEL[order.payment_method as PaymentMethod] ?? order.payment_method}` : ''}`, peso(total - dp))}
-        {order.payment_reference && row('Reference sent', order.payment_reference)}
       </div>
       <p className="flex items-start gap-2 text-xs text-muted-foreground">
         {order.pickup_type === 'pickup' ? <Store size={14} className="mt-px shrink-0" /> : <Truck size={14} className="mt-px shrink-0" />}
-        {status === 'unpaid' ? 'Work on the furniture starts once the down payment is received.' : status === 'down_paid' ? 'Down payment received. The balance is paid before or on delivery or pick-up.' : 'Fully paid. Thank you!'}
+        {status === 'unpaid' ? 'Pay the down payment in cash at the store. Work on the furniture starts once it is received.' : status === 'down_paid' ? 'Down payment received. The balance is paid before or on delivery or pick-up.' : 'Fully paid. Thank you!'}
       </p>
 
-      {as === 'customer' && !cancelled && status !== 'paid' && (
-        <form onSubmit={sendRef} className="flex flex-col gap-2 sm:flex-row">
-          <input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={40} placeholder="GCash or bank reference number" aria-label="Payment reference number" className="input-dark flex-1" />
-          <button type="submit" disabled={busy || ref.trim().length < 4} className="btn-primary flex items-center justify-center gap-2 text-sm">
-            {busy && <Loader2 size={14} className="animate-spin" />} Send reference
-          </button>
-        </form>
-      )}
 
       {as === 'admin' && !cancelled && (
         <div className="flex flex-wrap gap-2">
